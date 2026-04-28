@@ -4,8 +4,16 @@ import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
-export default function LampScene() {
+interface LampSceneProps {
+  modelPath: string
+  onLampClick?: () => void
+}
+
+export default function LampScene({ modelPath, onLampClick }: LampSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  const onLampClickRef = useRef(onLampClick)
+  onLampClickRef.current = onLampClick
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -40,7 +48,7 @@ export default function LampScene() {
     let model: THREE.Group | null = null
     const loader = new GLTFLoader()
 
-    loader.load('/models/lamp1.glb', (gltf) => {
+    loader.load(modelPath, (gltf) => {
       model = gltf.scene
 
       const box = new THREE.Box3().setFromObject(model)
@@ -54,10 +62,14 @@ export default function LampScene() {
       scene.add(model)
     })
 
+    const raycaster = new THREE.Raycaster()
+
     // Drag-to-spin
     let isDragging = false
     let prevX = 0
     let prevY = 0
+    let downX = 0
+    let downY = 0
     let velX = 0
     let velY = 0
     let rotY = Math.PI / 4
@@ -67,6 +79,8 @@ export default function LampScene() {
       isDragging = true
       prevX = e.clientX
       prevY = e.clientY
+      downX = e.clientX
+      downY = e.clientY
       velX = 0
       velY = 0
       canvas.setPointerCapture(e.pointerId)
@@ -84,7 +98,20 @@ export default function LampScene() {
       prevY = e.clientY
     }
 
-    const onPointerUp = () => { isDragging = false }
+    const onPointerUp = (e: PointerEvent) => {
+      isDragging = false
+      const totalDist = Math.hypot(e.clientX - downX, e.clientY - downY)
+      if (totalDist < 6 && model) {
+        const ndc = new THREE.Vector2(
+          (e.clientX / window.innerWidth) * 2 - 1,
+          -(e.clientY / window.innerHeight) * 2 + 1,
+        )
+        raycaster.setFromCamera(ndc, camera)
+        if (raycaster.intersectObject(model, true).length > 0) {
+          onLampClickRef.current?.()
+        }
+      }
+    }
 
     canvas.addEventListener('pointerdown', onPointerDown)
     canvas.addEventListener('pointermove', onPointerMove)

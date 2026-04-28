@@ -1,9 +1,5 @@
-import LampScene from './components/LampScene'
+import SceneWrapper from './components/SceneWrapper'
 
 export default function Home() {
-  return (
-    <div className="w-screen h-screen overflow-hidden">
-      <LampScene />
-    </div>
-  )
+  return <SceneWrapper />
 }
