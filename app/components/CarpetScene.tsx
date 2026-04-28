@@ -17,8 +17,11 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const onReachRef = useRef(onReachClouds)
   const onClickRef = useRef(onCarpetClick)
-  onReachRef.current = onReachClouds
-  onClickRef.current = onCarpetClick
+
+  useEffect(() => {
+    onReachRef.current = onReachClouds
+    onClickRef.current = onCarpetClick
+  }, [onCarpetClick, onReachClouds])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -32,8 +35,8 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
     renderer.toneMappingExposure = 1.0
 
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color('#050510')
-    scene.fog = new THREE.Fog('#050510', 14, 32)
+    scene.background = new THREE.Color('#0c0c0c')
+    scene.fog = new THREE.Fog('#0c0c0c', 14, 32)
 
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100)
     camera.position.set(0, 0, 6)

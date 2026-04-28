@@ -79,7 +79,7 @@ export default function SceneWrapper() {
       {!panelOpen && (
         <div
           className="fixed bottom-6 left-1/2 -translate-x-1/2 text-xs tracking-widest pointer-events-none"
-          style={{ color: '#1a2a50', fontFamily: 'var(--font-geist-mono)' }}
+          style={{ color: '#282828', fontFamily: 'var(--font-geist-mono)' }}
         >
           → CLICK CARPET FOR MISSION DATA → DRAG TO FLY
         </div>

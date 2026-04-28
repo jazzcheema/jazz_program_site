@@ -13,7 +13,10 @@ export default function LampScene({ modelPath, onLampClick }: LampSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const onLampClickRef = useRef(onLampClick)
-  onLampClickRef.current = onLampClick
+
+  useEffect(() => {
+    onLampClickRef.current = onLampClick
+  }, [onLampClick])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -159,7 +162,7 @@ export default function LampScene({ modelPath, onLampClick }: LampSceneProps) {
       window.removeEventListener('resize', onResize)
       renderer.dispose()
     }
-  }, [])
+  }, [modelPath])
 
   return (
     <canvas

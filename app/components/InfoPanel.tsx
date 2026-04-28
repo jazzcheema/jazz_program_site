@@ -44,29 +44,29 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
       className="fixed top-0 right-0 h-full w-1/3 transition-transform duration-300 ease-in-out z-10 flex flex-col"
       style={{
         transform: open ? 'translateX(0)' : 'translateX(100%)',
-        background: '#06060e',
-        borderLeft: '1px solid #0033aa',
+        background: '#0c0c0c',
+        borderLeft: '1px solid #1e1e1e',
         fontFamily: 'var(--font-geist-mono)',
       }}
     >
       {/* Header */}
-      <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid #0033aa' }}>
+      <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid #1e1e1e' }}>
         <div className="flex justify-between items-start">
           <div>
-            <div className="text-xs tracking-widest mb-0.5" style={{ color: '#0055ff' }}>
+            <div className="text-xs tracking-widest mb-0.5" style={{ color: '#484848' }}>
               OBJECT_DATA.SYS ──────────────── VER.01.09.26
             </div>
-            <div className="text-base font-bold tracking-widest" style={{ color: '#c0ccff' }}>
+            <div className="text-base font-bold tracking-widest" style={{ color: '#c8c8c8' }}>
               → {data.label}
             </div>
-            <div className="text-xs tracking-widest mt-0.5" style={{ color: '#304080' }}>
+            <div className="text-xs tracking-widest mt-0.5" style={{ color: '#303030' }}>
               CLASS: {data.class} / STATUS: [{data.status}]
             </div>
           </div>
           <button
             onClick={onClose}
             className="text-xs tracking-widest hover:opacity-60 transition-opacity shrink-0"
-            style={{ color: '#0055ff' }}
+            style={{ color: '#484848' }}
           >
             [×] CLOSE
           </button>
@@ -78,10 +78,10 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
 
         {/* Spatial coords */}
         <section>
-          <div className="text-xs tracking-widest mb-1.5" style={{ color: '#0055ff' }}>
+          <div className="text-xs tracking-widest mb-1.5" style={{ color: '#484848' }}>
             SPATIAL_COORDS ──────────────────────────────
           </div>
-          <table className="w-full text-xs" style={{ color: '#a0b4e0' }}>
+          <table className="w-full text-xs" style={{ color: '#808080' }}>
             <tbody>
               {[
                 ['X', '+0.000', 'Y', '+0.023', 'Z', '+0.000'],
@@ -91,7 +91,7 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
                 <tr key={i}>
                   {row.map((cell, j) => (
                     <td key={j} className="py-0.5 pr-2"
-                      style={{ color: j % 2 === 0 ? '#304080' : '#a0b4e0', whiteSpace: 'nowrap' }}>
+                      style={{ color: j % 2 === 0 ? '#303030' : '#808080', whiteSpace: 'nowrap' }}>
                       {cell}
                     </td>
                   ))}
@@ -103,7 +103,7 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
 
         {/* EQ / oscillation bars — unique per object */}
         <section>
-          <div className="text-xs tracking-widest mb-2" style={{ color: '#0055ff' }}>
+          <div className="text-xs tracking-widest mb-2" style={{ color: '#484848' }}>
             {data.eqLabel} ───────────────────────────────
           </div>
           <div className="space-y-1">
@@ -111,17 +111,17 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
               const pct = animPcts[i]
               return (
                 <div key={hz} className="flex items-center gap-2">
-                  <span className="text-xs w-10 text-right shrink-0" style={{ color: '#304080' }}>{hz}</span>
-                  <div className="flex-1 h-2 relative" style={{ background: '#0a0a1e' }}>
+                  <span className="text-xs w-10 text-right shrink-0" style={{ color: '#303030' }}>{hz}</span>
+                  <div className="flex-1 h-2 relative" style={{ background: '#141414' }}>
                     <div
                       className="absolute inset-y-0 left-0"
                       style={{
                         width: `${pct}%`,
-                        background: pct > 80 ? '#ff2244' : pct > 55 ? '#0055ff' : '#00aa55',
+                        background: pct > 80 ? '#c87820' : pct > 55 ? '#2a5fc0' : '#249958',
                       }}
                     />
                   </div>
-                  <span className="text-xs w-6 shrink-0 tabular-nums" style={{ color: '#304080' }}>{pct}</span>
+                  <span className="text-xs w-6 shrink-0 tabular-nums" style={{ color: '#303030' }}>{pct}</span>
                 </div>
               )
             })}
@@ -130,35 +130,35 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
 
         {/* Object-specific specs */}
         <section>
-          <div className="text-xs tracking-widest mb-1.5" style={{ color: '#0055ff' }}>
+          <div className="text-xs tracking-widest mb-1.5" style={{ color: '#484848' }}>
             {data.specsLabel} ───────────────────────────────
           </div>
           {data.specs.map(([k, v], i) => (
-            <div key={i} className="flex gap-2 text-xs py-0.5" style={{ borderBottom: '1px solid #0d0d2a' }}>
-              <span className="w-24 shrink-0" style={{ color: '#304080' }}>{k}</span>
-              <span style={{ color: '#a0b4e0' }}>{v}</span>
+            <div key={i} className="flex gap-2 text-xs py-0.5" style={{ borderBottom: '1px solid #181818' }}>
+              <span className="w-24 shrink-0" style={{ color: '#303030' }}>{k}</span>
+              <span style={{ color: '#808080' }}>{v}</span>
             </div>
           ))}
         </section>
 
         {/* Material / composition scan */}
         <section>
-          <div className="text-xs tracking-widest mb-1.5" style={{ color: '#0055ff' }}>
+          <div className="text-xs tracking-widest mb-1.5" style={{ color: '#484848' }}>
             {data.scanLabel} ───────────────────────────────
           </div>
           {data.materials.map(([a, b, c, d], i) => (
-            <div key={i} className="flex gap-2 text-xs py-0.5" style={{ borderBottom: '1px solid #0d0d2a' }}>
-              <span className="w-20 shrink-0" style={{ color: '#304080' }}>{a}</span>
-              <span className="w-20 shrink-0" style={{ color: '#a0b4e0' }}>{b}</span>
-              <span className="w-10 shrink-0" style={{ color: '#a0b4e0' }}>{c}</span>
-              <span style={{ color: '#607090' }}>{d}</span>
+            <div key={i} className="flex gap-2 text-xs py-0.5" style={{ borderBottom: '1px solid #181818' }}>
+              <span className="w-20 shrink-0" style={{ color: '#303030' }}>{a}</span>
+              <span className="w-20 shrink-0" style={{ color: '#808080' }}>{b}</span>
+              <span className="w-10 shrink-0" style={{ color: '#808080' }}>{c}</span>
+              <span style={{ color: '#484848' }}>{d}</span>
             </div>
           ))}
         </section>
 
         {/* Sys diag — always engine data */}
         <section>
-          <div className="text-xs tracking-widest mb-1.5" style={{ color: '#0055ff' }}>
+          <div className="text-xs tracking-widest mb-1.5" style={{ color: '#484848' }}>
             SYS_DIAG ────────────────────────────────────
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
@@ -170,9 +170,9 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
               ['MEM_ALLOC',  '384 MB'],
               ['ANTIALIAS',  'ON / 2×'],
             ].map(([k, v]) => (
-              <div key={k} className="flex justify-between" style={{ borderBottom: '1px solid #0a0a1e' }}>
-                <span style={{ color: '#304080' }}>{k}</span>
-                <span style={{ color: '#a0b4e0' }}>{v}</span>
+              <div key={k} className="flex justify-between" style={{ borderBottom: '1px solid #141414' }}>
+                <span style={{ color: '#303030' }}>{k}</span>
+                <span style={{ color: '#808080' }}>{v}</span>
               </div>
             ))}
           </div>
@@ -180,10 +180,10 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
 
         {/* Nav */}
         <section>
-          <div className="text-xs tracking-widest mb-1.5" style={{ color: '#0055ff' }}>
+          <div className="text-xs tracking-widest mb-1.5" style={{ color: '#484848' }}>
             NAV ─────────────────────────────────────────
           </div>
-          <div className="text-xs space-y-0.5" style={{ color: '#304080' }}>
+          <div className="text-xs space-y-0.5" style={{ color: '#303030' }}>
             <div>→ DRAG LEFT/RIGHT   ROTATE ON Y-AXIS</div>
             <div>↕ DRAG UP/DOWN      TILT ON X-AXIS</div>
             <div>→ DIAL              SWITCH OBJECT</div>
@@ -196,22 +196,22 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
       <div
         className="px-4 py-3"
         style={{
-          borderTop: '1px solid #0033aa',
-          color: '#1a2040',
+          borderTop: '1px solid #1e1e1e',
+          color: '#1e1e1e',
           fontSize: '0.6rem',
           lineHeight: 1.4,
           letterSpacing: '0.04em',
           wordBreak: 'break-all',
         }}
       >
-        <div className="mb-1" style={{ color: '#202840', fontSize: '0.55rem' }}>
+        <div className="mb-1" style={{ color: '#1a1a1a', fontSize: '0.55rem' }}>
           ██████████████████████████████████████████████████████
         </div>
         {data.finePrint}
-        <div className="mt-1" style={{ color: '#202840', fontSize: '0.55rem' }}>
+        <div className="mt-1" style={{ color: '#1a1a1a', fontSize: '0.55rem' }}>
           ██████████████████████████████████████████████████████
         </div>
-        <div className="mt-1 flex justify-between" style={{ color: '#304080' }}>
+        <div className="mt-1 flex justify-between" style={{ color: '#303030' }}>
           <span>JAZZ.CHEEMA // 2026.04.28</span>
           <span>→</span>
         </div>
