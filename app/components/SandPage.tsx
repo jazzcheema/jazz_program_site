@@ -20,6 +20,27 @@ const BASE_LOOK_TARGET = new THREE.Vector3(0, -1.72, -1.85)
 const SAND_FLOOR_SIZE = 17.5
 const GENIE_WORLD_SIZE = 0.74
 const REFERENCE_ASPECT = 16 / 10
+const FINAL_LOOK_OFFSET = new THREE.Vector3(0.01, -0.06, 0.02)
+const MOBILE_FINAL_LOOK_OFFSET = new THREE.Vector3(0, -0.1, 0.02)
+const BIO_REVEAL_PROGRESS = 0.68
+
+const SKY_BIO_COLUMNS = [
+  {
+    label: 'WHO_AM_I',
+    title: 'southern california-born full-stack engineer',
+    body: 'video producer / director / editor background. visual storytelling applied to interactive systems.',
+  },
+  {
+    label: 'BUILD_SIGNAL',
+    title: 'interactive web + mobile systems',
+    body: 'react, next.js, three.js, react native, expo, firebase. tactile interfaces and mobile product work for a 15k user base.',
+  },
+  {
+    label: 'LOOKING_FOR',
+    title: 'meaningful work with sharp teams',
+    body: 'projects where people push the experience beyond the expected result.',
+  },
+]
 
 const easeInOutCubic = (value: number) => {
   return value < 0.5 ? 4 * value * value * value : 1 - Math.pow(-2 * value + 2, 3) / 2
@@ -43,6 +64,7 @@ const cubicBezier = (
 export default function SandPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [show, setShow] = useState(false)
+  const [bioVisible, setBioVisible] = useState(false)
 
   useEffect(() => {
     const t = setTimeout(() => setShow(true), 60)
@@ -120,6 +142,8 @@ export default function SandPage() {
     let cinematicComplete = false
     let cameraBezier: [THREE.Vector3, THREE.Vector3, THREE.Vector3, THREE.Vector3] | null = null
     let lookBezier: [THREE.Vector3, THREE.Vector3, THREE.Vector3, THREE.Vector3] | null = null
+    let lockedFinalLookTarget: THREE.Vector3 | null = null
+    let bioTriggered = false
 
     const dracoLoader = new DRACOLoader()
     dracoLoader.setDecoderPath('/draco/gltf/')
@@ -166,6 +190,10 @@ export default function SandPage() {
       )
     }
 
+    const getFinalLookTarget = (portrait = 0) => {
+      return getGenieHeadTarget().add(FINAL_LOOK_OFFSET.clone().lerp(MOBILE_FINAL_LOOK_OFFSET, portrait))
+    }
+
     const updatePointer = (event: PointerEvent) => {
       const rect = canvas.getBoundingClientRect()
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
@@ -184,15 +212,19 @@ export default function SandPage() {
 
       const headTarget = getGenieHeadTarget()
       const bodyTarget = new THREE.Vector3(genie.position.x, genie.position.y, genie.position.z)
+      const portrait = portraitAmount()
       const closeFrameScale = narrowAspectScale(camera.aspect, 1.65)
-      const finalLookTarget = headTarget.clone().add(new THREE.Vector3(0.03, 0.14, 0))
+      const finalLookTarget = getFinalLookTarget(portrait)
       const finalCameraPosition = new THREE.Vector3(
-        headTarget.x + 0.18 * closeFrameScale,
-        headTarget.y - 0.22 * closeFrameScale,
-        headTarget.z + 1.02 * closeFrameScale,
+        headTarget.x + THREE.MathUtils.lerp(0.04, 0, portrait) * closeFrameScale,
+        headTarget.y - THREE.MathUtils.lerp(0.48, 0.20, portrait) * closeFrameScale,
+        headTarget.z + THREE.MathUtils.lerp(1.38, 0.45, portrait) * closeFrameScale,
       )
       cinematicActive = true
       cinematicStart = performance.now()
+      bioTriggered = false
+      setBioVisible(false)
+      lockedFinalLookTarget = finalLookTarget.clone()
       canvas.style.cursor = 'default'
 
       cameraBezier = [
@@ -262,11 +294,12 @@ export default function SandPage() {
 
       if (genie) {
         const scale = currentGenieScale()
-        genie.position.x = GENIE_BASE_X + Math.sin(t * 0.14) * 0.045
-        genie.position.z = GENIE_BASE_Z + Math.sin(t * 0.1 + 1.3) * 0.035
-        genie.position.y = floorY + genieModelHeight * scale * 0.5 + genieRideHeight + Math.sin(t * 0.48) * 0.018
-        genie.rotation.y = Math.PI / 5 + Math.sin(t * 0.18) * 0.035
-        genie.rotation.z = Math.sin(t * 0.16) * 0.008
+        const motionWeight = cinematicActive || cinematicComplete ? 0 : 1
+        genie.position.x = GENIE_BASE_X + Math.sin(t * 0.14) * 0.045 * motionWeight
+        genie.position.z = GENIE_BASE_Z + Math.sin(t * 0.1 + 1.3) * 0.035 * motionWeight
+        genie.position.y = floorY + genieModelHeight * scale * 0.5 + genieRideHeight + Math.sin(t * 0.48) * 0.018 * motionWeight
+        genie.rotation.y = Math.PI / 5 + Math.sin(t * 0.18) * 0.035 * motionWeight
+        genie.rotation.z = Math.sin(t * 0.16) * 0.008 * motionWeight
         genieLight.position.set(genie.position.x, genie.position.y + 0.45, genie.position.z + 1.25)
       }
 
@@ -277,12 +310,20 @@ export default function SandPage() {
         activeLookTarget.copy(cubicBezier(...lookBezier, eased))
         camera.lookAt(activeLookTarget)
 
+        if (progress > BIO_REVEAL_PROGRESS && !bioTriggered) {
+          bioTriggered = true
+          setBioVisible(true)
+        }
+
         if (progress >= 1) {
+          bioTriggered = true
+          setBioVisible(true)
+          if (lockedFinalLookTarget) activeLookTarget.copy(lockedFinalLookTarget)
+          camera.lookAt(activeLookTarget)
           cinematicActive = false
           cinematicComplete = true
         }
       } else if (cinematicComplete) {
-        activeLookTarget.lerp(getGenieHeadTarget(), 0.045)
         camera.lookAt(activeLookTarget)
       }
 
@@ -321,10 +362,89 @@ export default function SandPage() {
         />
       </div>
 
+      <section
+        aria-hidden={!bioVisible}
+        data-visible={bioVisible}
+        className="sand-sky-bio pointer-events-none absolute"
+        style={{
+          zIndex: 1,
+          color: '#c8c8c8',
+          fontFamily: 'var(--font-geist-mono)',
+          textShadow: '0 0 20px rgba(12, 12, 12, 0.95)',
+        }}
+      >
+        <div
+          className="sand-sky-stack relative"
+          style={{
+            transformStyle: 'preserve-3d',
+          }}
+        >
+          {SKY_BIO_COLUMNS.map((column, index) => {
+            const rowOffset = index * 1.35
+
+            return (
+              <article
+                key={column.label}
+                className="sand-sky-row min-w-0"
+                style={{
+                  width: `calc(100% - min(${rowOffset}rem, 18vw))`,
+                  marginLeft: `min(${rowOffset}rem, 18vw)`,
+                  marginTop: index === 0 ? 0 : '-0.15rem',
+                  borderTop: '1px solid rgba(200, 200, 200, 0.14)',
+                  paddingTop: '0.58rem',
+                  paddingBottom: '0.55rem',
+                  transform: `translateZ(${index * 18}px)`,
+                  opacity: 1 - index * 0.08,
+                }}
+              >
+              <div
+                className="sand-sky-label"
+                style={{
+                  color: index === 1 ? '#c87820' : '#808080',
+                  fontSize: 'clamp(0.5rem, 0.54vw, 0.62rem)',
+                  letterSpacing: '0.16em',
+                  marginBottom: '0.34rem',
+                }}
+              >
+                → {column.label}
+              </div>
+              <h2
+                className="sand-sky-title"
+                style={{
+                  color: '#ededed',
+                  fontFamily: 'var(--font-geist-sans)',
+                  fontSize: 'clamp(1.08rem, 1.55vw, 1.78rem)',
+                  fontWeight: 400,
+                  lineHeight: 1.04,
+                  margin: 0,
+                  marginBottom: '0.36rem',
+                  letterSpacing: 0,
+                }}
+              >
+                {column.title}
+              </h2>
+              <p
+                className="sand-sky-copy"
+                style={{
+                  color: '#9c9c9c',
+                  fontSize: 'clamp(0.62rem, 0.72vw, 0.84rem)',
+                  lineHeight: 1.55,
+                  margin: 0,
+                  maxWidth: '30rem',
+                }}
+              >
+                {column.body}
+              </p>
+              </article>
+            )
+          })}
+        </div>
+      </section>
+
       <canvas
         ref={canvasRef}
         className="absolute inset-0"
-        style={{ width: '100%', height: '100%' }}
+        style={{ width: '100%', height: '100%', zIndex: 2 }}
       />
 
       <div

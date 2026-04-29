@@ -93,6 +93,101 @@ canvas {
   outline: none;
 }
 
+.sand-sky-bio {
+  left: 42%;
+  top: max(3.8rem, 8.5dvh);
+  width: clamp(34rem, 48vw, 58rem);
+  max-width: calc(100vw - 5rem);
+  opacity: 0;
+  filter: blur(8px);
+  perspective: 1100px;
+  transform: translate3d(-50%, 18px, 0) scale(0.985);
+  transition:
+    opacity 1500ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 1500ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 1700ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sand-sky-bio[data-visible="true"] {
+  opacity: 0.82;
+  filter: blur(0);
+  transform: translate3d(-50%, 0, 0) scale(1.02);
+}
+
+.sand-sky-stack {
+  transform: rotateX(6deg) rotateY(-12deg) rotateZ(-2.5deg);
+  transform-origin: 50% 0%;
+}
+
+@media (min-width: 768px) {
+  .sand-sky-stack::before {
+    content: "";
+    position: absolute;
+    inset: -1rem -1.3rem -0.9rem -1.1rem;
+    z-index: -1;
+    border: 1px solid rgba(200, 200, 200, 0.1);
+    background: rgba(12, 12, 12, 0.28);
+    backdrop-filter: blur(14px) saturate(116%);
+    transform: translateZ(-42px);
+  }
+
+  .sand-sky-row {
+    border-left: 1px solid rgba(200, 200, 200, 0.08);
+    padding-left: clamp(0.8rem, 1vw, 1.15rem);
+    background: rgba(12, 12, 12, 0.18);
+  }
+
+  .sand-sky-label {
+    color: #808080;
+  }
+}
+
+@media (max-width: 767px), (max-aspect-ratio: 3 / 4) {
+  .sand-sky-bio {
+    left: max(16px, env(safe-area-inset-left));
+    right: max(16px, env(safe-area-inset-right));
+    top: max(4.4rem, 14dvh);
+    width: auto;
+    max-width: none;
+    perspective: 560px;
+    transform: translate3d(0, 14px, 0) scale(0.97);
+  }
+
+  .sand-sky-bio[data-visible="true"] {
+    opacity: 0.78;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  .sand-sky-stack {
+    transform: rotateX(1deg) rotateY(0deg) rotateZ(-1deg) !important;
+    transform-origin: 50% 0%;
+  }
+
+  .sand-sky-row {
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-top: -0.05rem !important;
+    padding-top: 0.48rem !important;
+    padding-bottom: 0.5rem !important;
+    transform: none !important;
+  }
+
+  .sand-sky-title {
+    font-size: clamp(0.74rem, 3.6vw, 0.92rem) !important;
+    line-height: 1.02 !important;
+    margin-bottom: 0.28rem !important;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .sand-sky-copy {
+    font-size: clamp(0.46rem, 2.35vw, 0.58rem) !important;
+    line-height: 1.38 !important;
+    max-width: 100% !important;
+    overflow-wrap: anywhere;
+  }
+}
+
 @media (min-width: 768px) {
   .object-dial[data-panel-open="true"] {
     left: 33.333%;

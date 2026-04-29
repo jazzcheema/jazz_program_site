@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import LampCorner from "./components/LampCorner";
 import "./globals.css";
@@ -17,6 +17,12 @@ export const metadata: Metadata = {
   title: "jazz.dev",
   description: "Jazz Cheema — interactive 3D programming portfolio",
 };
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 
 export default function RootLayout({
   children,
