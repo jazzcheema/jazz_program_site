@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { containDistanceForFrame, worldFrameAtDistance } from '../lib/responsiveScene'
 import Sparkles from './Sparkles'
 
 const CAM = {
@@ -15,6 +16,7 @@ const CAM = {
   duration:   340,
 }
 
+const DESIGN_FRAME = worldFrameAtDistance(45, CAM.endDist)
 const LIGHT_TARGETS = { ambient: 0.45, key: 1.6, rim: 2.2 }
 const LIGHT_DURATION = 260
 
@@ -109,8 +111,11 @@ function ProjectCard({
         right: 'clamp(14px, 5vw, 76px)',
         zIndex: 30,
         width: 'min(430px, calc(100vw - 28px))',
+        maxHeight: carouselOpen ? 'min(680px, calc(100dvh - 116px))' : 'min(620px, calc(100dvh - 132px))',
+        overflowY: 'auto',
         pointerEvents: 'none',
         fontFamily: 'var(--font-geist-mono), monospace',
+        scrollbarWidth: 'none',
       }}
     >
       <div
@@ -387,8 +392,9 @@ export default function CloudsPage() {
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    const isMobile = 'ontouchstart' in window
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isMobile, alpha: true })
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2))
     renderer.setSize(window.innerWidth, window.innerHeight)
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.toneMapping = THREE.ACESFilmicToneMapping
@@ -398,12 +404,27 @@ export default function CloudsPage() {
     const scene = new THREE.Scene()
 
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100)
-    camera.position.set(
-      Math.sin(CAM.startAngle) * CAM.startDist,
-      CAM.startY,
-      Math.cos(CAM.startAngle) * CAM.startDist,
-    )
-    camera.lookAt(0, 0, 0)
+    const responsiveCameraSettings = () => {
+      const fitScale = containDistanceForFrame(camera, DESIGN_FRAME) / CAM.endDist
+      return {
+        startDist: CAM.startDist * fitScale,
+        endDist: CAM.endDist * fitScale,
+        startY: CAM.startY * Math.min(fitScale, 1.45),
+        endY: CAM.endY * Math.min(fitScale, 1.25),
+      }
+    }
+
+    const applyCameraPose = (progress: number) => {
+      const settings = responsiveCameraSettings()
+      const e = progress * progress * (3 - 2 * progress)
+      const angle = CAM.startAngle * (1 - e)
+      const dist = settings.startDist + (settings.endDist - settings.startDist) * e
+      const y = settings.startY + (settings.endY - settings.startY) * e
+      camera.position.set(Math.sin(angle) * dist, y, Math.cos(angle) * dist)
+      camera.lookAt(0, 0, 0)
+    }
+
+    applyCameraPose(0)
 
     const ambient = new THREE.AmbientLight('#ffffff', 0)
     scene.add(ambient)
@@ -425,11 +446,7 @@ export default function CloudsPage() {
     const projectObjects: ProjectObject[] = []
     const raycaster = new THREE.Raycaster()
 
-    const responsiveModelSize = () => {
-      const height = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5) * CAM.endDist
-      const width = height * camera.aspect
-      return Math.min(2.5, Math.max(1.45, width * 0.72))
-    }
+    const responsiveModelSize = () => 2.5
 
     const applyMaterialOpacity = (object: THREE.Object3D, opacity: number) => {
       object.traverse((child) => {
@@ -522,17 +539,18 @@ export default function CloudsPage() {
     canvas.addEventListener('pointerdown', onPointerDown)
     canvas.addEventListener('pointerup', onPointerUp)
 
+    let tick = 0, camT = 0, animId: number
+
     const onResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight
       camera.updateProjectionMatrix()
       renderer.setSize(window.innerWidth, window.innerHeight)
+      applyCameraPose(camT)
       projectObjects.forEach(({ group, maxDim }) => {
         group.scale.setScalar(responsiveModelSize() / maxDim)
       })
     }
     window.addEventListener('resize', onResize)
-
-    let tick = 0, camT = 0, animId: number
 
     const animate = () => {
       animId = requestAnimationFrame(animate)
@@ -549,12 +567,7 @@ export default function CloudsPage() {
 
       if (camT < 1) {
         camT = Math.min(1, camT + 1 / CAM.duration)
-        const e     = camT * camT * (3 - 2 * camT)
-        const angle = CAM.startAngle * (1 - e)
-        const dist  = CAM.startDist  + (CAM.endDist - CAM.startDist) * e
-        const y     = CAM.startY     + (CAM.endY    - CAM.startY)    * e
-        camera.position.set(Math.sin(angle) * dist, y, Math.cos(angle) * dist)
-        camera.lookAt(0, 0, 0)
+        applyCameraPose(camT)
       }
 
       projectObjects.forEach((projectObject) => {

@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { REFERENCE_ASPECT } from '../lib/responsiveScene'
 
 interface CarpetSceneProps {
   onCarpetClick?: () => void
@@ -13,10 +14,12 @@ interface CarpetSceneProps {
 
 // Desktop target; the live position is clamped to the camera's visible area.
 const DESKTOP_CLOUD_POS = new THREE.Vector3(3.0, 1.6, 0)
-const DESKTOP_SANDCASTLE_POS = new THREE.Vector3(-3.0, -1.55, 0)
+const DESKTOP_SANDCASTLE_POS = new THREE.Vector3(-3.55, -2.05, 0)
+const CAMERA_Z = 6
 const REACH_DIST = 1.3
 const SANDCASTLE_REACH_DIST = 0.72
 const SANDCASTLE_PULL_DIST = 2.15
+const MOBILE_ASPECT = 0.74
 
 export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandcastle }: CarpetSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -34,12 +37,15 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    const isPortraitMobile = () => window.innerWidth / window.innerHeight < MOBILE_ASPECT
+    const isMobile = isPortraitMobile() || ('ontouchstart' in window)
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isMobile, alpha: true })
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isPortraitMobile() ? 1.25 : 2))
     renderer.setSize(window.innerWidth, window.innerHeight)
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 1.0
+    renderer.toneMappingExposure = isPortraitMobile() ? 1.35 : 1.0
 
     renderer.setClearColor(0x0c0c0c, 0)
 
@@ -47,7 +53,16 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
     scene.fog = new THREE.Fog('#0c0c0c', 14, 32)
 
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100)
-    camera.position.set(0, 0, 6)
+    camera.position.set(0, 0, CAMERA_Z)
+    camera.updateProjectionMatrix()
+
+    const designVisibleHeight = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5) * CAMERA_Z
+    const designVisibleWidth = designVisibleHeight * REFERENCE_ASPECT
+
+    const stageScale = () => {
+      const visible = visibleWorldSize()
+      return Math.min(1, visible.width / designVisibleWidth, visible.height / designVisibleHeight)
+    }
 
     const visibleWorldSize = () => {
       const height = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5) * camera.position.z
@@ -55,26 +70,16 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
     }
 
     const responsiveCloudPos = () => {
-      const visible = visibleWorldSize()
-      return new THREE.Vector3(
-        THREE.MathUtils.clamp(visible.width / 2 - 0.55, 0.85, DESKTOP_CLOUD_POS.x),
-        THREE.MathUtils.clamp(visible.height / 2 - 0.85, 0.95, DESKTOP_CLOUD_POS.y),
-        0,
-      )
+      return DESKTOP_CLOUD_POS.clone().multiplyScalar(stageScale())
     }
 
     const responsiveSandcastlePos = () => {
-      const visible = visibleWorldSize()
-      return new THREE.Vector3(
-        -THREE.MathUtils.clamp(visible.width / 2 - 0.72, 0.95, Math.abs(DESKTOP_SANDCASTLE_POS.x)),
-        -THREE.MathUtils.clamp(visible.height / 2 - 0.72, 0.82, Math.abs(DESKTOP_SANDCASTLE_POS.y)),
-        0,
-      )
+      return DESKTOP_SANDCASTLE_POS.clone().multiplyScalar(stageScale())
     }
 
     const responsiveModelSize = (desktopSize: number, mobileWidthFactor: number) => {
-      const visible = visibleWorldSize()
-      return Math.min(desktopSize, Math.max(desktopSize * 0.58, visible.width * mobileWidthFactor))
+      void mobileWidthFactor
+      return desktopSize * stageScale()
     }
 
     let cloudPos = responsiveCloudPos()
@@ -96,7 +101,7 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
     sandcastleLight.position.copy(sandcastlePos).add(new THREE.Vector3(0, 0.8, 2))
     scene.add(sandcastleLight)
 
-    const LIGHT_TARGETS = { ambient: 0.4, key: 1.5, rim: 2.5, cloud: 2.0, sandcastle: 1.15 }
+    const LIGHT_TARGETS = { ambient: 0.52, key: 1.9, rim: 2.8, cloud: 2.0, sandcastle: 1.15 }
     const LIGHT_DURATION = 210 // ~3.5s at 60fps
     let lightT = 0
 
@@ -214,12 +219,17 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
     const onResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight
       camera.updateProjectionMatrix()
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, isPortraitMobile() ? 1.25 : 2))
+      renderer.toneMappingExposure = isPortraitMobile() ? 1.35 : 1.0
       renderer.setSize(window.innerWidth, window.innerHeight)
       cloudPos = responsiveCloudPos()
       sandcastlePos = responsiveSandcastlePos()
       cloudLight.position.copy(cloudPos).add(new THREE.Vector3(0, 1, 2))
       sandcastleLight.position.copy(sandcastlePos).add(new THREE.Vector3(0, 0.8, 2))
-      if (carpet) carpetBaseScale = responsiveModelSize(2.2, 0.62) / carpetMaxDim
+      if (carpet) {
+        carpetBaseScale = responsiveModelSize(2.2, 0.62) / carpetMaxDim
+        carpet.scale.setScalar(carpetBaseScale)
+      }
       if (clouds) clouds.scale.setScalar(responsiveModelSize(1.6, 0.44) / cloudsMaxDim)
       if (sandcastle) sandcastle.scale.setScalar(responsiveModelSize(1.35, 0.34) / sandcastleMaxDim)
     }
@@ -285,21 +295,22 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
         const cPos = new THREE.Vector3(carpet.position.x, carpet.position.y, 0)
 
         // Shrink as it moves from center, then tuck smaller into the sandcastle target.
+        const currentStageScale = stageScale()
         const dist = Math.hypot(currX, currY)
-        const worldShrink = Math.max(0.42, 1 - dist * 0.09)
+        const worldShrink = Math.max(0.42, 1 - (dist / Math.max(currentStageScale, 0.001)) * 0.09)
         const sandcastleDist = cPos.distanceTo(sandcastlePos)
-        const sandcastlePull = 1 - THREE.MathUtils.clamp(sandcastleDist / SANDCASTLE_PULL_DIST, 0, 1)
+        const sandcastlePull = 1 - THREE.MathUtils.clamp(sandcastleDist / (SANDCASTLE_PULL_DIST * currentStageScale), 0, 1)
         const sandcastleShrink = THREE.MathUtils.lerp(worldShrink, 0.2, sandcastlePull * sandcastlePull)
         carpet.scale.setScalar(carpetBaseScale * sandcastleShrink)
 
         // Proximity check
-        if (cPos.distanceTo(cloudPos) < REACH_DIST) {
+        if (cPos.distanceTo(cloudPos) < REACH_DIST * currentStageScale) {
           reached = true
           onReachRef.current()
-        } else if (sandcastleDist < SANDCASTLE_REACH_DIST && !sandcastleActivated) {
+        } else if (sandcastleDist < SANDCASTLE_REACH_DIST * currentStageScale && !sandcastleActivated) {
           sandcastleActivated = true
           onReachSandcastleRef.current()
-        } else if (sandcastleDist > SANDCASTLE_REACH_DIST * 1.7) {
+        } else if (sandcastleDist > SANDCASTLE_REACH_DIST * currentStageScale * 1.7) {
           sandcastleActivated = false
         }
       }

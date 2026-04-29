@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 const SIZE = 92
+const CSS_SIZE = 'clamp(64px, 17vw, 92px)'
 
 export default function LampCorner() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -13,8 +14,9 @@ export default function LampCorner() {
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    const isMobile = 'ontouchstart' in window
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isMobile, alpha: true })
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2))
     renderer.setSize(SIZE, SIZE)
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.toneMapping = THREE.ACESFilmicToneMapping
@@ -90,8 +92,8 @@ export default function LampCorner() {
         position: 'fixed',
         top: 10,
         left: 10,
-        width: SIZE,
-        height: SIZE,
+        width: CSS_SIZE,
+        height: CSS_SIZE,
         zIndex: 200,
         cursor: 'pointer',
         padding: 0,
@@ -107,7 +109,6 @@ export default function LampCorner() {
         height={SIZE}
         aria-hidden="true"
         style={{
-          display: 'block',
           width: '100%',
           height: '100%',
           pointerEvents: 'none',
