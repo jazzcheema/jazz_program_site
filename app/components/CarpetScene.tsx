@@ -27,15 +27,16 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(window.innerWidth, window.innerHeight)
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.toneMapping = THREE.ACESFilmicToneMapping
     renderer.toneMappingExposure = 1.0
 
+    renderer.setClearColor(0x0c0c0c, 0)
+
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color('#0c0c0c')
     scene.fog = new THREE.Fog('#0c0c0c', 14, 32)
 
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100)

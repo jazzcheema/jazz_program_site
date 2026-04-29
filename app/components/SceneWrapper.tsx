@@ -4,6 +4,7 @@ import { useState } from 'react'
 import CarpetScene from './CarpetScene'
 import InfoPanel from './InfoPanel'
 import CloudsPage from './CloudsPage'
+import VortexBackground from './VortexBackground'
 import type { ObjectData } from '../data/objects'
 
 const CARPET_DATA: ObjectData = {
@@ -57,11 +58,17 @@ export default function SceneWrapper() {
   if (reached) return <CloudsPage />
 
   return (
-    <div className="w-dvw h-dvh overflow-hidden relative" style={{ width: '100dvw', height: '100dvh' }}>
-      <CarpetScene
-        onCarpetClick={() => setPanelOpen(true)}
-        onReachClouds={handleReachClouds}
-      />
+    <div className="w-dvw h-dvh overflow-hidden relative" style={{ width: '100dvw', height: '100dvh', background: '#0c0c0c' }}>
+      <div className="absolute inset-0 pointer-events-none">
+        <VortexBackground className="w-full h-full" />
+      </div>
+
+      <div className="absolute inset-0">
+        <CarpetScene
+          onCarpetClick={() => setPanelOpen(true)}
+          onReachClouds={handleReachClouds}
+        />
+      </div>
 
       <InfoPanel
         open={panelOpen}
