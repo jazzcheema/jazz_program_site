@@ -44,8 +44,10 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
       className="fixed inset-y-0 right-0 w-full sm:w-[min(520px,66vw)] xl:w-1/3 transition-transform duration-300 ease-in-out z-30 flex flex-col"
       style={{
         transform: open ? 'translateX(0)' : 'translateX(100%)',
-        background: '#0c0c0c',
-        borderLeft: '1px solid #1e1e1e',
+        background: 'rgba(12, 12, 12, 0.72)',
+        backdropFilter: 'blur(18px) saturate(118%)',
+        WebkitBackdropFilter: 'blur(18px) saturate(118%)',
+        borderLeft: '1px solid rgba(200, 200, 200, 0.18)',
         fontFamily: 'var(--font-geist-mono)',
       }}
     >
@@ -65,8 +67,7 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
           </div>
           <button
             onClick={onClose}
-            className="text-xs tracking-widest hover:opacity-60 transition-opacity shrink-0"
-            style={{ color: '#484848' }}
+            className="info-panel-close text-xs tracking-widest shrink-0"
           >
             [×] CLOSE
           </button>

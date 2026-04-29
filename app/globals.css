@@ -30,6 +30,54 @@ body {
   left: 50%;
 }
 
+.clouds-project-link:hover,
+.clouds-project-link:focus-visible {
+  border-color: rgba(200, 200, 200, 0.72) !important;
+  color: #ffffff !important;
+  outline: none;
+}
+
+.clouds-project-close {
+  color: #303030;
+  transition: color 120ms ease;
+}
+
+.clouds-project-close:hover,
+.clouds-project-close:focus-visible {
+  color: #ff2a2a !important;
+  outline: none;
+}
+
+.info-panel-close {
+  color: #484848;
+  transition: color 120ms ease;
+}
+
+.info-panel-close:hover,
+.info-panel-close:focus-visible {
+  color: #ff2a2a;
+  outline: none;
+}
+
+.clouds-axis-button {
+  color: #808080;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.clouds-axis-button-prev:hover,
+.clouds-axis-button-prev:focus-visible {
+  background-color: rgba(42, 95, 192, 0.08) !important;
+  color: #2a5fc0 !important;
+  outline: none;
+}
+
+.clouds-axis-button-next:hover,
+.clouds-axis-button-next:focus-visible {
+  background-color: rgba(36, 153, 88, 0.08) !important;
+  color: #249958 !important;
+  outline: none;
+}
+
 @media (min-width: 768px) {
   .object-dial[data-panel-open="true"] {
     left: 33.333%;

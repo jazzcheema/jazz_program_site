@@ -85,109 +85,269 @@ function ProjectCard({
   onPrev: () => void
   onNext: () => void
 }) {
-  const [mounted, setMounted] = useState(false)
+  if (!visible) return null
 
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setMounted(visible))
-    return () => cancelAnimationFrame(frame)
-  }, [visible])
+  const scanBars = project.id === 'episode'
+    ? [88, 72, 41, 66, 24]
+    : project.id === 'krate'
+      ? [96, 82, 75, 70, 44]
+      : [78, 63, 57, 38, 21]
+  const activeSignal = project.id === 'episode'
+    ? '#c87820'
+    : project.id === 'krate'
+      ? '#249958'
+      : '#808080'
+  const projectIndex = PROJECTS.findIndex(({ id }) => id === project.id) + 1
 
-  if (!visible && !mounted) return null
+  const stop = (event: React.SyntheticEvent) => event.stopPropagation()
 
   return (
     <div
       style={{
-        position: 'absolute',
-        top: carouselOpen ? 'max(86px, 12dvh)' : 'max(72px, 10dvh)',
-        right: 'max(16px, 7vw)',
-        width: 'min(360px, calc(100vw - 32px))',
-        fontFamily: 'var(--font-geist-mono)',
-        background: '#0c0c0c',
-        border: '1px solid #1e1e1e',
-        transform: `perspective(900px) rotateY(-7deg) translateY(${mounted && visible ? 0 : 12}px)`,
-        opacity: mounted && visible ? 1 : 0,
-        transition: 'opacity 0.35s ease, transform 0.35s ease',
-        zIndex: 10,
+        position: 'fixed',
+        top: carouselOpen ? 'max(76px, 10dvh)' : 'max(82px, 12dvh)',
+        right: 'clamp(14px, 5vw, 76px)',
+        zIndex: 30,
+        width: 'min(430px, calc(100vw - 28px))',
+        pointerEvents: 'none',
+        fontFamily: 'var(--font-geist-mono), monospace',
       }}
     >
-      {/* Header */}
-      <div style={{ borderBottom: '1px solid #1e1e1e', padding: '12px 14px', position: 'relative' }}>
-        <div style={{ color: '#2a2a2a', fontSize: '0.55rem', letterSpacing: '0.1em', marginBottom: 6 }}>
-          PROJECT_DATA.SYS ──────── VER.02.01.14
-        </div>
-        <div style={{ color: '#d0d0d0', fontSize: '0.8rem', letterSpacing: '0.08em', fontWeight: 'bold' }}>
-          → {project.label}
-        </div>
-        <div style={{ color: '#2e2e2e', fontSize: '0.55rem', letterSpacing: '0.06em', marginTop: 3 }}>
-          CLASS: {project.className}
-        </div>
-        <button
-          onClick={onClose}
-          style={{ position: 'absolute', top: 12, right: 14, color: '#383838', fontSize: '0.6rem', background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '0.05em' }}
-        >
-          [×]
-        </button>
-      </div>
-
-      {/* Specs */}
-      <div style={{ padding: '10px 14px' }}>
-        {([
-          ['STACK',  project.stack],
-          ['TYPE',   project.type],
-          ['DESC',   project.description],
-          ['STATUS', project.status],
-        ] as [string, string][]).map(([k, v]) => (
-          <div key={k} style={{ display: 'flex', gap: 10, borderBottom: '1px solid #161616', padding: '5px 0' }}>
-            <span style={{ color: '#2e2e2e', fontSize: '0.6rem', width: 44, flexShrink: 0, letterSpacing: '0.04em' }}>{k}</span>
-            <span style={{ color: '#585858', fontSize: '0.6rem', lineHeight: 1.6, letterSpacing: '0.02em' }}>{v}</span>
-          </div>
-        ))}
-      </div>
-
-      {carouselOpen && (
-        <div style={{ display: 'flex', borderTop: '1px solid #161616', borderBottom: '1px solid #161616' }}>
-          <button
-            onClick={onPrev}
-            style={{ flex: 1, padding: '8px 0', border: 0, borderRight: '1px solid #161616', background: 'transparent', color: '#585858', fontSize: '0.65rem', letterSpacing: '0.1em', cursor: 'pointer' }}
-          >
-            [←]
-          </button>
-          <button
-            onClick={onNext}
-            style={{ flex: 1, padding: '8px 0', border: 0, background: 'transparent', color: '#585858', fontSize: '0.65rem', letterSpacing: '0.1em', cursor: 'pointer' }}
-          >
-            [→]
-          </button>
-        </div>
-      )}
-
-      {/* Visit link */}
-      <div style={{ padding: '10px 14px', borderTop: '1px solid #161616' }}>
-        <a
-          href={project.href}
-          target="_blank"
-          rel="noopener noreferrer"
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 10,
+          transform: 'translate3d(14px, 12px, 0)',
+          border: '1px solid rgba(128, 128, 128, 0.08)',
+          background: 'rgba(12, 12, 12, 0.22)',
+          pointerEvents: 'none',
+        }}
+      />
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 5,
+          transform: 'translate3d(7px, 6px, 0)',
+          border: '1px solid rgba(200, 200, 200, 0.08)',
+          background: 'rgba(12, 12, 12, 0.18)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          pointerEvents: 'none',
+        }}
+      />
+      <div
+        style={{
+          position: 'relative',
+          pointerEvents: 'auto',
+          overflow: 'hidden',
+          border: '1px solid rgba(200, 200, 200, 0.18)',
+          background: 'rgba(12, 12, 12, 0.72)',
+          backdropFilter: 'blur(18px) saturate(118%)',
+          WebkitBackdropFilter: 'blur(18px) saturate(118%)',
+          color: '#808080',
+        }}
+      >
+        <header
           style={{
-            display: 'block',
-            color: '#909090',
-            fontSize: '0.65rem',
-            letterSpacing: '0.1em',
-            textAlign: 'center',
-            padding: '8px 0',
-            border: '1px solid #222222',
-            textDecoration: 'none',
-            transition: 'color 0.2s, border-color 0.2s',
+            position: 'relative',
+            padding: '13px 14px 11px',
+            borderBottom: '1px solid rgba(200, 200, 200, 0.12)',
           }}
-          onMouseEnter={e => { (e.target as HTMLElement).style.color = '#d0d0d0'; (e.target as HTMLElement).style.borderColor = '#404040' }}
-          onMouseLeave={e => { (e.target as HTMLElement).style.color = '#909090'; (e.target as HTMLElement).style.borderColor = '#222222' }}
         >
-          VISIT SITE →
-        </a>
-      </div>
+          <div style={{ paddingRight: 78 }}>
+            <div style={{ marginBottom: 6, color: '#303030', fontSize: '0.55rem', fontWeight: 700, letterSpacing: 0 }}>
+              PROJECT_DATA.SYS -------- AXIS:{String(projectIndex).padStart(2, '0')} / VER.02.01.14
+            </div>
+            <h2 style={{ margin: 0, color: '#c8c8c8', fontSize: '0.86rem', fontWeight: 800, letterSpacing: '0.08em', lineHeight: 1.2 }}>
+              → {project.label}
+            </h2>
+            <div style={{ marginTop: 4, color: '#303030', fontSize: '0.56rem', letterSpacing: '0.06em' }}>
+              CLASS: {project.className}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="clouds-project-close"
+            onClick={(event) => {
+              event.stopPropagation()
+              onClose()
+            }}
+            onPointerDown={stop}
+            onPointerUp={stop}
+            style={{
+              position: 'absolute',
+              top: 11,
+              right: 12,
+              cursor: 'pointer',
+              border: 0,
+              background: 'transparent',
+              fontFamily: 'var(--font-geist-mono), monospace',
+              fontSize: '0.58rem',
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+            }}
+          >
+            [×] close
+          </button>
+        </header>
 
-      {/* Fine print */}
-      <div style={{ padding: '7px 14px', borderTop: '1px solid #141414', color: '#161616', fontSize: '0.5rem', letterSpacing: '0.05em', wordBreak: 'break-all' }}>
-        {project.finePrint}
+        <section style={{ padding: '10px 14px', borderBottom: '1px solid rgba(200, 200, 200, 0.08)' }}>
+          <div style={{ color: '#303030', fontSize: '0.58rem', letterSpacing: '0.06em', marginBottom: 6 }}>
+            MISSION_BRIEF --------------------------------
+          </div>
+          <p style={{ margin: 0, color: '#808080', fontSize: '0.66rem', lineHeight: 1.65 }}>
+            {project.description}
+          </p>
+        </section>
+
+        <section style={{ padding: '8px 14px 10px', borderBottom: '1px solid rgba(200, 200, 200, 0.08)' }}>
+          {([
+            ['STACK', project.stack],
+            ['TYPE', project.type],
+            ['STATUS', project.status],
+          ] as [string, string][]).map(([k, v]) => (
+            <div
+              key={k}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '54px minmax(0, 1fr)',
+                gap: 10,
+                padding: '5px 0',
+                borderBottom: '1px solid rgba(200, 200, 200, 0.05)',
+              }}
+            >
+              <span style={{ color: '#303030', fontSize: '0.58rem', letterSpacing: '0.04em' }}>{k}</span>
+              <span style={{ color: '#808080', fontSize: '0.6rem', lineHeight: 1.45 }}>{v}</span>
+            </div>
+          ))}
+        </section>
+
+        <section style={{ padding: '9px 14px 10px', borderBottom: '1px solid rgba(200, 200, 200, 0.08)' }}>
+          <div style={{ color: '#303030', fontSize: '0.58rem', letterSpacing: '0.06em', marginBottom: 8 }}>
+            SIGNAL_SCAN / MHz ----------------------------
+          </div>
+          <div style={{ display: 'grid', gap: 5 }}>
+            {scanBars.map((pct, i) => (
+              <div
+                key={i}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '30px minmax(0, 1fr) 26px',
+                  gap: 7,
+                  alignItems: 'center',
+                  color: '#303030',
+                  fontSize: '0.56rem',
+                }}
+              >
+                <span>{String(i + 1).padStart(2, '0')}</span>
+                <span style={{ height: 7, background: '#101010', overflow: 'hidden' }}>
+                  <i style={{ display: 'block', width: `${pct}%`, height: '100%', background: i === 0 ? activeSignal : '#404040' }} />
+                </span>
+                <span style={{ textAlign: 'right' }}>{pct}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {carouselOpen && (
+          <nav
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              borderBottom: '1px solid rgba(200, 200, 200, 0.08)',
+            }}
+          >
+            <button
+              type="button"
+              className="clouds-axis-button clouds-axis-button-prev"
+              onClick={(event) => {
+                event.stopPropagation()
+                onPrev()
+              }}
+              onPointerDown={stop}
+              onPointerUp={stop}
+              style={{
+                minHeight: 36,
+                cursor: 'pointer',
+                border: 0,
+                borderRight: '1px solid rgba(200, 200, 200, 0.08)',
+                background: 'transparent',
+                fontFamily: 'var(--font-geist-mono), monospace',
+                fontSize: '0.62rem',
+                letterSpacing: '0.08em',
+                pointerEvents: 'auto',
+              }}
+            >
+              ← PREV_AXIS
+            </button>
+            <button
+              type="button"
+              className="clouds-axis-button clouds-axis-button-next"
+              onClick={(event) => {
+                event.stopPropagation()
+                onNext()
+              }}
+              onPointerDown={stop}
+              onPointerUp={stop}
+              style={{
+                minHeight: 36,
+                cursor: 'pointer',
+                border: 0,
+                background: 'transparent',
+                fontFamily: 'var(--font-geist-mono), monospace',
+                fontSize: '0.62rem',
+                letterSpacing: '0.08em',
+                pointerEvents: 'auto',
+              }}
+            >
+              NEXT_AXIS →
+            </button>
+          </nav>
+        )}
+
+        <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(200, 200, 200, 0.06)' }}>
+          <a
+            href={project.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="clouds-project-link"
+            onPointerDown={stop}
+            onPointerUp={stop}
+            onClick={stop}
+            style={{
+              display: 'flex',
+              minHeight: 38,
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+              padding: '0 10px',
+              border: '1px solid rgba(128, 128, 128, 0.28)',
+              color: '#909090',
+              fontSize: '0.64rem',
+              letterSpacing: '0.1em',
+              textDecoration: 'none',
+              pointerEvents: 'auto',
+            }}
+          >
+            <span>VISIT SITE</span>
+            <span>→</span>
+          </a>
+        </div>
+
+        <div
+          style={{
+            padding: '7px 14px 9px',
+            color: '#202020',
+            fontSize: '0.48rem',
+            lineHeight: 1.45,
+            letterSpacing: '0.04em',
+            wordBreak: 'break-all',
+          }}
+        >
+          {project.finePrint}
+        </div>
       </div>
     </div>
   )

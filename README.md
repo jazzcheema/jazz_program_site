@@ -45,7 +45,8 @@ public/        # Static assets (models, textures, fonts)
 Primary influence: **The Designers Republic (TDR)** — the Sheffield studio behind Wipeout's visual identity. Their work is the bible for every UI decision.
 
 ### TDR / Wipeout visual rules
-- **Color** — off-black (`#0c0c0c`) dominates. Panels, rules, labels, and fine print live in compressed gray values. Blue is no longer the primary accent; color appears only as data state (amber / green / muted blue), never as decoration. No gradients, no softness.
+- **Color** — off-black (`#0c0c0c`) dominates. Panels, rules, labels, and fine print live in compressed gray values. Blue is no longer the primary accent; color appears only as data state (amber / green / muted blue), never as decoration. No gradients.
+- **Panel surface** — cards and info panels can use translucent off-black (`rgba(12, 12, 12, 0.72)`) with restrained Gaussian-style backdrop blur (`blur(18px) saturate(118%)`) so 3D objects remain faintly present behind the UI. This is a functional glass/instrument surface, not a soft decorative glow.
 - **Typography** — geometric monospace throughout. Tight tracking, all-caps labels, version numbers everywhere (`VER.01.09.26`). Mixed micro and macro scales on the same surface.
 - **Data density** — every panel should feel like a technical document: frequency bars (EQ-style), coordinate readouts, material scans, draw-call counts. The UI is *information*, not decoration.
 - **Fine print as texture** — dense legal/system copy at the bottom of panels functions as a visual barcode. It doesn't need to be read; it needs to fill space with authority.
@@ -60,6 +61,7 @@ Primary influence: **The Designers Republic (TDR)** — the Sheffield studio beh
 |--------|-----------|-----------------------------------|
 | VOID   | `#0c0c0c` | Primary background / scene void   |
 | PANEL  | `#101010` | Panel mass / recessed surfaces    |
+| GLASS  | `rgba(12,12,12,0.72)` | Translucent blurred panel surface |
 | RULE   | `#1e1e1e` | Borders, dividers, hard seams     |
 | GHOST  | `#303030` | Secondary labels / inactive data  |
 | SIGNAL | `#808080` | Readable data text                |
