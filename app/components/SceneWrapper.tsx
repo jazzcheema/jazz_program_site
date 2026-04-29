@@ -4,6 +4,7 @@ import { useState } from 'react'
 import CarpetScene from './CarpetScene'
 import InfoPanel from './InfoPanel'
 import CloudsPage from './CloudsPage'
+import SandPage from './SandPage'
 import VortexBackground from './VortexBackground'
 import type { ObjectData } from '../data/objects'
 
@@ -44,6 +45,7 @@ const CARPET_DATA: ObjectData = {
 export default function SceneWrapper() {
   const [panelOpen, setPanelOpen] = useState(false)
   const [reached, setReached] = useState(false)
+  const [reachedSand, setReachedSand] = useState(false)
   const [flashing, setFlashing] = useState(false)
 
   const handleReachClouds = () => {
@@ -55,7 +57,17 @@ export default function SceneWrapper() {
     }, 450)
   }
 
+  const handleReachSandcastle = () => {
+    setPanelOpen(false)
+    setFlashing(true)
+    setTimeout(() => {
+      setReachedSand(true)
+      setFlashing(false)
+    }, 450)
+  }
+
   if (reached) return <CloudsPage />
+  if (reachedSand) return <SandPage />
 
   return (
     <div className="w-dvw h-dvh overflow-hidden relative" style={{ width: '100dvw', height: '100dvh', background: '#0c0c0c' }}>
@@ -67,6 +79,7 @@ export default function SceneWrapper() {
         <CarpetScene
           onCarpetClick={() => setPanelOpen(true)}
           onReachClouds={handleReachClouds}
+          onReachSandcastle={handleReachSandcastle}
         />
       </div>
 
@@ -92,7 +105,7 @@ export default function SceneWrapper() {
             width: 'min(34rem, calc(100vw - 32px))',
           }}
         >
-          → CLICK CARPET FOR MISSION DATA → DRAG TO FLY
+          → CLICK CARPET FOR MISSION DATA → DRAG TO CLOUDS OR SANDCASTLE
         </div>
       )}
     </div>

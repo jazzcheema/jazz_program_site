@@ -2,26 +2,33 @@
 
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 interface CarpetSceneProps {
   onCarpetClick?: () => void
   onReachClouds: () => void
+  onReachSandcastle: () => void
 }
 
 // Desktop target; the live position is clamped to the camera's visible area.
 const DESKTOP_CLOUD_POS = new THREE.Vector3(3.0, 1.6, 0)
+const DESKTOP_SANDCASTLE_POS = new THREE.Vector3(-3.0, -1.55, 0)
 const REACH_DIST = 1.3
+const SANDCASTLE_REACH_DIST = 0.72
+const SANDCASTLE_PULL_DIST = 2.15
 
-export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetSceneProps) {
+export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandcastle }: CarpetSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const onReachRef = useRef(onReachClouds)
+  const onReachSandcastleRef = useRef(onReachSandcastle)
   const onClickRef = useRef(onCarpetClick)
 
   useEffect(() => {
     onReachRef.current = onReachClouds
+    onReachSandcastleRef.current = onReachSandcastle
     onClickRef.current = onCarpetClick
-  }, [onCarpetClick, onReachClouds])
+  }, [onCarpetClick, onReachClouds, onReachSandcastle])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -56,12 +63,22 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
       )
     }
 
+    const responsiveSandcastlePos = () => {
+      const visible = visibleWorldSize()
+      return new THREE.Vector3(
+        -THREE.MathUtils.clamp(visible.width / 2 - 0.72, 0.95, Math.abs(DESKTOP_SANDCASTLE_POS.x)),
+        -THREE.MathUtils.clamp(visible.height / 2 - 0.72, 0.82, Math.abs(DESKTOP_SANDCASTLE_POS.y)),
+        0,
+      )
+    }
+
     const responsiveModelSize = (desktopSize: number, mobileWidthFactor: number) => {
       const visible = visibleWorldSize()
       return Math.min(desktopSize, Math.max(desktopSize * 0.58, visible.width * mobileWidthFactor))
     }
 
     let cloudPos = responsiveCloudPos()
+    let sandcastlePos = responsiveSandcastlePos()
 
     // All lights start at 0 and ramp up cinematically
     const ambient = new THREE.AmbientLight('#ffffff', 0)
@@ -75,8 +92,11 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
     const cloudLight = new THREE.PointLight('#8899ff', 0, 8)
     cloudLight.position.copy(cloudPos).add(new THREE.Vector3(0, 1, 2))
     scene.add(cloudLight)
+    const sandcastleLight = new THREE.PointLight('#c87820', 0, 7)
+    sandcastleLight.position.copy(sandcastlePos).add(new THREE.Vector3(0, 0.8, 2))
+    scene.add(sandcastleLight)
 
-    const LIGHT_TARGETS = { ambient: 0.4, key: 1.5, rim: 2.5, cloud: 2.0 }
+    const LIGHT_TARGETS = { ambient: 0.4, key: 1.5, rim: 2.5, cloud: 2.0, sandcastle: 1.15 }
     const LIGHT_DURATION = 210 // ~3.5s at 60fps
     let lightT = 0
 
@@ -94,12 +114,19 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
 
     let carpet: THREE.Group | null = null
     let clouds: THREE.Group | null = null
+    let sandcastle: THREE.Group | null = null
     let carpetBaseScale = 1
     let carpetMaxDim = 1
     let cloudsMaxDim = 1
+    let sandcastleMaxDim = 1
     let reached = false
+    let sandcastleActivated = false
+
+    const dracoLoader = new DRACOLoader()
+    dracoLoader.setDecoderPath('/draco/gltf/')
 
     const loader = new GLTFLoader()
+    loader.setDRACOLoader(dracoLoader)
 
     loader.load('/models/carpet.glb', (gltf) => {
       carpet = gltf.scene
@@ -122,6 +149,18 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
       clouds.scale.setScalar(responsiveModelSize(1.6, 0.44) / cloudsMaxDim)
       clouds.position.copy(cloudPos)
       scene.add(clouds)
+    })
+
+    loader.load('/models/sandcastle.glb', (gltf) => {
+      sandcastle = gltf.scene
+      const box = new THREE.Box3().setFromObject(sandcastle)
+      sandcastle.position.sub(box.getCenter(new THREE.Vector3()))
+      const size = box.getSize(new THREE.Vector3())
+      sandcastleMaxDim = Math.max(size.x, size.y, size.z)
+      sandcastle.scale.setScalar(responsiveModelSize(1.35, 0.34) / sandcastleMaxDim)
+      sandcastle.position.copy(sandcastlePos)
+      sandcastle.rotation.y = -Math.PI / 7
+      scene.add(sandcastle)
     })
 
     // Drag state
@@ -177,9 +216,12 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
       camera.updateProjectionMatrix()
       renderer.setSize(window.innerWidth, window.innerHeight)
       cloudPos = responsiveCloudPos()
+      sandcastlePos = responsiveSandcastlePos()
       cloudLight.position.copy(cloudPos).add(new THREE.Vector3(0, 1, 2))
+      sandcastleLight.position.copy(sandcastlePos).add(new THREE.Vector3(0, 0.8, 2))
       if (carpet) carpetBaseScale = responsiveModelSize(2.2, 0.62) / carpetMaxDim
       if (clouds) clouds.scale.setScalar(responsiveModelSize(1.6, 0.44) / cloudsMaxDim)
+      if (sandcastle) sandcastle.scale.setScalar(responsiveModelSize(1.35, 0.34) / sandcastleMaxDim)
     }
     window.addEventListener('resize', onResize)
 
@@ -199,6 +241,7 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
         key.intensity       = LIGHT_TARGETS.key     * e
         rim.intensity       = LIGHT_TARGETS.rim     * e
         cloudLight.intensity = LIGHT_TARGETS.cloud  * e
+        sandcastleLight.intensity = LIGHT_TARGETS.sandcastle * e
       }
 
       if (carpet && !reached) {
@@ -239,15 +282,25 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
           carpet.rotation.z = Math.sin(t * 0.55 + 1.2) * 0.025
         }
 
-        // Shrink as it moves from center — feels like it's flying into distance
+        const cPos = new THREE.Vector3(carpet.position.x, carpet.position.y, 0)
+
+        // Shrink as it moves from center, then tuck smaller into the sandcastle target.
         const dist = Math.hypot(currX, currY)
-        carpet.scale.setScalar(carpetBaseScale * Math.max(0.42, 1 - dist * 0.09))
+        const worldShrink = Math.max(0.42, 1 - dist * 0.09)
+        const sandcastleDist = cPos.distanceTo(sandcastlePos)
+        const sandcastlePull = 1 - THREE.MathUtils.clamp(sandcastleDist / SANDCASTLE_PULL_DIST, 0, 1)
+        const sandcastleShrink = THREE.MathUtils.lerp(worldShrink, 0.2, sandcastlePull * sandcastlePull)
+        carpet.scale.setScalar(carpetBaseScale * sandcastleShrink)
 
         // Proximity check
-        const cPos = new THREE.Vector3(carpet.position.x, carpet.position.y, 0)
         if (cPos.distanceTo(cloudPos) < REACH_DIST) {
           reached = true
           onReachRef.current()
+        } else if (sandcastleDist < SANDCASTLE_REACH_DIST && !sandcastleActivated) {
+          sandcastleActivated = true
+          onReachSandcastleRef.current()
+        } else if (sandcastleDist > SANDCASTLE_REACH_DIST * 1.7) {
+          sandcastleActivated = false
         }
       }
 
@@ -256,6 +309,12 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
         clouds.position.y = cloudPos.y + Math.sin(t * 0.8) * 0.055
         clouds.position.x = cloudPos.x + Math.sin(t * 0.4) * 0.02
         clouds.rotation.y = Math.sin(t * 0.3) * 0.04
+      }
+
+      if (sandcastle) {
+        sandcastle.position.y = sandcastlePos.y + Math.sin(t * 0.55) * 0.035
+        sandcastle.position.x = sandcastlePos.x + Math.sin(t * 0.28) * 0.015
+        sandcastle.rotation.y = -Math.PI / 7 + Math.sin(t * 0.24) * 0.035
       }
 
       renderer.render(scene, camera)
@@ -269,6 +328,7 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerup', onPointerUp)
       window.removeEventListener('resize', onResize)
+      dracoLoader.dispose()
       renderer.dispose()
     }
   }, [])
