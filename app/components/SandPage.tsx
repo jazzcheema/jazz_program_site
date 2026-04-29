@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
@@ -26,8 +26,23 @@ const MOBILE_FINAL_LOOK_OFFSET = new THREE.Vector3(0, -0.1, 0.02)
 const BIO_REVEAL_PROGRESS = 0.68
 const GENIE_CLICK_PULSE_DURATION = 620
 const RESET_DURATION = 1800
-const GOAL_MODE_DURATION = 2200
+const GOAL_MODE_DURATION = 3900
 const SUNRISE_DURATION = 7600
+const TUMBLEWEED_WORLD_SIZE = 0.48
+const GOAL_WORLD_SIZE = 1.1
+const GAMEPLAY_MOVE_SPEED = 0.055
+const GENIE_GAMEPLAY_LIFT = 0.16
+const TUMBLEWEED_GAMEPLAY_LIFT = 0
+const GOAL_GAMEPLAY_LIFT = -0.34
+const GOAL_FACE_ROTATION = 0
+const TUMBLEWEED_START_OFFSET = new THREE.Vector3(0, 0, 2.2)
+const GOAL_START_OFFSET = new THREE.Vector3(1.9, 0, 5.55)
+const GAMEPLAY_BOUNDS = {
+  minX: -9,
+  maxX: 9,
+  minZ: -4,
+  maxZ: 11,
+}
 const SUN_SETTLED_POSITION = new THREE.Vector3(-1.63, 3.8, 2.85)
 const SUN_START_POSITION = new THREE.Vector3(-2.6, -3.2, 4.8)
 const BOUNCE_FINAL_POSITION = new THREE.Vector3(-4.8, 2.15, 4.4)
@@ -94,9 +109,35 @@ const tuneSandMaterial = (object: THREE.Object3D) => {
 export default function SandPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const goalModeRequestedRef = useRef(false)
+  const moveInputRef = useRef({ x: 0, z: 0 })
+  const joystickPointerIdRef = useRef<number | null>(null)
   const [show, setShow] = useState(false)
   const [bioVisible, setBioVisible] = useState(false)
   const [goalModeActive, setGoalModeActive] = useState(false)
+  const [gameWon, setGameWon] = useState(false)
+  const [joystickPosition, setJoystickPosition] = useState({ x: 0, y: 0 })
+
+  const updateJoystick = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const radius = Math.max(rect.width, rect.height) * 0.36
+    const dx = event.clientX - (rect.left + rect.width / 2)
+    const dy = event.clientY - (rect.top + rect.height / 2)
+    const length = Math.hypot(dx, dy)
+    const clamp = length > radius ? radius / length : 1
+    const x = (dx * clamp) / radius
+    const y = (dy * clamp) / radius
+    setJoystickPosition({ x, y })
+    moveInputRef.current = { x: -x, z: -y }
+  }
+
+  const releaseJoystick = (event?: ReactPointerEvent<HTMLDivElement>) => {
+    if (event && joystickPointerIdRef.current !== null) {
+      event.currentTarget.releasePointerCapture(joystickPointerIdRef.current)
+    }
+    joystickPointerIdRef.current = null
+    setJoystickPosition({ x: 0, y: 0 })
+    moveInputRef.current = { x: 0, z: 0 }
+  }
 
   useEffect(() => {
     const t = setTimeout(() => setShow(true), 60)
@@ -174,11 +215,34 @@ export default function SandPage() {
 
     let sandFloor: THREE.Group | null = null
     let genie: THREE.Group | null = null
+    let tumbleweed: THREE.Group | null = null
+    let goal: THREE.Group | null = null
     let sandFloorMaxDim = 1
     let genieMaxDim = 1
     let genieModelHeight = 1
+    let tumbleweedModelHeight = 1
+    let tumbleweedScale = 1
+    let goalModelHeight = 1
+    let goalScale = 1
     const floorY = -2.18
     const genieRideHeight = 1.68
+    const tumbleweedGameplayPosition = new THREE.Vector3(
+      GENIE_BASE_X + TUMBLEWEED_START_OFFSET.x,
+      0,
+      GENIE_BASE_Z + TUMBLEWEED_START_OFFSET.z,
+    )
+    const goalGameplayPosition = new THREE.Vector3(
+      GENIE_BASE_X + GOAL_START_OFFSET.x,
+      0,
+      GENIE_BASE_Z + GOAL_START_OFFSET.z,
+    )
+    const keyboardInput = { x: 0, z: 0 }
+    const genieGameplayPos = new THREE.Vector3(GENIE_BASE_X, 0, GENIE_BASE_Z)
+    const tumbleweedVel = { x: 0, z: 0 }
+    let gameWonLocal = false
+    const goalWorldBox = new THREE.Box3()
+    const goalWorldCenter = new THREE.Vector3()
+    const goalWorldSize = new THREE.Vector3()
     const raycaster = new THREE.Raycaster()
     const pointer = new THREE.Vector2()
     let cinematicStart = 0
@@ -197,6 +261,7 @@ export default function SandPage() {
     const resetEndLookTarget = new THREE.Vector3()
     let goalModeTransitionActive = false
     let goalModeSceneActive = false
+    let goalModeStaged = false
     let goalModeTransitionStart = 0
     let goalModeStartFov = camera.fov
     let goalModeEndFov = camera.fov
@@ -213,6 +278,62 @@ export default function SandPage() {
 
     const loader = new GLTFLoader()
     loader.setDRACOLoader(dracoLoader)
+
+    const setGroundedObjectPosition = (
+      object: THREE.Object3D,
+      position: THREE.Vector3,
+      modelHeight: number,
+      scale: number,
+      lift = 0,
+    ) => {
+      object.position.set(position.x, floorY + modelHeight * scale * 0.5 + lift, position.z)
+    }
+
+    const prepGameplayObject = (object: THREE.Group, targetWorldSize: number) => {
+      const box = new THREE.Box3().setFromObject(object)
+      object.position.sub(box.getCenter(new THREE.Vector3()))
+      const size = box.getSize(new THREE.Vector3())
+      const maxDim = Math.max(size.x, size.y, size.z)
+      const scale = targetWorldSize / maxDim
+      object.scale.setScalar(scale)
+      object.visible = false
+      return { height: size.y, scale }
+    }
+
+    const placeGameplayObjects = () => {
+      if (!genie) return
+      // Reset positions centred in front of genie's starting spot
+      const scale = currentGenieScale()
+      genieGameplayPos.set(GENIE_BASE_X, 0, GENIE_BASE_Z)
+      genie.position.set(
+        genieGameplayPos.x,
+        floorY + genieModelHeight * scale * 0.5 + GENIE_GAMEPLAY_LIFT,
+        genieGameplayPos.z,
+      )
+      genie.rotation.y = 0
+      genie.rotation.z = 0
+      tumbleweedGameplayPosition.set(
+        GENIE_BASE_X + TUMBLEWEED_START_OFFSET.x,
+        0,
+        GENIE_BASE_Z + TUMBLEWEED_START_OFFSET.z,
+      )
+      goalGameplayPosition.set(
+        GENIE_BASE_X + GOAL_START_OFFSET.x,
+        0,
+        GENIE_BASE_Z + GOAL_START_OFFSET.z,
+      )
+
+      if (tumbleweed) {
+        setGroundedObjectPosition(tumbleweed, tumbleweedGameplayPosition, tumbleweedModelHeight, tumbleweedScale, TUMBLEWEED_GAMEPLAY_LIFT)
+        tumbleweed.visible = true
+      }
+
+      if (goal) {
+        setGroundedObjectPosition(goal, goalGameplayPosition, goalModelHeight, goalScale, GOAL_GAMEPLAY_LIFT)
+        goal.rotation.y = GOAL_FACE_ROTATION
+        goal.visible = true
+      }
+    }
 
     loader.load('/models/sand.glb', (gltf) => {
       sandFloor = gltf.scene
@@ -242,6 +363,27 @@ export default function SandPage() {
       scene.add(genie)
     })
 
+    loader.load('/models/tumbleweed.glb', (gltf) => {
+      tumbleweed = gltf.scene
+      const prepared = prepGameplayObject(tumbleweed, TUMBLEWEED_WORLD_SIZE)
+      tumbleweedModelHeight = prepared.height
+      tumbleweedScale = prepared.scale
+      setGroundedObjectPosition(tumbleweed, tumbleweedGameplayPosition, tumbleweedModelHeight, tumbleweedScale, TUMBLEWEED_GAMEPLAY_LIFT)
+      scene.add(tumbleweed)
+      if (goalModeSceneActive || goalModeTransitionActive) tumbleweed.visible = true
+    })
+
+    loader.load('/models/goal.glb', (gltf) => {
+      goal = gltf.scene
+      const prepared = prepGameplayObject(goal, GOAL_WORLD_SIZE)
+      goalModelHeight = prepared.height
+      goalScale = prepared.scale
+      goal.rotation.y = GOAL_FACE_ROTATION
+      setGroundedObjectPosition(goal, goalGameplayPosition, goalModelHeight, goalScale, GOAL_GAMEPLAY_LIFT)
+      scene.add(goal)
+      if (goalModeSceneActive || goalModeTransitionActive) goal.visible = true
+    })
+
     const currentGenieScale = () => responsiveGenieSize() / genieMaxDim
 
     const getGenieHeadTarget = () => {
@@ -261,20 +403,26 @@ export default function SandPage() {
     const getGoalModeFrame = () => {
       const portrait = portraitAmount()
       const frameScale = narrowAspectScale(camera.aspect, 1.32)
-      const basePosition = genie?.position ?? new THREE.Vector3(GENIE_BASE_X, floorY + 1.8, GENIE_BASE_Z)
+      const scale = currentGenieScale()
+      const basePosition = new THREE.Vector3(
+        genieGameplayPos.x,
+        floorY + genieModelHeight * scale * 0.5 + GENIE_GAMEPLAY_LIFT,
+        genieGameplayPos.z,
+      )
+      // Centered third-person gameplay frame so forward input reads as straight ahead.
       const cameraOffset = new THREE.Vector3(
-        THREE.MathUtils.lerp(0.1, 0, portrait),
-        THREE.MathUtils.lerp(1.18, 1.45, portrait),
-        -2.28 * frameScale,
+        0,
+        THREE.MathUtils.lerp(0.42, 0.72, portrait),
+        -2.16 * frameScale,
       )
       const lookOffset = new THREE.Vector3(
         0,
-        THREE.MathUtils.lerp(0.72, 0.9, portrait),
-        1.1 * frameScale,
+        THREE.MathUtils.lerp(0.2, 0.34, portrait),
+        1.35 * frameScale,
       )
 
       return {
-        fov: THREE.MathUtils.lerp(48, 56, portrait),
+        fov: THREE.MathUtils.lerp(52, 60, portrait),
         position: basePosition.clone().add(cameraOffset),
         target: basePosition.clone().add(lookOffset),
       }
@@ -363,6 +511,17 @@ export default function SandPage() {
     const beginGoalModeTransition = () => {
       if (!genie || goalModeTransitionActive || goalModeSceneActive) return
 
+      // Place objects and reset gameplay state before camera moves
+      genieGameplayPos.set(GENIE_BASE_X, 0, GENIE_BASE_Z)
+      tumbleweedVel.x = 0
+      tumbleweedVel.z = 0
+      gameWonLocal = false
+      setGameWon(false)
+      goalModeStaged = false
+      if (sandFloor) sandFloor.visible = true
+      if (tumbleweed) tumbleweed.visible = false
+      if (goal) goal.visible = false
+
       const goalFrame = getGoalModeFrame()
       goalModeTransitionActive = true
       goalModeTransitionStart = performance.now()
@@ -403,16 +562,31 @@ export default function SandPage() {
     canvas.addEventListener('pointerleave', onPointerLeave)
     canvas.addEventListener('pointerdown', onPointerDown)
 
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowUp'    || e.key === 'w' || e.key === 'W') keyboardInput.z =  1
+      if (e.key === 'ArrowDown'  || e.key === 's' || e.key === 'S') keyboardInput.z = -1
+      if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') keyboardInput.x =  1
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keyboardInput.x = -1
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowUp'    || e.key === 'w' || e.key === 'W') keyboardInput.z = 0
+      if (e.key === 'ArrowDown'  || e.key === 's' || e.key === 'S') keyboardInput.z = 0
+      if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') keyboardInput.x = 0
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keyboardInput.x = 0
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+
     const onResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight
       camera.updateProjectionMatrix()
       renderer.setSize(window.innerWidth, window.innerHeight)
-      if (!cinematicActive && !cinematicComplete && !resetActive) fitInitialCamera()
+      if (!cinematicActive && !cinematicComplete && !resetActive && !goalModeTransitionActive && !goalModeSceneActive) fitInitialCamera()
       if (sandFloor) sandFloor.scale.setScalar(responsiveFloorSize() / sandFloorMaxDim)
       if (genie) {
         const scale = responsiveGenieSize() / genieMaxDim
         genie.scale.setScalar(scale)
-        genie.position.y = floorY + genieModelHeight * scale * 0.5 + genieRideHeight
+        genie.position.y = floorY + genieModelHeight * scale * 0.5 + (goalModeTransitionActive || goalModeSceneActive ? GENIE_GAMEPLAY_LIFT : genieRideHeight)
       }
     }
     window.addEventListener('resize', onResize)
@@ -450,22 +624,147 @@ export default function SandPage() {
         const hoverPulse = pointerOnGenie && !cinematicActive && !resetActive && !goalModeTransitionActive && !goalModeSceneActive ? (Math.sin(t * 2.8) + 1) * 0.5 : 0
         const interactionScale = 1 + hoverPulse * 0.025 + pulse * 0.09
         genie.scale.setScalar(scale * interactionScale)
-        genie.position.x = GENIE_BASE_X + Math.sin(t * 0.14) * 0.045 * motionWeight
-        genie.position.z = GENIE_BASE_Z + Math.sin(t * 0.1 + 1.3) * 0.035 * motionWeight
-        genie.position.y = floorY + genieModelHeight * scale * interactionScale * 0.5 + genieRideHeight + Math.sin(t * 0.48) * 0.018 * motionWeight
-        genie.rotation.y = Math.PI / 5 + Math.sin(t * 0.18) * 0.035 * motionWeight
-        genie.rotation.z = Math.sin(t * 0.16) * 0.008 * motionWeight
+        if (goalModeTransitionActive && goalModeStaged) {
+          genie.position.x = genieGameplayPos.x
+          genie.position.z = genieGameplayPos.z
+          genie.position.y = floorY + genieModelHeight * scale * interactionScale * 0.5 + GENIE_GAMEPLAY_LIFT
+          genie.rotation.y = 0
+          genie.rotation.z = 0
+        } else if (!goalModeSceneActive) {
+          genie.position.x = GENIE_BASE_X + Math.sin(t * 0.14) * 0.045 * motionWeight
+          genie.position.z = GENIE_BASE_Z + Math.sin(t * 0.1 + 1.3) * 0.035 * motionWeight
+          genie.position.y = floorY + genieModelHeight * scale * interactionScale * 0.5 + genieRideHeight + Math.sin(t * 0.48) * 0.018 * motionWeight
+          genie.rotation.y = Math.PI / 5 + Math.sin(t * 0.18) * 0.035 * motionWeight
+          genie.rotation.z = Math.sin(t * 0.16) * 0.008 * motionWeight
+        }
         genieLight.position.set(genie.position.x, genie.position.y + 0.45, genie.position.z + 1.25)
         genieSignalLight.position.set(genie.position.x, genie.position.y + 0.28, genie.position.z + 0.88)
         genieSignalLight.intensity = hoverPulse * 0.42 + pulse * 2.35
       }
 
+      // Gameplay: drive genie, push tumbleweed, detect goal
+      if (goalModeSceneActive && genie && !gameWonLocal) {
+        const scale = currentGenieScale()
+        const jx = moveInputRef.current.x
+        const jz = moveInputRef.current.z  // positive = joystick up = forward
+        const totalX = jx + keyboardInput.x
+        const totalZ = jz + keyboardInput.z
+
+        genieGameplayPos.x = THREE.MathUtils.clamp(
+          genieGameplayPos.x + totalX * GAMEPLAY_MOVE_SPEED,
+          GAMEPLAY_BOUNDS.minX, GAMEPLAY_BOUNDS.maxX,
+        )
+        genieGameplayPos.z = THREE.MathUtils.clamp(
+          genieGameplayPos.z + totalZ * GAMEPLAY_MOVE_SPEED,
+          GAMEPLAY_BOUNDS.minZ, GAMEPLAY_BOUNDS.maxZ,
+        )
+
+        genie.position.x = THREE.MathUtils.lerp(genie.position.x, genieGameplayPos.x, 0.2)
+        genie.position.z = THREE.MathUtils.lerp(genie.position.z, genieGameplayPos.z, 0.2)
+        genie.position.y = floorY + genieModelHeight * scale * 0.5 + GENIE_GAMEPLAY_LIFT
+
+        // Rotate to face direction of travel
+        const moveLen = Math.hypot(totalX, totalZ)
+        if (moveLen > 0.08) {
+          const targetRot = Math.atan2(totalX, totalZ)
+          const delta = ((targetRot - genie.rotation.y) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI
+          genie.rotation.y += delta * 0.12
+        }
+
+        genieLight.position.set(genie.position.x, genie.position.y + 0.45, genie.position.z + 1.25)
+
+        // Tumbleweed push physics
+        if (tumbleweed) {
+          const dx = tumbleweedGameplayPosition.x - genie.position.x
+          const dz = tumbleweedGameplayPosition.z - genie.position.z
+          const dist = Math.hypot(dx, dz)
+          const pushRadius = 0.58
+          if (dist < pushRadius && dist > 0.01) {
+            const strength = (1 - dist / pushRadius) * 0.034
+            tumbleweedVel.x += (dx / dist) * strength
+            tumbleweedVel.z += (dz / dist) * strength
+          }
+          tumbleweedGameplayPosition.x = THREE.MathUtils.clamp(
+            tumbleweedGameplayPosition.x + tumbleweedVel.x,
+            GAMEPLAY_BOUNDS.minX, GAMEPLAY_BOUNDS.maxX,
+          )
+          tumbleweedGameplayPosition.z = THREE.MathUtils.clamp(
+            tumbleweedGameplayPosition.z + tumbleweedVel.z,
+            GAMEPLAY_BOUNDS.minZ, GAMEPLAY_BOUNDS.maxZ,
+          )
+          tumbleweedVel.x *= 0.86
+          tumbleweedVel.z *= 0.86
+          tumbleweed.rotation.x += tumbleweedVel.z * 6
+          tumbleweed.rotation.z -= tumbleweedVel.x * 6
+
+          if (goal) {
+            goalWorldBox.setFromObject(goal)
+            goalWorldBox.getCenter(goalWorldCenter)
+            goalWorldBox.getSize(goalWorldSize)
+            const gx = tumbleweedGameplayPosition.x - goalWorldCenter.x
+            const ballRadius = TUMBLEWEED_WORLD_SIZE * 0.42
+            const mouthHalfWidth = goalWorldSize.x * 0.42
+            const sideWallHalfWidth = goalWorldSize.x * 0.5 + ballRadius * 0.24
+            const goalFrontZ = goalWorldBox.min.z - ballRadius * 0.22
+            const goalBackMeshZ = goalWorldBox.max.z - ballRadius * 0.82
+            const insideGoalDepth = tumbleweedGameplayPosition.z > goalFrontZ && tumbleweedGameplayPosition.z < goalWorldBox.max.z + ballRadius * 0.12
+            const insideGoalMouth = Math.abs(gx) < mouthHalfWidth && tumbleweedGameplayPosition.z >= goalBackMeshZ
+
+            if (Math.abs(gx) > mouthHalfWidth && Math.abs(gx) < sideWallHalfWidth && insideGoalDepth) {
+              tumbleweedGameplayPosition.x = goalWorldCenter.x + Math.sign(gx) * sideWallHalfWidth
+              tumbleweedVel.x *= -0.22
+            }
+
+            if (Math.abs(gx) < mouthHalfWidth && tumbleweedGameplayPosition.z > goalBackMeshZ) {
+              tumbleweedGameplayPosition.z = goalBackMeshZ
+              tumbleweedVel.z = Math.min(0, tumbleweedVel.z * -0.18)
+            }
+
+            if (insideGoalMouth) {
+              tumbleweedGameplayPosition.x = THREE.MathUtils.lerp(tumbleweedGameplayPosition.x, goalWorldCenter.x, 0.48)
+              tumbleweedGameplayPosition.z = goalBackMeshZ
+              tumbleweedVel.x = 0
+              tumbleweedVel.z = 0
+              setGroundedObjectPosition(tumbleweed, tumbleweedGameplayPosition, tumbleweedModelHeight, tumbleweedScale, TUMBLEWEED_GAMEPLAY_LIFT)
+              gameWonLocal = true
+              setGameWon(true)
+            }
+          }
+
+          setGroundedObjectPosition(tumbleweed, tumbleweedGameplayPosition, tumbleweedModelHeight, tumbleweedScale, TUMBLEWEED_GAMEPLAY_LIFT)
+        }
+
+        if (goal) {
+          goalWorldBox.setFromObject(goal)
+          const goalFrontZ = goalWorldBox.min.z - 0.18
+          const insideGoalX = genieGameplayPos.x > goalWorldBox.min.x - 0.55 && genieGameplayPos.x < goalWorldBox.max.x + 0.55
+          if (insideGoalX && genieGameplayPos.z > goalFrontZ) {
+            genieGameplayPos.z = goalFrontZ
+            genie.position.z = THREE.MathUtils.lerp(genie.position.z, genieGameplayPos.z, 0.55)
+          }
+        }
+      }
+
       if (goalModeTransitionActive) {
         const progress = THREE.MathUtils.clamp((performance.now() - goalModeTransitionStart) / GOAL_MODE_DURATION, 0, 1)
         const eased = easeInOutCubic(progress)
+        const skyRise = easeInOutCubic(THREE.MathUtils.clamp(progress / 0.48, 0, 1))
+        const skyFall = easeInOutCubic(THREE.MathUtils.clamp((progress - 0.46) / 0.34, 0, 1))
+        const skyDetour = Math.max(0, skyRise - skyFall)
+        const stagedPosition = new THREE.Vector3().lerpVectors(goalModeStartPosition, goalModeEndPosition, eased)
+        const stagedLook = new THREE.Vector3().lerpVectors(goalModeStartLookTarget, goalModeEndLookTarget, eased)
+        stagedPosition.y += skyDetour * 2.65
+        stagedLook.y += skyDetour * 3.75
+
+        if (progress >= 0.42 && !goalModeStaged) {
+          goalModeStaged = true
+          if (sandFloor) sandFloor.visible = false
+          placeGameplayObjects()
+        }
+
         camera.fov = THREE.MathUtils.lerp(goalModeStartFov, goalModeEndFov, eased)
-        camera.position.lerpVectors(goalModeStartPosition, goalModeEndPosition, eased)
-        activeLookTarget.lerpVectors(goalModeStartLookTarget, goalModeEndLookTarget, eased)
+        camera.position.copy(stagedPosition)
+        activeLookTarget.copy(stagedLook)
         camera.updateProjectionMatrix()
         camera.lookAt(activeLookTarget)
 
@@ -534,6 +833,8 @@ export default function SandPage() {
     return () => {
       cancelAnimationFrame(animId)
       window.removeEventListener('resize', onResize)
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerleave', onPointerLeave)
       canvas.removeEventListener('pointerdown', onPointerDown)
@@ -674,18 +975,136 @@ export default function SandPage() {
         </div>
       )}
 
-      <div
-        className="absolute left-1/2 -translate-x-1/2 text-center text-[0.6rem] sm:text-xs tracking-widest pointer-events-none"
-        style={{
-          bottom: 'max(22px, 6dvh)',
-          width: 'min(38rem, calc(100vw - 32px))',
-          color: '#303030',
-          fontFamily: 'var(--font-geist-mono)',
-          zIndex: 9,
-        }}
-      >
-        → CLICK_GENIE // CINEMATIC_FACE_SCAN
-      </div>
+      {!goalModeActive && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2 text-center text-[0.6rem] sm:text-xs tracking-widest pointer-events-none"
+          style={{
+            bottom: 'max(22px, 6dvh)',
+            width: 'min(38rem, calc(100vw - 32px))',
+            color: '#303030',
+            fontFamily: 'var(--font-geist-mono)',
+            zIndex: 9,
+          }}
+        >
+          → CLICK_GENIE // CINEMATIC_FACE_SCAN
+        </div>
+      )}
+
+      {/* Joystick — shown in gameplay mode */}
+      {goalModeActive && !gameWon && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 'max(28px, 5dvh)',
+            right: 'max(24px, 4vw)',
+            zIndex: 20,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '0.38rem',
+            fontFamily: 'var(--font-geist-mono)',
+            userSelect: 'none',
+          }}
+        >
+          <div style={{ color: '#303030', fontSize: '0.46rem', letterSpacing: '0.16em' }}>
+            MOVE_AXIS
+          </div>
+          <div
+            onPointerDown={(e) => {
+              joystickPointerIdRef.current = e.pointerId
+              e.currentTarget.setPointerCapture(e.pointerId)
+              updateJoystick(e)
+            }}
+            onPointerMove={(e) => {
+              if (joystickPointerIdRef.current === e.pointerId) updateJoystick(e)
+            }}
+            onPointerUp={releaseJoystick}
+            onPointerCancel={releaseJoystick}
+            style={{
+              width: 124,
+              height: 124,
+              borderRadius: '50%',
+              border: '1px solid rgba(200, 200, 200, 0.13)',
+              background: 'rgba(12, 12, 12, 0.54)',
+              backdropFilter: 'blur(18px) saturate(118%)',
+              WebkitBackdropFilter: 'blur(18px) saturate(118%)',
+              position: 'relative',
+              cursor: 'grab',
+              touchAction: 'none',
+            }}
+          >
+            {/* inner guide ring */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              borderRadius: '50%',
+              border: '1px solid rgba(200, 200, 200, 0.06)',
+              transform: 'scale(0.58)',
+              pointerEvents: 'none',
+            }} />
+            {/* crosshair lines */}
+            <div style={{ position: 'absolute', top: '50%', left: '12%', right: '12%', height: 1, background: 'rgba(200,200,200,0.04)', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', left: '50%', top: '12%', bottom: '12%', width: 1, background: 'rgba(200,200,200,0.04)', pointerEvents: 'none' }} />
+            {/* thumb */}
+            <div style={{
+              position: 'absolute',
+              width: 38,
+              height: 38,
+              borderRadius: '50%',
+              background: (joystickPosition.x !== 0 || joystickPosition.y !== 0)
+                ? 'rgba(200, 120, 32, 0.38)'
+                : 'rgba(200, 200, 200, 0.16)',
+              border: '1px solid rgba(200, 200, 200, 0.24)',
+              top: '50%',
+              left: '50%',
+              transform: `translate(calc(-50% + ${joystickPosition.x * 40}px), calc(-50% + ${joystickPosition.y * 40}px))`,
+              transition: (joystickPosition.x === 0 && joystickPosition.y === 0)
+                ? 'transform 200ms ease, background 140ms ease'
+                : 'background 140ms ease',
+              pointerEvents: 'none',
+            }} />
+          </div>
+          <div style={{ color: '#242424', fontSize: '0.42rem', letterSpacing: '0.12em' }}>
+            W·A·S·D / ARROWS
+          </div>
+        </div>
+      )}
+
+      {/* Goal scored */}
+      {gameWon && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 25,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+            fontFamily: 'var(--font-geist-mono)',
+          }}
+        >
+          <div style={{
+            border: '1px solid rgba(36, 153, 88, 0.32)',
+            background: 'rgba(12, 12, 12, 0.72)',
+            backdropFilter: 'blur(18px) saturate(118%)',
+            WebkitBackdropFilter: 'blur(18px) saturate(118%)',
+            padding: '1.4rem 2.2rem',
+            textAlign: 'center',
+          }}>
+            <div style={{ color: '#249958', fontSize: 'clamp(0.56rem, 0.7vw, 0.72rem)', letterSpacing: '0.18em', marginBottom: '0.5rem' }}>
+              → GOAL_SCORED // SIGNAL_CONFIRMED
+            </div>
+            <div style={{ color: '#c8c8c8', fontSize: 'clamp(1rem, 1.4vw, 1.5rem)', fontWeight: 400, letterSpacing: '0.04em' }}>
+              MAKE_CONTACT
+            </div>
+            <div style={{ color: '#303030', fontSize: '0.52rem', letterSpacing: '0.14em', marginTop: '0.6rem' }}>
+              FIELD: #249958 / STATUS: LIVE
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
