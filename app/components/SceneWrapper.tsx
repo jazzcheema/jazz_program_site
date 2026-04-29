@@ -57,7 +57,7 @@ export default function SceneWrapper() {
   if (reached) return <CloudsPage />
 
   return (
-    <div className="w-screen h-screen overflow-hidden relative">
+    <div className="w-dvw h-dvh overflow-hidden relative" style={{ width: '100dvw', height: '100dvh' }}>
       <CarpetScene
         onCarpetClick={() => setPanelOpen(true)}
         onReachClouds={handleReachClouds}
@@ -78,8 +78,12 @@ export default function SceneWrapper() {
       {/* Hint — shown until first interaction */}
       {!panelOpen && (
         <div
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 text-xs tracking-widest pointer-events-none"
-          style={{ color: '#282828', fontFamily: 'var(--font-geist-mono)' }}
+          className="fixed bottom-5 sm:bottom-6 left-1/2 -translate-x-1/2 text-[0.65rem] sm:text-xs tracking-widest pointer-events-none text-center"
+          style={{
+            color: '#282828',
+            fontFamily: 'var(--font-geist-mono)',
+            width: 'min(34rem, calc(100vw - 32px))',
+          }}
         >
           → CLICK CARPET FOR MISSION DATA → DRAG TO FLY
         </div>

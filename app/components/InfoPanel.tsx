@@ -41,7 +41,7 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
   }, [data])
   return (
     <div
-      className="fixed top-0 right-0 h-full w-1/3 transition-transform duration-300 ease-in-out z-10 flex flex-col"
+      className="fixed inset-y-0 right-0 w-full sm:w-[min(520px,66vw)] xl:w-1/3 transition-transform duration-300 ease-in-out z-30 flex flex-col"
       style={{
         transform: open ? 'translateX(0)' : 'translateX(100%)',
         background: '#0c0c0c',
@@ -51,15 +51,15 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
     >
       {/* Header */}
       <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid #1e1e1e' }}>
-        <div className="flex justify-between items-start">
-          <div>
-            <div className="text-xs tracking-widest mb-0.5" style={{ color: '#484848' }}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
+          <div className="min-w-0">
+            <div className="text-[0.65rem] sm:text-xs tracking-widest mb-0.5 break-words" style={{ color: '#484848' }}>
               OBJECT_DATA.SYS ──────────────── VER.01.09.26
             </div>
-            <div className="text-base font-bold tracking-widest" style={{ color: '#c8c8c8' }}>
+            <div className="text-sm sm:text-base font-bold tracking-widest break-words" style={{ color: '#c8c8c8' }}>
               → {data.label}
             </div>
-            <div className="text-xs tracking-widest mt-0.5" style={{ color: '#303030' }}>
+            <div className="text-[0.65rem] sm:text-xs tracking-widest mt-0.5 break-words" style={{ color: '#303030' }}>
               CLASS: {data.class} / STATUS: [{data.status}]
             </div>
           </div>
@@ -81,24 +81,26 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
           <div className="text-xs tracking-widest mb-1.5" style={{ color: '#484848' }}>
             SPATIAL_COORDS ──────────────────────────────
           </div>
-          <table className="w-full text-xs" style={{ color: '#808080' }}>
-            <tbody>
-              {[
-                ['X', '+0.000', 'Y', '+0.023', 'Z', '+0.000'],
-                ['ROT.X', '0.040 rad', 'ROT.Y', '0.785 rad', 'ROT.Z', '0.030 rad'],
-                ['SCALE', '1.000×', 'POLY', '12,847 TRI', 'UV', 'MAPPED'],
-              ].map((row, i) => (
-                <tr key={i}>
-                  {row.map((cell, j) => (
-                    <td key={j} className="py-0.5 pr-2"
-                      style={{ color: j % 2 === 0 ? '#303030' : '#808080', whiteSpace: 'nowrap' }}>
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+            <table className="w-full min-w-[440px] text-xs" style={{ color: '#808080' }}>
+              <tbody>
+                {[
+                  ['X', '+0.000', 'Y', '+0.023', 'Z', '+0.000'],
+                  ['ROT.X', '0.040 rad', 'ROT.Y', '0.785 rad', 'ROT.Z', '0.030 rad'],
+                  ['SCALE', '1.000×', 'POLY', '12,847 TRI', 'UV', 'MAPPED'],
+                ].map((row, i) => (
+                  <tr key={i}>
+                    {row.map((cell, j) => (
+                      <td key={j} className="py-0.5 pr-2"
+                        style={{ color: j % 2 === 0 ? '#303030' : '#808080', whiteSpace: 'nowrap' }}>
+                        {cell}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         {/* EQ / oscillation bars — unique per object */}
@@ -134,7 +136,7 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
             {data.specsLabel} ───────────────────────────────
           </div>
           {data.specs.map(([k, v], i) => (
-            <div key={i} className="flex gap-2 text-xs py-0.5" style={{ borderBottom: '1px solid #181818' }}>
+            <div key={i} className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs py-0.5" style={{ borderBottom: '1px solid #181818' }}>
               <span className="w-24 shrink-0" style={{ color: '#303030' }}>{k}</span>
               <span style={{ color: '#808080' }}>{v}</span>
             </div>
@@ -147,7 +149,7 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
             {data.scanLabel} ───────────────────────────────
           </div>
           {data.materials.map(([a, b, c, d], i) => (
-            <div key={i} className="flex gap-2 text-xs py-0.5" style={{ borderBottom: '1px solid #181818' }}>
+            <div key={i} className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs py-0.5" style={{ borderBottom: '1px solid #181818' }}>
               <span className="w-20 shrink-0" style={{ color: '#303030' }}>{a}</span>
               <span className="w-20 shrink-0" style={{ color: '#808080' }}>{b}</span>
               <span className="w-10 shrink-0" style={{ color: '#808080' }}>{c}</span>

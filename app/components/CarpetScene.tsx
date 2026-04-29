@@ -9,8 +9,8 @@ interface CarpetSceneProps {
   onReachClouds: () => void
 }
 
-// Cloud lives at top-right in world space (camera z=6, FOV 45°)
-const CLOUD_POS = new THREE.Vector3(3.0, 1.6, 0)
+// Desktop target; the live position is clamped to the camera's visible area.
+const DESKTOP_CLOUD_POS = new THREE.Vector3(3.0, 1.6, 0)
 const REACH_DIST = 1.3
 
 export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetSceneProps) {
@@ -41,6 +41,27 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100)
     camera.position.set(0, 0, 6)
 
+    const visibleWorldSize = () => {
+      const height = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5) * camera.position.z
+      return { width: height * camera.aspect, height }
+    }
+
+    const responsiveCloudPos = () => {
+      const visible = visibleWorldSize()
+      return new THREE.Vector3(
+        THREE.MathUtils.clamp(visible.width / 2 - 0.55, 0.85, DESKTOP_CLOUD_POS.x),
+        THREE.MathUtils.clamp(visible.height / 2 - 0.85, 0.95, DESKTOP_CLOUD_POS.y),
+        0,
+      )
+    }
+
+    const responsiveModelSize = (desktopSize: number, mobileWidthFactor: number) => {
+      const visible = visibleWorldSize()
+      return Math.min(desktopSize, Math.max(desktopSize * 0.58, visible.width * mobileWidthFactor))
+    }
+
+    let cloudPos = responsiveCloudPos()
+
     // All lights start at 0 and ramp up cinematically
     const ambient = new THREE.AmbientLight('#ffffff', 0)
     scene.add(ambient)
@@ -51,7 +72,7 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
     rim.position.set(-3, 2, -2)
     scene.add(rim)
     const cloudLight = new THREE.PointLight('#8899ff', 0, 8)
-    cloudLight.position.copy(CLOUD_POS).add(new THREE.Vector3(0, 1, 2))
+    cloudLight.position.copy(cloudPos).add(new THREE.Vector3(0, 1, 2))
     scene.add(cloudLight)
 
     const LIGHT_TARGETS = { ambient: 0.4, key: 1.5, rim: 2.5, cloud: 2.0 }
@@ -73,6 +94,8 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
     let carpet: THREE.Group | null = null
     let clouds: THREE.Group | null = null
     let carpetBaseScale = 1
+    let carpetMaxDim = 1
+    let cloudsMaxDim = 1
     let reached = false
 
     const loader = new GLTFLoader()
@@ -82,7 +105,8 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
       const box = new THREE.Box3().setFromObject(carpet)
       carpet.position.sub(box.getCenter(new THREE.Vector3()))
       const size = box.getSize(new THREE.Vector3())
-      carpetBaseScale = 2.2 / Math.max(size.x, size.y, size.z)
+      carpetMaxDim = Math.max(size.x, size.y, size.z)
+      carpetBaseScale = responsiveModelSize(2.2, 0.62) / carpetMaxDim
       carpet.scale.setScalar(carpetBaseScale)
       carpet.rotation.y = Math.PI / 3
       scene.add(carpet)
@@ -93,8 +117,9 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
       const box = new THREE.Box3().setFromObject(clouds)
       clouds.position.sub(box.getCenter(new THREE.Vector3()))
       const size = box.getSize(new THREE.Vector3())
-      clouds.scale.setScalar(1.6 / Math.max(size.x, size.y, size.z))
-      clouds.position.copy(CLOUD_POS)
+      cloudsMaxDim = Math.max(size.x, size.y, size.z)
+      clouds.scale.setScalar(responsiveModelSize(1.6, 0.44) / cloudsMaxDim)
+      clouds.position.copy(cloudPos)
       scene.add(clouds)
     })
 
@@ -150,6 +175,10 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
       camera.aspect = window.innerWidth / window.innerHeight
       camera.updateProjectionMatrix()
       renderer.setSize(window.innerWidth, window.innerHeight)
+      cloudPos = responsiveCloudPos()
+      cloudLight.position.copy(cloudPos).add(new THREE.Vector3(0, 1, 2))
+      if (carpet) carpetBaseScale = responsiveModelSize(2.2, 0.62) / carpetMaxDim
+      if (clouds) clouds.scale.setScalar(responsiveModelSize(1.6, 0.44) / cloudsMaxDim)
     }
     window.addEventListener('resize', onResize)
 
@@ -215,7 +244,7 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
 
         // Proximity check
         const cPos = new THREE.Vector3(carpet.position.x, carpet.position.y, 0)
-        if (cPos.distanceTo(CLOUD_POS) < REACH_DIST) {
+        if (cPos.distanceTo(cloudPos) < REACH_DIST) {
           reached = true
           onReachRef.current()
         }
@@ -223,8 +252,8 @@ export default function CarpetScene({ onCarpetClick, onReachClouds }: CarpetScen
 
       // Clouds: gentle independent bob
       if (clouds) {
-        clouds.position.y = CLOUD_POS.y + Math.sin(t * 0.8) * 0.055
-        clouds.position.x = CLOUD_POS.x + Math.sin(t * 0.4) * 0.02
+        clouds.position.y = cloudPos.y + Math.sin(t * 0.8) * 0.055
+        clouds.position.x = cloudPos.x + Math.sin(t * 0.4) * 0.02
         clouds.rotation.y = Math.sin(t * 0.3) * 0.04
       }
 

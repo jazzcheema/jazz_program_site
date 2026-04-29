@@ -16,21 +16,21 @@ export default function ObjectDial({ selectedIndex, panelOpen, onSelect }: Objec
 
   return (
     <div
-      className="fixed bottom-0 z-20 transition-all duration-300"
+      data-panel-open={panelOpen}
+      className="object-dial fixed bottom-0 z-20 transition-all duration-300"
       style={{
-        left: panelOpen ? '33.333%' : '50%',
         transform: 'translateX(-50%)',
-        width: 520,
-        background: '#06060e',
-        borderTop: '1px solid #0033aa',
-        borderLeft: '1px solid #0033aa',
-        borderRight: '1px solid #0033aa',
+        width: 'min(520px, calc(100vw - 24px))',
+        background: '#0c0c0c',
+        borderTop: '1px solid #1e1e1e',
+        borderLeft: '1px solid #1e1e1e',
+        borderRight: '1px solid #1e1e1e',
         fontFamily: 'var(--font-geist-mono)',
       }}
     >
       {/* Top rule */}
-      <div className="px-4 pt-2 pb-1" style={{ borderBottom: '1px solid #0d0d2a' }}>
-        <div className="text-xs tracking-widest flex justify-between" style={{ color: '#304080' }}>
+      <div className="px-3 sm:px-4 pt-2 pb-1" style={{ borderBottom: '1px solid #1e1e1e' }}>
+        <div className="text-[0.65rem] sm:text-xs tracking-widest flex justify-between gap-3" style={{ color: '#484848' }}>
           <span>OBJECT_SELECTOR.SYS</span>
           <span>{String(selectedIndex + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}</span>
         </div>
@@ -42,7 +42,7 @@ export default function ObjectDial({ selectedIndex, panelOpen, onSelect }: Objec
         <button
           onClick={() => onSelect(prev)}
           className="text-xs tracking-widest transition-opacity hover:opacity-100 shrink-0"
-          style={{ color: '#0055ff', opacity: 0.7 }}
+          style={{ color: '#808080', opacity: 0.7 }}
         >
           [←]
         </button>
@@ -51,19 +51,19 @@ export default function ObjectDial({ selectedIndex, panelOpen, onSelect }: Objec
         <div className="flex-1 text-right">
           <button
             onClick={() => onSelect(prev)}
-            className="text-xs tracking-widest transition-opacity hover:opacity-60"
-            style={{ color: '#1a2a50' }}
+            className="hidden sm:inline text-xs tracking-widest transition-opacity hover:opacity-60"
+            style={{ color: '#303030' }}
           >
             {OBJECTS[prev].shortLabel}
           </button>
         </div>
 
         {/* Current */}
-        <div className="text-center shrink-0 px-3" style={{ minWidth: 180 }}>
-          <div className="text-sm font-bold tracking-widest leading-none mb-0.5" style={{ color: '#c0ccff' }}>
+        <div className="text-center shrink min-w-0 px-2 sm:px-3" style={{ minWidth: 0 }}>
+          <div className="text-xs sm:text-sm font-bold tracking-widest leading-tight mb-0.5 break-words" style={{ color: '#c8c8c8' }}>
             {obj.label}
           </div>
-          <div className="text-xs tracking-widest" style={{ color: '#304080', fontSize: '0.6rem' }}>
+          <div className="text-[0.55rem] sm:text-xs tracking-widest break-words" style={{ color: '#484848' }}>
             {obj.class}
           </div>
         </div>
@@ -72,8 +72,8 @@ export default function ObjectDial({ selectedIndex, panelOpen, onSelect }: Objec
         <div className="flex-1 text-left">
           <button
             onClick={() => onSelect(next)}
-            className="text-xs tracking-widest transition-opacity hover:opacity-60"
-            style={{ color: '#1a2a50' }}
+            className="hidden sm:inline text-xs tracking-widest transition-opacity hover:opacity-60"
+            style={{ color: '#303030' }}
           >
             {OBJECTS[next].shortLabel}
           </button>
@@ -83,7 +83,7 @@ export default function ObjectDial({ selectedIndex, panelOpen, onSelect }: Objec
         <button
           onClick={() => onSelect(next)}
           className="text-xs tracking-widest transition-opacity hover:opacity-100 shrink-0"
-          style={{ color: '#0055ff', opacity: 0.7 }}
+          style={{ color: '#808080', opacity: 0.7 }}
         >
           [→]
         </button>
@@ -103,9 +103,8 @@ export default function ObjectDial({ selectedIndex, panelOpen, onSelect }: Objec
                 width: i === selectedIndex ? 6 : 4,
                 height: i === selectedIndex ? 6 : 4,
                 borderRadius: '50%',
-                background: i === selectedIndex ? '#0055ff' : '#0d1a40',
-                border: `1px solid ${i === selectedIndex ? '#0055ff' : '#0d1a40'}`,
-                boxShadow: i === selectedIndex ? '0 0 6px #0055ff' : 'none',
+                background: i === selectedIndex ? '#808080' : '#303030',
+                border: `1px solid ${i === selectedIndex ? '#808080' : '#303030'}`,
               }}
             />
           </button>

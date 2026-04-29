@@ -25,3 +25,13 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   overflow: hidden;
 }
+
+.object-dial {
+  left: 50%;
+}
+
+@media (min-width: 768px) {
+  .object-dial[data-panel-open="true"] {
+    left: 33.333%;
+  }
+}
