@@ -9,6 +9,7 @@ import {
   narrowAspectScale,
 } from '../lib/responsiveScene'
 import VortexBackground from './VortexBackground'
+import WindTextChars from './WindTextChars'
 
 const SAND_VORTEX_HUES = [30, 38, 47]
 const GENIE_BASE_X = -1.18
@@ -23,6 +24,18 @@ const REFERENCE_ASPECT = 16 / 10
 const FINAL_LOOK_OFFSET = new THREE.Vector3(0.01, -0.06, 0.02)
 const MOBILE_FINAL_LOOK_OFFSET = new THREE.Vector3(0, -0.1, 0.02)
 const BIO_REVEAL_PROGRESS = 0.68
+const GENIE_CLICK_PULSE_DURATION = 620
+const RESET_DURATION = 1800
+const GOAL_MODE_DURATION = 2200
+const SUNRISE_DURATION = 7600
+const SUN_SETTLED_POSITION = new THREE.Vector3(-1.63, 3.8, 2.85)
+const SUN_START_POSITION = new THREE.Vector3(-2.6, -3.2, 4.8)
+const BOUNCE_FINAL_POSITION = new THREE.Vector3(-4.8, 2.15, 4.4)
+const SKY_FINAL_INTENSITY = 0.76
+const SUN_FINAL_INTENSITY = 2.05
+const BOUNCE_FINAL_INTENSITY = 0.32
+const GENIE_LIGHT_FINAL_INTENSITY = 0.98
+const FINAL_EXPOSURE = 0.9
 
 const SKY_BIO_COLUMNS = [
   {
@@ -61,10 +74,29 @@ const cubicBezier = (
     .addScaledVector(p3, t * t * t)
 }
 
+const tuneSandMaterial = (object: THREE.Object3D) => {
+  object.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return
+    const materials = Array.isArray(child.material) ? child.material : [child.material]
+    materials.forEach((material) => {
+      if (!material) return
+      if ('roughness' in material && typeof material.roughness === 'number') {
+        material.roughness = Math.max(material.roughness, 0.96)
+      }
+      if ('metalness' in material && typeof material.metalness === 'number') {
+        material.metalness = 0
+      }
+      material.needsUpdate = true
+    })
+  })
+}
+
 export default function SandPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const goalModeRequestedRef = useRef(false)
   const [show, setShow] = useState(false)
   const [bioVisible, setBioVisible] = useState(false)
+  const [goalModeActive, setGoalModeActive] = useState(false)
 
   useEffect(() => {
     const t = setTimeout(() => setShow(true), 60)
@@ -81,7 +113,7 @@ export default function SandPage() {
     renderer.setSize(window.innerWidth, window.innerHeight)
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 1.12
+    renderer.toneMappingExposure = 0.74
     renderer.setClearColor(0x0c0c0c, 0)
 
     const scene = new THREE.Scene()
@@ -94,18 +126,27 @@ export default function SandPage() {
       return THREE.MathUtils.clamp((REFERENCE_ASPECT - camera.aspect) / (REFERENCE_ASPECT - 0.56), 0, 1)
     }
 
-    const fitInitialCamera = () => {
+    const getInitialFrame = () => {
       const portrait = portraitAmount()
       const fittedDistance = BASE_CAMERA_Z * THREE.MathUtils.lerp(1, 1.24, portrait)
-      camera.fov = THREE.MathUtils.lerp(44, 52, portrait)
       const offset = fitOffsetFromTarget(
         BASE_CAMERA_POSITION.clone().sub(BASE_LOOK_TARGET),
         BASE_CAMERA_Z,
         fittedDistance,
       )
       const portraitLookTarget = BASE_LOOK_TARGET.clone().add(new THREE.Vector3(-0.25 * portrait, -0.18 * portrait, 0.78 * portrait))
-      camera.position.copy(portraitLookTarget.clone().add(offset))
-      activeLookTarget.copy(portraitLookTarget)
+      return {
+        fov: THREE.MathUtils.lerp(44, 52, portrait),
+        position: portraitLookTarget.clone().add(offset),
+        target: portraitLookTarget,
+      }
+    }
+
+    const fitInitialCamera = () => {
+      const frame = getInitialFrame()
+      camera.fov = frame.fov
+      camera.position.copy(frame.position)
+      activeLookTarget.copy(frame.target)
       camera.updateProjectionMatrix()
       camera.lookAt(activeLookTarget)
     }
@@ -116,17 +157,20 @@ export default function SandPage() {
 
     const responsiveGenieSize = () => GENIE_WORLD_SIZE
 
-    const skyFill = new THREE.HemisphereLight('#ffd08a', '#8a501c', 0.82)
+    const sceneStart = performance.now()
+    const skyFill = new THREE.HemisphereLight('#ffd08a', '#8a501c', 0.08)
     scene.add(skyFill)
-    const sun = new THREE.DirectionalLight('#ffc36f', 3.8)
-    sun.position.set(-0.85, 9.5, 1.25)
+    const sun = new THREE.DirectionalLight('#ffc36f', 0.05)
+    sun.position.copy(SUN_START_POSITION)
     scene.add(sun)
-    const bounce = new THREE.PointLight('#c87820', 1.25, 13)
-    bounce.position.set(-2.5, -0.55, 2.4)
+    const bounce = new THREE.PointLight('#c87820', 0, 18)
+    bounce.position.copy(BOUNCE_FINAL_POSITION)
     scene.add(bounce)
-    const genieLight = new THREE.PointLight('#ffb45a', 1.35, 5)
+    const genieLight = new THREE.PointLight('#ffb45a', 0.12, 5)
     genieLight.position.set(0.15, -0.8, 0.85)
     scene.add(genieLight)
+    const genieSignalLight = new THREE.PointLight('#ffc36f', 0, 4.2)
+    scene.add(genieSignalLight)
 
     let sandFloor: THREE.Group | null = null
     let genie: THREE.Group | null = null
@@ -143,7 +187,26 @@ export default function SandPage() {
     let cameraBezier: [THREE.Vector3, THREE.Vector3, THREE.Vector3, THREE.Vector3] | null = null
     let lookBezier: [THREE.Vector3, THREE.Vector3, THREE.Vector3, THREE.Vector3] | null = null
     let lockedFinalLookTarget: THREE.Vector3 | null = null
+    let resetActive = false
+    let resetStart = 0
+    let resetStartFov = camera.fov
+    let resetEndFov = camera.fov
+    const resetStartPosition = new THREE.Vector3()
+    const resetEndPosition = new THREE.Vector3()
+    const resetStartLookTarget = new THREE.Vector3()
+    const resetEndLookTarget = new THREE.Vector3()
+    let goalModeTransitionActive = false
+    let goalModeSceneActive = false
+    let goalModeTransitionStart = 0
+    let goalModeStartFov = camera.fov
+    let goalModeEndFov = camera.fov
+    const goalModeStartPosition = new THREE.Vector3()
+    const goalModeEndPosition = new THREE.Vector3()
+    const goalModeStartLookTarget = new THREE.Vector3()
+    const goalModeEndLookTarget = new THREE.Vector3()
     let bioTriggered = false
+    let pointerOnGenie = false
+    let geniePulseStart = -Infinity
 
     const dracoLoader = new DRACOLoader()
     dracoLoader.setDecoderPath('/draco/gltf/')
@@ -153,6 +216,7 @@ export default function SandPage() {
 
     loader.load('/models/sand.glb', (gltf) => {
       sandFloor = gltf.scene
+      tuneSandMaterial(sandFloor)
       const box = new THREE.Box3().setFromObject(sandFloor)
       sandFloor.position.sub(box.getCenter(new THREE.Vector3()))
       const size = box.getSize(new THREE.Vector3())
@@ -194,6 +258,28 @@ export default function SandPage() {
       return getGenieHeadTarget().add(FINAL_LOOK_OFFSET.clone().lerp(MOBILE_FINAL_LOOK_OFFSET, portrait))
     }
 
+    const getGoalModeFrame = () => {
+      const portrait = portraitAmount()
+      const frameScale = narrowAspectScale(camera.aspect, 1.32)
+      const basePosition = genie?.position ?? new THREE.Vector3(GENIE_BASE_X, floorY + 1.8, GENIE_BASE_Z)
+      const cameraOffset = new THREE.Vector3(
+        THREE.MathUtils.lerp(0.1, 0, portrait),
+        THREE.MathUtils.lerp(1.18, 1.45, portrait),
+        -2.28 * frameScale,
+      )
+      const lookOffset = new THREE.Vector3(
+        0,
+        THREE.MathUtils.lerp(0.72, 0.9, portrait),
+        1.1 * frameScale,
+      )
+
+      return {
+        fov: THREE.MathUtils.lerp(48, 56, portrait),
+        position: basePosition.clone().add(cameraOffset),
+        target: basePosition.clone().add(lookOffset),
+      }
+    }
+
     const updatePointer = (event: PointerEvent) => {
       const rect = canvas.getBoundingClientRect()
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
@@ -201,14 +287,14 @@ export default function SandPage() {
     }
 
     const isPointerOnGenie = (event: PointerEvent) => {
-      if (!genie || cinematicActive || cinematicComplete) return false
+      if (!genie || cinematicActive || resetActive || goalModeTransitionActive || goalModeSceneActive) return false
       updatePointer(event)
       raycaster.setFromCamera(pointer, camera)
       return raycaster.intersectObject(genie, true).length > 0
     }
 
     const beginCinematic = () => {
-      if (!genie || cinematicActive || cinematicComplete) return
+      if (!genie || cinematicActive || cinematicComplete || resetActive) return
 
       const headTarget = getGenieHeadTarget()
       const bodyTarget = new THREE.Vector3(genie.position.x, genie.position.y, genie.position.z)
@@ -222,6 +308,7 @@ export default function SandPage() {
       )
       cinematicActive = true
       cinematicStart = performance.now()
+      geniePulseStart = cinematicStart
       bioTriggered = false
       setBioVisible(false)
       lockedFinalLookTarget = finalLookTarget.clone()
@@ -250,16 +337,66 @@ export default function SandPage() {
       ]
     }
 
+    const beginReset = () => {
+      if (!genie || cinematicActive || resetActive || !cinematicComplete) return
+
+      const initialFrame = getInitialFrame()
+      resetActive = true
+      resetStart = performance.now()
+      geniePulseStart = resetStart
+      resetStartFov = camera.fov
+      resetEndFov = initialFrame.fov
+      resetStartPosition.copy(camera.position)
+      resetEndPosition.copy(initialFrame.position)
+      resetStartLookTarget.copy(activeLookTarget)
+      resetEndLookTarget.copy(initialFrame.target)
+      cinematicComplete = false
+      bioTriggered = false
+      lockedFinalLookTarget = null
+      cameraBezier = null
+      lookBezier = null
+      pointerOnGenie = false
+      setBioVisible(false)
+      canvas.style.cursor = 'default'
+    }
+
+    const beginGoalModeTransition = () => {
+      if (!genie || goalModeTransitionActive || goalModeSceneActive) return
+
+      const goalFrame = getGoalModeFrame()
+      goalModeTransitionActive = true
+      goalModeTransitionStart = performance.now()
+      goalModeStartFov = camera.fov
+      goalModeEndFov = goalFrame.fov
+      goalModeStartPosition.copy(camera.position)
+      goalModeEndPosition.copy(goalFrame.position)
+      goalModeStartLookTarget.copy(activeLookTarget)
+      goalModeEndLookTarget.copy(goalFrame.target)
+      cinematicActive = false
+      cinematicComplete = false
+      resetActive = false
+      pointerOnGenie = false
+      goalModeRequestedRef.current = false
+      bioTriggered = false
+      setBioVisible(false)
+      canvas.style.cursor = 'default'
+    }
+
     const onPointerMove = (event: PointerEvent) => {
-      canvas.style.cursor = isPointerOnGenie(event) ? 'pointer' : 'default'
+      pointerOnGenie = isPointerOnGenie(event)
+      canvas.style.cursor = pointerOnGenie ? 'pointer' : 'default'
     }
 
     const onPointerLeave = () => {
+      pointerOnGenie = false
       canvas.style.cursor = 'default'
     }
 
     const onPointerDown = (event: PointerEvent) => {
-      if (isPointerOnGenie(event)) beginCinematic()
+      pointerOnGenie = isPointerOnGenie(event)
+      if (!pointerOnGenie) return
+      if (cinematicComplete) beginReset()
+      else beginCinematic()
     }
 
     canvas.addEventListener('pointermove', onPointerMove)
@@ -270,7 +407,7 @@ export default function SandPage() {
       camera.aspect = window.innerWidth / window.innerHeight
       camera.updateProjectionMatrix()
       renderer.setSize(window.innerWidth, window.innerHeight)
-      if (!cinematicActive && !cinematicComplete) fitInitialCamera()
+      if (!cinematicActive && !cinematicComplete && !resetActive) fitInitialCamera()
       if (sandFloor) sandFloor.scale.setScalar(responsiveFloorSize() / sandFloorMaxDim)
       if (genie) {
         const scale = responsiveGenieSize() / genieMaxDim
@@ -292,18 +429,80 @@ export default function SandPage() {
         sandFloor.rotation.y = -Math.PI / 10 + Math.sin(t * 0.08) * 0.018
       }
 
+      if (goalModeRequestedRef.current && !goalModeTransitionActive && !goalModeSceneActive) {
+        beginGoalModeTransition()
+      }
+
+      const sunriseProgress = THREE.MathUtils.clamp((performance.now() - sceneStart) / SUNRISE_DURATION, 0, 1)
+      const sunrise = easeInOutCubic(sunriseProgress)
+      skyFill.intensity = THREE.MathUtils.lerp(0.08, SKY_FINAL_INTENSITY, sunrise)
+      sun.intensity = THREE.MathUtils.lerp(0.05, SUN_FINAL_INTENSITY, sunrise)
+      sun.position.lerpVectors(SUN_START_POSITION, SUN_SETTLED_POSITION, sunrise)
+      bounce.intensity = THREE.MathUtils.lerp(0, BOUNCE_FINAL_INTENSITY, sunrise)
+      genieLight.intensity = THREE.MathUtils.lerp(0.12, GENIE_LIGHT_FINAL_INTENSITY, sunrise)
+      renderer.toneMappingExposure = THREE.MathUtils.lerp(0.74, FINAL_EXPOSURE, sunrise)
+
       if (genie) {
         const scale = currentGenieScale()
-        const motionWeight = cinematicActive || cinematicComplete ? 0 : 1
+        const motionWeight = cinematicActive || cinematicComplete || resetActive || goalModeTransitionActive || goalModeSceneActive ? 0 : 1
+        const pulseProgress = THREE.MathUtils.clamp((performance.now() - geniePulseStart) / GENIE_CLICK_PULSE_DURATION, 0, 1)
+        const pulse = pulseProgress < 1 ? Math.sin(pulseProgress * Math.PI) : 0
+        const hoverPulse = pointerOnGenie && !cinematicActive && !resetActive && !goalModeTransitionActive && !goalModeSceneActive ? (Math.sin(t * 2.8) + 1) * 0.5 : 0
+        const interactionScale = 1 + hoverPulse * 0.025 + pulse * 0.09
+        genie.scale.setScalar(scale * interactionScale)
         genie.position.x = GENIE_BASE_X + Math.sin(t * 0.14) * 0.045 * motionWeight
         genie.position.z = GENIE_BASE_Z + Math.sin(t * 0.1 + 1.3) * 0.035 * motionWeight
-        genie.position.y = floorY + genieModelHeight * scale * 0.5 + genieRideHeight + Math.sin(t * 0.48) * 0.018 * motionWeight
+        genie.position.y = floorY + genieModelHeight * scale * interactionScale * 0.5 + genieRideHeight + Math.sin(t * 0.48) * 0.018 * motionWeight
         genie.rotation.y = Math.PI / 5 + Math.sin(t * 0.18) * 0.035 * motionWeight
         genie.rotation.z = Math.sin(t * 0.16) * 0.008 * motionWeight
         genieLight.position.set(genie.position.x, genie.position.y + 0.45, genie.position.z + 1.25)
+        genieSignalLight.position.set(genie.position.x, genie.position.y + 0.28, genie.position.z + 0.88)
+        genieSignalLight.intensity = hoverPulse * 0.42 + pulse * 2.35
       }
 
-      if (cinematicActive && cameraBezier && lookBezier) {
+      if (goalModeTransitionActive) {
+        const progress = THREE.MathUtils.clamp((performance.now() - goalModeTransitionStart) / GOAL_MODE_DURATION, 0, 1)
+        const eased = easeInOutCubic(progress)
+        camera.fov = THREE.MathUtils.lerp(goalModeStartFov, goalModeEndFov, eased)
+        camera.position.lerpVectors(goalModeStartPosition, goalModeEndPosition, eased)
+        activeLookTarget.lerpVectors(goalModeStartLookTarget, goalModeEndLookTarget, eased)
+        camera.updateProjectionMatrix()
+        camera.lookAt(activeLookTarget)
+
+        if (progress >= 1) {
+          camera.fov = goalModeEndFov
+          camera.position.copy(goalModeEndPosition)
+          activeLookTarget.copy(goalModeEndLookTarget)
+          camera.updateProjectionMatrix()
+          camera.lookAt(activeLookTarget)
+          goalModeTransitionActive = false
+          goalModeSceneActive = true
+        }
+      } else if (goalModeSceneActive) {
+        const goalFrame = getGoalModeFrame()
+        camera.fov = goalFrame.fov
+        camera.position.lerp(goalFrame.position, 0.055)
+        activeLookTarget.lerp(goalFrame.target, 0.065)
+        camera.updateProjectionMatrix()
+        camera.lookAt(activeLookTarget)
+      } else if (resetActive) {
+        const progress = THREE.MathUtils.clamp((performance.now() - resetStart) / RESET_DURATION, 0, 1)
+        const eased = easeInOutCubic(progress)
+        camera.fov = THREE.MathUtils.lerp(resetStartFov, resetEndFov, eased)
+        camera.position.lerpVectors(resetStartPosition, resetEndPosition, eased)
+        activeLookTarget.lerpVectors(resetStartLookTarget, resetEndLookTarget, eased)
+        camera.updateProjectionMatrix()
+        camera.lookAt(activeLookTarget)
+
+        if (progress >= 1) {
+          camera.fov = resetEndFov
+          camera.position.copy(resetEndPosition)
+          activeLookTarget.copy(resetEndLookTarget)
+          camera.updateProjectionMatrix()
+          camera.lookAt(activeLookTarget)
+          resetActive = false
+        }
+      } else if (cinematicActive && cameraBezier && lookBezier) {
         const progress = THREE.MathUtils.clamp((performance.now() - cinematicStart) / CINEMATIC_DURATION, 0, 1)
         const eased = easeInOutCubic(progress)
         camera.position.copy(cubicBezier(...cameraBezier, eased))
@@ -367,7 +566,7 @@ export default function SandPage() {
         data-visible={bioVisible}
         className="sand-sky-bio pointer-events-none absolute"
         style={{
-          zIndex: 1,
+          zIndex: 6,
           color: '#c8c8c8',
           fontFamily: 'var(--font-geist-mono)',
           textShadow: '0 0 20px rgba(12, 12, 12, 0.95)',
@@ -380,7 +579,7 @@ export default function SandPage() {
           }}
         >
           {SKY_BIO_COLUMNS.map((column, index) => {
-            const rowOffset = index * 1.35
+            const rowOffset = 0
 
             return (
               <article
@@ -389,8 +588,7 @@ export default function SandPage() {
                 style={{
                   width: `calc(100% - min(${rowOffset}rem, 18vw))`,
                   marginLeft: `min(${rowOffset}rem, 18vw)`,
-                  marginTop: index === 0 ? 0 : '-0.15rem',
-                  borderTop: '1px solid rgba(200, 200, 200, 0.14)',
+                  marginTop: index === 0 ? 0 : '0.25rem',
                   paddingTop: '0.58rem',
                   paddingBottom: '0.55rem',
                   transform: `translateZ(${index * 18}px)`,
@@ -406,7 +604,7 @@ export default function SandPage() {
                   marginBottom: '0.34rem',
                 }}
               >
-                → {column.label}
+                <WindTextChars active={bioVisible} baseDelay={120 + index * 210} stagger={36} mode="chars" text={`→ ${column.label}`} />
               </div>
               <h2
                 className="sand-sky-title"
@@ -421,7 +619,7 @@ export default function SandPage() {
                   letterSpacing: 0,
                 }}
               >
-                {column.title}
+                <WindTextChars active={bioVisible} baseDelay={210 + index * 210} stagger={58} mode="words" text={column.title} />
               </h2>
               <p
                 className="sand-sky-copy"
@@ -433,11 +631,24 @@ export default function SandPage() {
                   maxWidth: '30rem',
                 }}
               >
-                {column.body}
+                <WindTextChars active={bioVisible} baseDelay={340 + index * 210} stagger={72} mode="words" text={column.body} />
               </p>
               </article>
             )
           })}
+          {bioVisible && !goalModeActive && (
+            <button
+              type="button"
+              className="sand-goal-cta sand-goal-cta-inline"
+              onClick={() => {
+                goalModeRequestedRef.current = true
+                setGoalModeActive(true)
+                setBioVisible(false)
+              }}
+            >
+              → MAKE_CONTACT
+            </button>
+          )}
         </div>
       </section>
 
@@ -446,6 +657,22 @@ export default function SandPage() {
         className="absolute inset-0"
         style={{ width: '100%', height: '100%', zIndex: 2 }}
       />
+
+      {bioVisible && !goalModeActive && (
+        <div className="sand-goal-cta-wrap sand-goal-cta-wrap-mobile">
+          <button
+            type="button"
+            className="sand-goal-cta"
+            onClick={() => {
+              goalModeRequestedRef.current = true
+              setGoalModeActive(true)
+              setBioVisible(false)
+            }}
+          >
+            → MAKE_CONTACT
+          </button>
+        </div>
+      )}
 
       <div
         className="absolute left-1/2 -translate-x-1/2 text-center text-[0.6rem] sm:text-xs tracking-widest pointer-events-none"

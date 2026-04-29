@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "jazz.dev",
+  title: "jazz cheema",
   description: "Jazz Cheema — interactive 3D programming portfolio",
 };
 
