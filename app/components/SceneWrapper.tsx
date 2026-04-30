@@ -55,6 +55,10 @@ export default function SceneWrapper() {
     return () => clearTimeout(t)
   }, [])
 
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('carpet-panel-open', { detail: panelOpen }))
+  }, [panelOpen])
+
   const handleReachClouds = () => {
     setPanelOpen(false)
     setFlashing(true)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
@@ -9,6 +9,19 @@ const CSS_SIZE = 'clamp(64px, 17vw, 92px)'
 
 export default function LampCorner() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [hiddenForPanel, setHiddenForPanel] = useState(false)
+
+  useEffect(() => {
+    const isMobileViewport = () =>
+      window.innerWidth <= 767 || window.innerWidth / window.innerHeight <= 3 / 4
+
+    const handler = (e: Event) => {
+      const open = (e as CustomEvent<boolean>).detail
+      setHiddenForPanel(open && isMobileViewport())
+    }
+    window.addEventListener('carpet-panel-open', handler)
+    return () => window.removeEventListener('carpet-panel-open', handler)
+  }, [])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -85,6 +98,7 @@ export default function LampCorner() {
   return (
     <button
       type="button"
+      className="lamp-corner"
       aria-label="Reload site"
       title="RELOAD_SITE"
       onClick={() => window.location.reload()}
@@ -95,6 +109,9 @@ export default function LampCorner() {
         width: CSS_SIZE,
         height: CSS_SIZE,
         zIndex: 200,
+        opacity: hiddenForPanel ? 0 : 1,
+        pointerEvents: hiddenForPanel ? 'none' : 'auto',
+        transition: 'opacity 180ms ease',
         cursor: 'pointer',
         padding: 0,
         border: 0,
