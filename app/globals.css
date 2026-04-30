@@ -168,6 +168,95 @@ canvas {
   outline: none;
 }
 
+.sand-score-card {
+  pointer-events: auto;
+  display: block;
+  min-width: min(34rem, calc(100vw - 2rem));
+  padding: 1.4rem 2.2rem;
+  border: 1px solid rgba(36, 153, 88, 0.32);
+  background: rgba(12, 12, 12, 0.90);
+  color: #c8c8c8;
+  text-align: center;
+  text-decoration: none;
+  backdrop-filter: blur(26px) saturate(124%);
+  -webkit-backdrop-filter: blur(26px) saturate(124%);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.sand-score-card:hover,
+.sand-score-card:focus-visible {
+  border-color: #c8c8c8;
+  background: #c8c8c8;
+  color: #0c0c0c;
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.sand-score-kicker {
+  margin-bottom: 0.5rem;
+  color: #249958;
+  font-size: clamp(0.56rem, 0.7vw, 0.72rem);
+  letter-spacing: 0.18em;
+  transition: color 160ms ease;
+}
+
+.sand-score-card:hover .sand-score-kicker,
+.sand-score-card:focus-visible .sand-score-kicker {
+  color: #0c0c0c;
+}
+
+.sand-score-title {
+  position: relative;
+  color: currentColor;
+  font-size: clamp(1rem, 1.4vw, 1.5rem);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+
+.sand-score-title-default,
+.sand-score-title-hover {
+  display: block;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.sand-score-title-hover {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: translateY(0.28rem);
+}
+
+.sand-score-card:hover .sand-score-title-default,
+.sand-score-card:focus-visible .sand-score-title-default {
+  opacity: 0;
+  transform: translateY(-0.28rem);
+}
+
+.sand-score-card:hover .sand-score-title-hover,
+.sand-score-card:focus-visible .sand-score-title-hover {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.sand-score-meta {
+  margin-top: 0.6rem;
+  color: #303030;
+  font-size: 0.52rem;
+  letter-spacing: 0.14em;
+  transition: color 160ms ease;
+}
+
+.sand-score-card:hover .sand-score-meta,
+.sand-score-card:focus-visible .sand-score-meta {
+  color: rgba(12, 12, 12, 0.62);
+}
+
 @media (min-width: 768px) {
   .sand-sky-row {
     width: 100% !important;

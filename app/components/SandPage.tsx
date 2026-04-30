@@ -1073,6 +1073,7 @@ export default function SandPage() {
       {/* Goal scored */}
       {gameWon && (
         <div
+          className="sand-score-overlay"
           style={{
             position: 'fixed',
             inset: 0,
@@ -1085,24 +1086,22 @@ export default function SandPage() {
             fontFamily: 'var(--font-geist-mono)',
           }}
         >
-          <div style={{
-            border: '1px solid rgba(36, 153, 88, 0.32)',
-            background: 'rgba(12, 12, 12, 0.72)',
-            backdropFilter: 'blur(18px) saturate(118%)',
-            WebkitBackdropFilter: 'blur(18px) saturate(118%)',
-            padding: '1.4rem 2.2rem',
-            textAlign: 'center',
-          }}>
-            <div style={{ color: '#249958', fontSize: 'clamp(0.56rem, 0.7vw, 0.72rem)', letterSpacing: '0.18em', marginBottom: '0.5rem' }}>
+          <a
+            className="sand-score-card"
+            href="mailto:thecyberfoolz@gmail.com"
+            aria-label="Email thecyberfoolz@gmail.com"
+          >
+            <div className="sand-score-kicker">
               → GOAL_SCORED // SIGNAL_CONFIRMED
             </div>
-            <div style={{ color: '#c8c8c8', fontSize: 'clamp(1rem, 1.4vw, 1.5rem)', fontWeight: 400, letterSpacing: '0.04em' }}>
-              MAKE_CONTACT
+            <div className="sand-score-title" aria-hidden="true">
+              <span className="sand-score-title-default">MAKE_CONTACT</span>
+              <span className="sand-score-title-hover">EMAIL</span>
             </div>
-            <div style={{ color: '#303030', fontSize: '0.52rem', letterSpacing: '0.14em', marginTop: '0.6rem' }}>
+            <div className="sand-score-meta">
               FIELD: #249958 / STATUS: LIVE
             </div>
-          </div>
+          </a>
         </div>
       )}
     </div>

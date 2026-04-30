@@ -46,7 +46,8 @@ Primary influence: **The Designers Republic (TDR)** — the Sheffield studio beh
 
 ### TDR / Wipeout visual rules
 - **Color** — off-black (`#0c0c0c`) dominates. Panels, rules, labels, and fine print live in compressed gray values. Blue is no longer the primary accent; color appears only as data state (amber / green / muted blue), never as decoration. No gradients.
-- **Panel surface** — cards and info panels can use translucent off-black (`rgba(12, 12, 12, 0.72)`) with restrained Gaussian-style backdrop blur (`blur(18px) saturate(118%)`) so 3D objects remain faintly present behind the UI. This is a functional glass/instrument surface, not a soft decorative glow.
+- **Panel surface** — cards and info panels can use translucent off-black (`rgba(12, 12, 12, 0.72)`) with restrained Gaussian-style backdrop blur (`blur(18px) saturate(118%)`) so 3D objects remain faintly present behind the UI. Critical confirmations and contact surfaces can sit heavier (`rgba(12, 12, 12, 0.84-0.90)`) with stronger blur (`blur(24px-26px) saturate(124%)`) for a denser glass instrument feel. This is functional opacity and optical separation, not a soft decorative glow.
+- **Interactive glass states** — when a HUD/contact tile becomes actionable, the whole card should be the hit area. Hover/focus may invert the surface into CORE-on-VOID or VOID-on-CORE, swap the command label, and keep the motion short and mechanical.
 - **Responsive framing** — 3D scenes are composed against a `1440×900` design frame and should scale by camera containment, not by independent per-model hacks. Smaller or narrower viewports pull the camera back to preserve the full composition proportionally.
 - **Typography** — geometric monospace throughout. Tight tracking, all-caps labels, version numbers everywhere (`VER.01.09.26`). Mixed micro and macro scales on the same surface.
 - **Data density** — every panel should feel like a technical document: frequency bars (EQ-style), coordinate readouts, material scans, draw-call counts. The UI is *information*, not decoration.
@@ -62,7 +63,7 @@ Primary influence: **The Designers Republic (TDR)** — the Sheffield studio beh
 |--------|-----------|-----------------------------------|
 | VOID   | `#0c0c0c` | Primary background / scene void   |
 | PANEL  | `#101010` | Panel mass / recessed surfaces    |
-| GLASS  | `rgba(12,12,12,0.72)` | Translucent blurred panel surface |
+| GLASS  | `rgba(12,12,12,0.72-0.90)` | Translucent blurred panel surface / heavier contact glass |
 | RULE   | `#1e1e1e` | Borders, dividers, hard seams     |
 | GHOST  | `#303030` | Secondary labels / inactive data  |
 | SIGNAL | `#808080` | Readable data text                |
