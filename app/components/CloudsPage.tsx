@@ -668,15 +668,26 @@ export default function CloudsPage() {
     haloSprite.scale.set(5.8, 5.8, 1);
     scene.add(haloSprite);
 
+    type EyeRigMesh = {
+      mesh: THREE.Mesh;
+      basePosition: THREE.Vector3;
+      baseRotation: THREE.Euler;
+    };
+
     type ProjectObject = {
       group: THREE.Group;
       maxDim: number;
       index: number;
       baseRotationY: number;
+      eyeRig?: {
+        meshes: EyeRigMesh[];
+      };
     };
 
     const projectObjects: ProjectObject[] = [];
     const raycaster = new THREE.Raycaster();
+    const pointerTarget = new THREE.Vector2();
+    const pointerCurrent = new THREE.Vector2();
 
     const responsiveModelSize = () => {
       const mobile = window.innerWidth < 768;
@@ -711,12 +722,32 @@ export default function CloudsPage() {
         const size = box.getSize(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
         const baseRotationY = index === 1 ? Math.PI / 4 : 0;
+        const eyeMeshes: EyeRigMesh[] = [];
+        if (project.id === "teva") {
+          group.traverse((child) => {
+            if (!(child instanceof THREE.Mesh)) return;
+            const name = child.name.toLowerCase();
+            if (name === "sphere") {
+              eyeMeshes.push({
+                mesh: child,
+                basePosition: child.position.clone(),
+                baseRotation: child.rotation.clone(),
+              });
+            }
+          });
+        }
         group.rotation.y = baseRotationY;
         group.visible = index === 0;
         group.scale.setScalar(responsiveModelSize() / maxDim);
         group.userData.projectIndex = index;
         scene.add(group);
-        projectObjects[index] = { group, maxDim, index, baseRotationY };
+        projectObjects[index] = {
+          group,
+          maxDim,
+          index,
+          baseRotationY,
+          eyeRig: eyeMeshes.length > 0 ? { meshes: eyeMeshes } : undefined,
+        };
       });
     });
 
@@ -781,6 +812,20 @@ export default function CloudsPage() {
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointerup", onPointerUp);
 
+    const onPointerMove = (e: PointerEvent) => {
+      pointerTarget.set(
+        THREE.MathUtils.clamp((e.clientX / window.innerWidth) * 2 - 1, -1, 1),
+        THREE.MathUtils.clamp((e.clientY / window.innerHeight) * -2 + 1, -1, 1),
+      );
+    };
+
+    const onPointerLeave = () => {
+      pointerTarget.set(0, 0);
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerleave", onPointerLeave);
+
     let tick = 0,
       camT = 0,
       animId: number;
@@ -822,6 +867,7 @@ export default function CloudsPage() {
       haloSprite.position.y = 0.45 + Math.sin(t * 0.35) * 0.08;
 
       haloSprite.scale.setScalar(carouselOpenRef.current ? 6.3 : 5.4);
+      pointerCurrent.lerp(pointerTarget, 0.045);
 
       if (camT < 1) {
         camT = Math.min(1, camT + 1 / CAM.duration);
@@ -884,6 +930,16 @@ export default function CloudsPage() {
           Math.sin(t * 0.31 + index) * 0.02,
           0.08,
         );
+        if (projectObject.eyeRig) {
+          const gazeX = pointerCurrent.x * (0.008 + focus * 0.01);
+          const gazeY = pointerCurrent.y * (0.006 + focus * 0.008);
+          projectObject.eyeRig.meshes.forEach(({ mesh, basePosition, baseRotation }) => {
+            mesh.position.x = THREE.MathUtils.lerp(mesh.position.x, basePosition.x + gazeX, 0.18);
+            mesh.position.y = THREE.MathUtils.lerp(mesh.position.y, basePosition.y + gazeY, 0.18);
+            mesh.rotation.y = THREE.MathUtils.lerp(mesh.rotation.y, baseRotation.y + pointerCurrent.x * 0.045, 0.14);
+            mesh.rotation.x = THREE.MathUtils.lerp(mesh.rotation.x, baseRotation.x - pointerCurrent.y * 0.035, 0.14);
+          });
+        }
         applyMaterialOpacity(group, 0.34 + focus * 0.66);
       });
 
@@ -896,6 +952,8 @@ export default function CloudsPage() {
       cancelAnimationFrame(animId);
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerleave", onPointerLeave);
       window.removeEventListener("resize", onResize);
       haloTexture.dispose();
       haloSprite.material.dispose();
