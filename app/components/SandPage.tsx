@@ -32,7 +32,7 @@ const TUMBLEWEED_WORLD_SIZE = 0.48
 const GOAL_WORLD_SIZE = 1.1
 const GAMEPLAY_MOVE_SPEED = 0.055
 const GENIE_GAMEPLAY_LIFT = 0.16
-const TUMBLEWEED_GAMEPLAY_LIFT = 0
+const TUMBLEWEED_GAMEPLAY_LIFT = -0.06
 const GOAL_GAMEPLAY_LIFT = -0.34
 const GOAL_FACE_ROTATION = 0
 const TUMBLEWEED_START_OFFSET = new THREE.Vector3(0, 0, 2.2)
@@ -707,7 +707,7 @@ export default function SandPage() {
             const sideWallHalfWidth = goalWorldSize.x * 0.5 + ballRadius * 0.24
             const goalFrontZ = goalWorldBox.min.z - ballRadius * 0.22
             const goalBackMeshZ = goalWorldBox.max.z - ballRadius * 0.82
-            const scoreLineZ = goalBackMeshZ - ballRadius * 1.35
+            const scoreLineZ = goalWorldBox.min.z + ballRadius * 0.5
             const insideGoalDepth = tumbleweedGameplayPosition.z > goalFrontZ && tumbleweedGameplayPosition.z < goalWorldBox.max.z + ballRadius * 0.12
             const insideGoalMouth = Math.abs(gx) < mouthHalfWidth && tumbleweedGameplayPosition.z >= scoreLineZ
 
@@ -721,12 +721,7 @@ export default function SandPage() {
               tumbleweedVel.z = Math.min(0, tumbleweedVel.z * -0.18)
             }
 
-            if (insideGoalMouth) {
-              tumbleweedGameplayPosition.x = THREE.MathUtils.lerp(tumbleweedGameplayPosition.x, goalWorldCenter.x, 0.48)
-              tumbleweedGameplayPosition.z = goalBackMeshZ
-              tumbleweedVel.x = 0
-              tumbleweedVel.z = 0
-              setGroundedObjectPosition(tumbleweed, tumbleweedGameplayPosition, tumbleweedModelHeight, tumbleweedScale, TUMBLEWEED_GAMEPLAY_LIFT)
+            if (insideGoalMouth && !gameWonLocal) {
               gameWonLocal = true
               setGameWon(true)
             }
@@ -738,7 +733,7 @@ export default function SandPage() {
         if (goal) {
           goalWorldBox.setFromObject(goal)
           const goalFrontZ = goalWorldBox.min.z - 0.18
-          const insideGoalX = genieGameplayPos.x > goalWorldBox.min.x - 0.55 && genieGameplayPos.x < goalWorldBox.max.x + 0.55
+          const insideGoalX = genieGameplayPos.x > goalWorldBox.min.x + 0.05 && genieGameplayPos.x < goalWorldBox.max.x - 0.05
           if (insideGoalX && genieGameplayPos.z > goalFrontZ) {
             genieGameplayPos.z = goalFrontZ
             genie.position.z = THREE.MathUtils.lerp(genie.position.z, genieGameplayPos.z, 0.55)
