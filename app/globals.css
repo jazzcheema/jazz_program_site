@@ -168,6 +168,77 @@ canvas {
   outline: none;
 }
 
+.sand-webcam-sky {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  filter: saturate(1.12) contrast(1.06);
+  mix-blend-mode: screen;
+  transition: opacity 520ms ease;
+}
+
+.sand-webcam-sky[data-ready="true"] {
+  opacity: 0.7;
+}
+
+.sand-webcam-status {
+  position: fixed;
+  left: 50%;
+  bottom: max(3.3rem, 10dvh);
+  z-index: 10;
+  display: flex;
+  width: min(40rem, calc(100vw - 32px));
+  transform: translateX(-50%);
+  align-items: center;
+  justify-content: center;
+  gap: 0.72rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #ffd08a;
+  font-family: var(--font-geist-mono);
+  font-size: clamp(0.54rem, 0.68vw, 0.76rem);
+  letter-spacing: 0.14em;
+  line-height: 1.25;
+  padding: 0.2rem 0.4rem;
+  text-align: center;
+  pointer-events: auto;
+  text-shadow:
+    0 1px 1px #000000,
+    0 0 7px rgba(0, 0, 0, 1),
+    0 0 16px rgba(0, 0, 0, 1),
+    0 0 30px rgba(0, 0, 0, 1),
+    0 0 42px rgba(255, 195, 111, 0.38);
+}
+
+.sand-webcam-status button {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82em;
+  letter-spacing: 0.12em;
+  padding: 0.18rem 0.28rem;
+  text-shadow:
+    0 1px 1px #000000,
+    0 0 8px rgba(0, 0, 0, 1),
+    0 0 18px rgba(0, 0, 0, 1),
+    0 0 30px rgba(255, 255, 255, 0.28);
+  transition:
+    color 120ms ease,
+    text-shadow 120ms ease;
+}
+
+.sand-webcam-status button:hover,
+.sand-webcam-status button:focus-visible {
+  color: #ffd08a;
+  outline: none;
+}
+
 .home-identity {
   position: fixed;
   top: clamp(5.5rem, 9dvh, 7.5rem);
