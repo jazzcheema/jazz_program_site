@@ -146,6 +146,14 @@ export default function SandPage() {
     webcamSkyActiveRef.current = true;
   };
 
+  const dismissWebcamError = () => {
+    if (webcamSkyStatusRef.current !== "error") return;
+    webcamSkyStatusRef.current = "idle";
+    webcamSkyActiveRef.current = false;
+    setWebcamSkyStatus("idle");
+    setWebcamSkyActive(false);
+  };
+
   const updateJoystick = (event: ReactPointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const radius = Math.max(rect.width, rect.height) * 0.36;
@@ -229,7 +237,7 @@ export default function SandPage() {
         fittedDistance,
       );
       const portraitLookTarget = BASE_LOOK_TARGET.clone().add(
-        new THREE.Vector3(-0.25 * portrait, -0.18 * portrait, 0.78 * portrait),
+        new THREE.Vector3(-0.55 * portrait, -0.18 * portrait, 0.78 * portrait),
       );
       return {
         fov: THREE.MathUtils.lerp(44, 52, portrait),
@@ -338,19 +346,6 @@ export default function SandPage() {
     let pointerOnCamera = false;
     let geniePulseStart = -Infinity;
     let cameraPulseStart = -Infinity;
-    const cameraMarkerMaterial = new THREE.MeshBasicMaterial({
-      color: "#ffc36f",
-      transparent: true,
-      opacity: 0.42,
-      depthWrite: false,
-    });
-    const cameraMarker = new THREE.Mesh(
-      new THREE.TorusGeometry(0.62, 0.018, 8, 64),
-      cameraMarkerMaterial,
-    );
-    cameraMarker.rotation.x = Math.PI / 2;
-    cameraMarker.visible = false;
-    scene.add(cameraMarker);
 
     const tuneCameraMaterial = (object: THREE.Object3D) => {
       object.traverse((child) => {
@@ -723,7 +718,6 @@ export default function SandPage() {
       if (tumbleweed) tumbleweed.visible = false;
       if (goal) goal.visible = false;
       if (cameraModel) cameraModel.visible = false;
-      cameraMarker.visible = false;
 
       const goalFrame = getGoalModeFrame();
       goalModeTransitionActive = true;
@@ -779,10 +773,7 @@ export default function SandPage() {
         beginWebcamSky();
         return;
       }
-      if (webcamSkyStatusRef.current === "error") {
-        webcamSkyStatusRef.current = "idle";
-        setWebcamSkyStatus("idle");
-      }
+      dismissWebcamError();
       if (!pointerOnGenie) return;
       if (cinematicComplete) beginReset();
       else beginCinematic();
@@ -1000,16 +991,6 @@ export default function SandPage() {
         cameraSignalLight.intensity = webcamSkyActiveRef.current
           ? 1.2
           : 0.52 + hoverPulse * 0.46 + pulse * 1.2;
-        cameraMarker.visible = cameraModel.visible;
-        cameraMarker.position.set(
-          cameraModel.position.x,
-          floorY + 0.045,
-          cameraModel.position.z,
-        );
-        cameraMarker.scale.setScalar(1 + hoverPulse * 0.14 + pulse * 0.35);
-        cameraMarkerMaterial.opacity = webcamSkyActiveRef.current
-          ? 0.68
-          : 0.28 + hoverPulse * 0.24 + pulse * 0.32;
       }
 
       // Gameplay: drive genie, push tumbleweed, detect goal
@@ -1290,8 +1271,6 @@ export default function SandPage() {
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerleave", onPointerLeave);
       canvas.removeEventListener("pointerdown", onPointerDown);
-      cameraMarker.geometry.dispose();
-      cameraMarkerMaterial.dispose();
       dracoLoader.dispose();
       renderer.dispose();
     };
@@ -1450,10 +1429,7 @@ export default function SandPage() {
               type="button"
               className="sand-goal-cta sand-goal-cta-inline"
               onClick={() => {
-                if (webcamSkyStatus === "error") {
-                  webcamSkyStatusRef.current = "idle";
-                  setWebcamSkyStatus("idle");
-                }
+                dismissWebcamError();
                 goalModeRequestedRef.current = true;
                 setGoalModeActive(true);
                 setBioVisible(false);
@@ -1477,10 +1453,7 @@ export default function SandPage() {
             type="button"
             className="sand-goal-cta"
             onClick={() => {
-              if (webcamSkyStatus === "error") {
-                webcamSkyStatusRef.current = "idle";
-                setWebcamSkyStatus("idle");
-              }
+              dismissWebcamError();
               goalModeRequestedRef.current = true;
               setGoalModeActive(true);
               setBioVisible(false);
