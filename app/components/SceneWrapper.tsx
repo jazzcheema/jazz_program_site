@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import CarpetScene from './CarpetScene'
 import InfoPanel from './InfoPanel'
 import CloudsPage from './CloudsPage'
 import SandPage from './SandPage'
 import VortexBackground from './VortexBackground'
+import WindTextChars from './WindTextChars'
 import type { ObjectData } from '../data/objects'
 
 const CARPET_DATA: ObjectData = {
@@ -47,6 +48,12 @@ export default function SceneWrapper() {
   const [reached, setReached] = useState(false)
   const [reachedSand, setReachedSand] = useState(false)
   const [flashing, setFlashing] = useState(false)
+  const [identityActive, setIdentityActive] = useState(false)
+
+  useEffect(() => {
+    const t = setTimeout(() => setIdentityActive(true), 180)
+    return () => clearTimeout(t)
+  }, [])
 
   const handleReachClouds = () => {
     setPanelOpen(false)
@@ -72,7 +79,7 @@ export default function SceneWrapper() {
   return (
     <div className="w-dvw h-dvh overflow-hidden relative" style={{ width: '100dvw', height: '100dvh', background: '#0c0c0c' }}>
       <div className="absolute inset-0 pointer-events-none">
-        <VortexBackground className="w-full h-full" />
+        <VortexBackground className="w-full h-full" particleMultiplier={1.65} alphaMultiplier={1.18} />
       </div>
 
       <div className="absolute inset-0">
@@ -88,6 +95,20 @@ export default function SceneWrapper() {
         data={CARPET_DATA}
         onClose={() => setPanelOpen(false)}
       />
+
+      <div
+        className="home-identity"
+        data-hidden={panelOpen}
+        aria-hidden={panelOpen}
+        aria-label="Jazz Cheema, Software Engineer"
+      >
+        <h1>
+          <WindTextChars active={identityActive} text="Jazz Cheema" baseDelay={80} stagger={58} mode="chars" />
+        </h1>
+        <p>
+          <WindTextChars active={identityActive} text="Software Engineer" baseDelay={520} stagger={36} mode="chars" />
+        </p>
+      </div>
 
       {/* White flash on reach */}
       <div

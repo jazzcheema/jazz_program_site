@@ -899,7 +899,7 @@ export default function SandPage() {
               <div
                 className="sand-sky-label"
                 style={{
-                  color: index === 1 ? '#c87820' : '#808080',
+                  color: '#c87820',
                   fontSize: 'clamp(0.5rem, 0.54vw, 0.62rem)',
                   letterSpacing: '0.16em',
                   marginBottom: '0.34rem',
