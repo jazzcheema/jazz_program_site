@@ -74,34 +74,34 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
         </div>
       </div>
 
-      {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4" style={{ scrollbarWidth: 'none' }}>
+      {/* Body — no scroll, content must fit */}
+      <div className="flex-1 overflow-hidden px-4 py-3 space-y-3">
 
         {/* Spatial coords */}
         <section>
           <div className="text-xs tracking-widest mb-1.5" style={{ color: '#484848' }}>
             SPATIAL_COORDS ──────────────────────────────
           </div>
-          <div className="overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-            <table className="w-full min-w-[440px] text-xs" style={{ color: '#808080' }}>
-              <tbody>
-                {[
-                  ['X', '+0.000', 'Y', '+0.023', 'Z', '+0.000'],
-                  ['ROT.X', '0.040 rad', 'ROT.Y', '0.785 rad', 'ROT.Z', '0.030 rad'],
-                  ['SCALE', '1.000×', 'POLY', '12,847 TRI', 'UV', 'MAPPED'],
-                ].map((row, i) => (
-                  <tr key={i}>
-                    {row.map((cell, j) => (
-                      <td key={j} className="py-0.5 pr-2"
-                        style={{ color: j % 2 === 0 ? '#303030' : '#808080', whiteSpace: 'nowrap' }}>
-                        {cell}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <table className="w-full text-xs" style={{ color: '#808080' }}>
+            <tbody>
+              {[
+                ['X', '+0.000', 'Y', '+0.023'],
+                ['Z', '+0.000', 'ROT.X', '0.040 rad'],
+                ['ROT.Y', '0.785 rad', 'ROT.Z', '0.030 rad'],
+                ['SCALE', '1.000×', 'POLY', '12,847 TRI'],
+                ['UV', 'MAPPED', '', ''],
+              ].map((row, i) => (
+                <tr key={i}>
+                  {row.map((cell, j) => (
+                    <td key={j} className="py-0.5 pr-2"
+                      style={{ color: j % 2 === 0 ? '#303030' : '#808080' }}>
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </section>
 
         {/* EQ / oscillation bars — unique per object */}

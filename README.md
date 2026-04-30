@@ -57,6 +57,7 @@ Primary influence: **The Designers Republic (TDR)** — the Sheffield studio beh
 - **Corporate language** — object names like `LAMP_UNIT_001`, class designations like `CLASS: DECORATIVE-B`, registration codes like `AX-7741-B`. Makes the UI feel like a military/industrial system.
 - **Color swatches** — palette always documented inline (name + hex), styled like a brand standards document.
 - **No decoration for decoration's sake** — every element is either data or navigation. Nothing is purely aesthetic.
+- **No scroll anywhere** — the entire experience is viewport-locked. No `overflow-y` or `overflow-x` scroll on any surface, including panels and overlays. If content doesn't fit, reduce density or size — never introduce a scrollable region. `body` carries `overflow: hidden` globally; all components must respect it.
 
 ### Palette
 | Name   | Hex       | Role                              |
