@@ -707,8 +707,9 @@ export default function SandPage() {
             const sideWallHalfWidth = goalWorldSize.x * 0.5 + ballRadius * 0.24
             const goalFrontZ = goalWorldBox.min.z - ballRadius * 0.22
             const goalBackMeshZ = goalWorldBox.max.z - ballRadius * 0.82
+            const scoreLineZ = goalBackMeshZ - ballRadius * 1.35
             const insideGoalDepth = tumbleweedGameplayPosition.z > goalFrontZ && tumbleweedGameplayPosition.z < goalWorldBox.max.z + ballRadius * 0.12
-            const insideGoalMouth = Math.abs(gx) < mouthHalfWidth && tumbleweedGameplayPosition.z >= goalBackMeshZ
+            const insideGoalMouth = Math.abs(gx) < mouthHalfWidth && tumbleweedGameplayPosition.z >= scoreLineZ
 
             if (Math.abs(gx) > mouthHalfWidth && Math.abs(gx) < sideWallHalfWidth && insideGoalDepth) {
               tumbleweedGameplayPosition.x = goalWorldCenter.x + Math.sign(gx) * sideWallHalfWidth
