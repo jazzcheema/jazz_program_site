@@ -1542,6 +1542,13 @@ export default function SandPage() {
         </div>
       )}
 
+      {webcamSkyStatus === "ready" && !goalModeActive && (
+        <div className="sand-webcam-status sand-webcam-live" role="status" aria-live="polite">
+          <span className="sand-webcam-live-dot" aria-hidden="true" />
+          <span>SKY_FEED_ACTIVE</span>
+        </div>
+      )}
+
       {webcamSkyStatus === "error" && !goalModeActive && (
         <div className="sand-webcam-status" role="status">
           <span>CAMERA_BLOCKED // SKY_FEED_OFFLINE</span>

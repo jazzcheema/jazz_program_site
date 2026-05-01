@@ -182,6 +182,7 @@ canvas {
   padding: 0 0.56rem;
   opacity: 0;
   transform: translateY(0.28rem);
+  white-space: nowrap;
 }
 
 .sand-goal-cta-inline {
@@ -292,6 +293,35 @@ canvas {
 .sand-webcam-status button:focus-visible {
   color: #ffd08a;
   outline: none;
+}
+
+.sand-webcam-live {
+  color: #249958;
+  pointer-events: none;
+  gap: 0.52rem;
+  text-shadow:
+    0 1px 1px #000000,
+    0 0 7px rgba(0, 0, 0, 1),
+    0 0 16px rgba(0, 0, 0, 1),
+    0 0 30px rgba(0, 0, 0, 1),
+    0 0 42px rgba(36, 153, 88, 0.32);
+}
+
+.sand-webcam-live-dot {
+  display: inline-block;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: #249958;
+  box-shadow: 0 0 6px rgba(36, 153, 88, 0.9), 0 0 12px rgba(36, 153, 88, 0.5);
+  animation: sand-live-blink 2.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes sand-live-blink {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(36, 153, 88, 0.9), 0 0 12px rgba(36, 153, 88, 0.5); }
+  48%       { opacity: 0.18; box-shadow: 0 0 2px rgba(36, 153, 88, 0.3); }
+  52%       { opacity: 0.18; box-shadow: 0 0 2px rgba(36, 153, 88, 0.3); }
 }
 
 .home-identity {
