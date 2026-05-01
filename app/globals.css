@@ -41,6 +41,15 @@ canvas {
   display: block;
 }
 
+.lamp-corner:hover,
+.lamp-corner:focus-visible {
+  transform: scale(1.08);
+}
+
+.lamp-corner:active {
+  transform: scale(1.04);
+}
+
 .object-dial {
   left: 50%;
 }

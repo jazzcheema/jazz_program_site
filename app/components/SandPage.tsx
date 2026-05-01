@@ -292,6 +292,12 @@ export default function SandPage() {
     let goalScale = 1;
     let cameraModelHeight = 1;
     let cameraModelScale = 1;
+    type EyeRigMesh = {
+      mesh: THREE.Mesh;
+      basePosition: THREE.Vector3;
+      baseRotation: THREE.Euler;
+    };
+    const genieEyeMeshes: EyeRigMesh[] = [];
     const floorY = -2.18;
     const genieRideHeight = 1.68;
     const tumbleweedGameplayPosition = new THREE.Vector3(
@@ -313,6 +319,8 @@ export default function SandPage() {
     const goalWorldSize = new THREE.Vector3();
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
+    const pointerTarget = new THREE.Vector2();
+    const pointerCurrent = new THREE.Vector2();
     let cinematicStart = 0;
     let cinematicActive = false;
     let cinematicComplete = false;
@@ -480,6 +488,15 @@ export default function SandPage() {
 
     loader.load("/models/genie1.glb", (gltf) => {
       genie = gltf.scene;
+      genie.traverse((child) => {
+        if (!(child instanceof THREE.Mesh)) return;
+        if (child.name.toLowerCase() !== "sphere") return;
+        genieEyeMeshes.push({
+          mesh: child,
+          basePosition: child.position.clone(),
+          baseRotation: child.rotation.clone(),
+        });
+      });
       const box = new THREE.Box3().setFromObject(genie);
       genie.position.sub(box.getCenter(new THREE.Vector3()));
       const size = box.getSize(new THREE.Vector3());
@@ -602,6 +619,13 @@ export default function SandPage() {
       pointer.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
     };
 
+    const updateGazePointer = (event: PointerEvent) => {
+      pointerTarget.set(
+        THREE.MathUtils.clamp((event.clientX / window.innerWidth) * 2 - 1, -1, 1),
+        THREE.MathUtils.clamp((event.clientY / window.innerHeight) * -2 + 1, -1, 1),
+      );
+    };
+
     const getPointerHits = (event: PointerEvent) => {
       if (
         cinematicActive ||
@@ -650,6 +674,7 @@ export default function SandPage() {
       setBioVisible(false);
       lockedFinalLookTarget = finalLookTarget.clone();
       pointerOnCamera = false;
+      pointerTarget.set(0, 0);
       canvas.style.cursor = "default";
 
       cameraBezier = [
@@ -700,6 +725,7 @@ export default function SandPage() {
       lookBezier = null;
       pointerOnGenie = false;
       pointerOnCamera = false;
+      pointerTarget.set(0, 0);
       setBioVisible(false);
       canvas.style.cursor = "default";
     };
@@ -733,6 +759,7 @@ export default function SandPage() {
       resetActive = false;
       pointerOnGenie = false;
       pointerOnCamera = false;
+      pointerTarget.set(0, 0);
       goalModeRequestedRef.current = false;
       bioTriggered = false;
       setBioVisible(false);
@@ -752,6 +779,7 @@ export default function SandPage() {
     };
 
     const onPointerMove = (event: PointerEvent) => {
+      updateGazePointer(event);
       const hits = getPointerHits(event);
       pointerOnGenie = hits.genie;
       pointerOnCamera = hits.camera;
@@ -762,10 +790,12 @@ export default function SandPage() {
     const onPointerLeave = () => {
       pointerOnGenie = false;
       pointerOnCamera = false;
+      pointerTarget.set(0, 0);
       canvas.style.cursor = "default";
     };
 
     const onPointerDown = (event: PointerEvent) => {
+      updateGazePointer(event);
       const hits = getPointerHits(event);
       pointerOnGenie = hits.genie;
       pointerOnCamera = hits.camera;
@@ -840,6 +870,7 @@ export default function SandPage() {
       animId = requestAnimationFrame(animate);
       tick++;
       const t = tick * 0.01;
+      pointerCurrent.lerp(pointerTarget, 0.055);
 
       if (sandFloor) {
         sandFloor.rotation.y = -Math.PI / 10 + Math.sin(t * 0.08) * 0.018;
@@ -944,6 +975,36 @@ export default function SandPage() {
           .copy(genie.position)
           .add(GENIE_SIGNAL_LIGHT_OFFSET);
         genieSignalLight.intensity = 0.36 + hoverPulse * 0.42 + pulse * 2.35;
+
+        const gazeActive =
+          bioTriggered &&
+          !resetActive &&
+          !goalModeTransitionActive &&
+          !goalModeSceneActive;
+        const gazeX = pointerCurrent.x * (gazeActive ? 0.018 : 0);
+        const gazeY = pointerCurrent.y * (gazeActive ? 0.014 : 0);
+        genieEyeMeshes.forEach(({ mesh, basePosition, baseRotation }) => {
+          mesh.position.x = THREE.MathUtils.lerp(
+            mesh.position.x,
+            basePosition.x + gazeX,
+            0.18,
+          );
+          mesh.position.y = THREE.MathUtils.lerp(
+            mesh.position.y,
+            basePosition.y + gazeY,
+            0.18,
+          );
+          mesh.rotation.y = THREE.MathUtils.lerp(
+            mesh.rotation.y,
+            baseRotation.y + pointerCurrent.x * (gazeActive ? 0.045 : 0),
+            0.14,
+          );
+          mesh.rotation.x = THREE.MathUtils.lerp(
+            mesh.rotation.x,
+            baseRotation.x - pointerCurrent.y * (gazeActive ? 0.035 : 0),
+            0.14,
+          );
+        });
       }
 
       if (cameraModel) {
