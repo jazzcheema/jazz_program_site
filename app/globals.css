@@ -650,14 +650,16 @@ canvas {
       sand-cta-breathe 2.8s ease-in-out 700ms infinite;
   }
 
-  .sand-sky-bio[data-skyfeed="true"] {
+  .sand-sky-bio[data-visible="true"][data-skyfeed="true"] {
+    opacity: 1;
     filter:
       drop-shadow(0 0 6px #000)
-      drop-shadow(0 0 14px #000)
-      drop-shadow(0 0 28px #000)
-      drop-shadow(0 0 44px rgba(0, 0, 0, 0.98))
-      drop-shadow(0 2px 3px #000)
-      drop-shadow(0 0 60px rgba(0, 0, 0, 0.92));
+      drop-shadow(0 0 16px #000)
+      drop-shadow(0 0 32px #000)
+      drop-shadow(0 0 52px rgba(0, 0, 0, 0.99))
+      drop-shadow(0 3px 4px #000)
+      drop-shadow(0 0 72px rgba(0, 0, 0, 0.95))
+      drop-shadow(0 0 96px rgba(0, 0, 0, 0.85));
   }
 }
 
