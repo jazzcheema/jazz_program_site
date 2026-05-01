@@ -661,6 +661,20 @@ canvas {
       drop-shadow(0 0 72px rgba(0, 0, 0, 0.95))
       drop-shadow(0 0 96px rgba(0, 0, 0, 0.85));
   }
+
+  .sand-sky-bio[data-skyfeed="true"] .sand-sky-label,
+  .sand-sky-bio[data-skyfeed="true"] .sand-sky-title,
+  .sand-sky-bio[data-skyfeed="true"] .sand-sky-copy {
+    text-shadow:
+      0 0 3px #000,
+      0 0 7px #000,
+      0 0 14px #000,
+      0 1px 3px #000,
+      0 -1px 3px #000,
+      1px 0 3px #000,
+      -1px 0 3px #000,
+      0 0 22px rgba(0, 0, 0, 0.98);
+  }
 }
 
 @media (min-width: 768px) {
