@@ -121,6 +121,7 @@ canvas {
   transform: translate3d(-50%, 0, 0) scale(1);
 }
 
+
 .sand-sky-stack {
   padding: 0 0 0 clamp(0.9rem, 1vw, 1.2rem);
   transform: rotateX(3deg) rotateY(-5deg) rotateZ(-0.45deg);
@@ -237,6 +238,40 @@ canvas {
 
 .sand-webcam-sky[data-ready="true"] {
   opacity: 0.7;
+}
+
+.sand-sky-bio[data-skyfeed="true"] {
+  filter:
+    drop-shadow(0 0 6px #000)
+    drop-shadow(0 0 14px #000)
+    drop-shadow(0 0 28px rgba(0, 0, 0, 0.95))
+    drop-shadow(0 2px 3px #000);
+}
+
+.sand-goal-cta-wrap[data-skyfeed="true"] {
+  filter:
+    drop-shadow(0 0 4px #000)
+    drop-shadow(0 0 10px #000)
+    drop-shadow(0 0 20px #000)
+    drop-shadow(0 0 34px rgba(0, 0, 0, 0.98))
+    drop-shadow(0 2px 4px #000)
+    drop-shadow(0 0 50px rgba(0, 0, 0, 0.85));
+}
+
+.sand-goal-cta-wrap[data-skyfeed="true"] .sand-goal-cta {
+  animation: sand-cta-announce 700ms ease-out forwards,
+    sand-cta-breathe-active 2.8s ease-in-out 700ms infinite;
+}
+
+@keyframes sand-cta-breathe-active {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(36, 153, 88, 0.65), 0 0 32px rgba(36, 153, 88, 0.38);
+    color: #909090;
+  }
+  50% {
+    box-shadow: 0 0 36px rgba(36, 153, 88, 1), 0 0 72px rgba(36, 153, 88, 0.72), 0 0 110px rgba(36, 153, 88, 0.38);
+    color: #d8d8d8;
+  }
 }
 
 .sand-webcam-status {

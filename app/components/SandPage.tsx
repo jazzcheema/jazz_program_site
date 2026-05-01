@@ -1383,6 +1383,7 @@ export default function SandPage() {
         <div
           className="sand-webcam-sky"
           data-ready={webcamSkyStatus === "ready"}
+          data-bio={bioVisible}
         >
           <WebcamPixelGrid
             key={webcamSkyAttempt}
@@ -1414,6 +1415,7 @@ export default function SandPage() {
       <section
         aria-hidden={!bioVisible}
         data-visible={bioVisible}
+        data-skyfeed={webcamSkyStatus === "ready"}
         className="sand-sky-bio pointer-events-none absolute"
         style={{
           zIndex: 6,
@@ -1529,7 +1531,7 @@ export default function SandPage() {
       />
 
       {bioVisible && !goalModeActive && (
-        <div className="sand-goal-cta-wrap sand-goal-cta-wrap-mobile">
+        <div className="sand-goal-cta-wrap sand-goal-cta-wrap-mobile" data-skyfeed={webcamSkyStatus === "ready"}>
           <button
             type="button"
             className="sand-goal-cta"
