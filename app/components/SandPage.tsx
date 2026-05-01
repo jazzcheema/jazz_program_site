@@ -1496,7 +1496,8 @@ export default function SandPage() {
                 setBioVisible(false);
               }}
             >
-              → MAKE_CONTACT
+              <span className="sand-goal-cta-default">→ MAKE_CONTACT</span>
+              <span className="sand-goal-cta-reveal">→ SCORE_A_GOAL</span>
             </button>
           )}
         </div>
@@ -1520,7 +1521,8 @@ export default function SandPage() {
               setBioVisible(false);
             }}
           >
-            → MAKE_CONTACT
+            <span className="sand-goal-cta-default">→ MAKE_CONTACT</span>
+            <span className="sand-goal-cta-reveal">→ SCORE_A_GOAL</span>
           </button>
         </div>
       )}

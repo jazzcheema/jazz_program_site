@@ -146,6 +146,8 @@ canvas {
 }
 
 .sand-goal-cta {
+  position: relative;
+  overflow: hidden;
   width: 100%;
   min-height: 1.9rem;
   pointer-events: auto;
@@ -159,8 +161,27 @@ canvas {
   text-align: left;
   padding: 0.45rem 0.56rem;
   transition:
-    color 120ms ease,
-    background-color 120ms ease;
+    color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+  animation: sand-cta-announce 700ms ease-out forwards,
+    sand-cta-breathe 2.8s ease-in-out 700ms infinite;
+}
+
+.sand-goal-cta-default,
+.sand-goal-cta-reveal {
+  display: block;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.sand-goal-cta-reveal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 0.56rem;
+  opacity: 0;
+  transform: translateY(0.28rem);
 }
 
 .sand-goal-cta-inline {
@@ -172,9 +193,34 @@ canvas {
 
 .sand-goal-cta:hover,
 .sand-goal-cta:focus-visible {
-  background-color: rgba(36, 153, 88, 0.08);
-  color: #249958;
+  background-color: #c8c8c8;
+  color: #0c0c0c;
   outline: none;
+  animation-play-state: paused;
+  box-shadow: none;
+}
+
+.sand-goal-cta:hover .sand-goal-cta-default,
+.sand-goal-cta:focus-visible .sand-goal-cta-default {
+  opacity: 0;
+  transform: translateY(-0.28rem);
+}
+
+.sand-goal-cta:hover .sand-goal-cta-reveal,
+.sand-goal-cta:focus-visible .sand-goal-cta-reveal {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes sand-cta-announce {
+  0%   { box-shadow: none; color: #808080; }
+  35%  { box-shadow: 0 0 24px rgba(36, 153, 88, 0.72), 0 0 8px rgba(36, 153, 88, 0.52); color: #d0d0d0; }
+  100% { box-shadow: 0 0 5px rgba(36, 153, 88, 0.16); color: #888888; }
+}
+
+@keyframes sand-cta-breathe {
+  0%, 100% { box-shadow: 0 0 4px rgba(36, 153, 88, 0.1);  color: #808080; }
+  50%       { box-shadow: 0 0 16px rgba(36, 153, 88, 0.44), 0 0 5px rgba(36, 153, 88, 0.28); color: #a0a0a0; }
 }
 
 .sand-webcam-sky {
