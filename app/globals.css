@@ -359,6 +359,60 @@ canvas {
   52%       { opacity: 0.18; box-shadow: 0 0 2px rgba(36, 153, 88, 0.3); }
 }
 
+.mobile-gate-btn {
+  position: relative;
+  overflow: hidden;
+  align-self: flex-start;
+  min-width: 10.5rem;
+  background: transparent;
+  border: 1px solid #2a2a2a;
+  color: #808080;
+  cursor: pointer;
+  font-family: var(--font-geist-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  padding: 0.7rem 1.1rem;
+  white-space: nowrap;
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+
+.mobile-gate-btn-default,
+.mobile-gate-btn-reveal {
+  display: block;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.mobile-gate-btn-reveal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 1.1rem;
+  opacity: 0;
+  transform: translateY(0.28rem);
+  white-space: nowrap;
+}
+
+.mobile-gate-btn:hover,
+.mobile-gate-btn:focus-visible {
+  background-color: #c8c8c8;
+  border-color: #c8c8c8;
+  color: #0c0c0c;
+  outline: none;
+}
+
+.mobile-gate-btn:hover .mobile-gate-btn-default,
+.mobile-gate-btn:focus-visible .mobile-gate-btn-default {
+  opacity: 0;
+  transform: translateY(-0.28rem);
+}
+
+.mobile-gate-btn:hover .mobile-gate-btn-reveal,
+.mobile-gate-btn:focus-visible .mobile-gate-btn-reveal {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .home-identity {
   position: fixed;
   top: clamp(5.5rem, 9dvh, 7.5rem);
