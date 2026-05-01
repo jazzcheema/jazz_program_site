@@ -40,7 +40,7 @@ export default function WebcamPixelGrid({
   gridCols = 64,
   gridRows = 48,
   maxElevation = 15,
-  motionSensitivity = 0.4,
+  motionSensitivity = 0.9,
   elevationSmoothing = 0.1,
   colorMode = 'webcam',
   monochromeColor = '#00ff88',
@@ -58,11 +58,16 @@ export default function WebcamPixelGrid({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const onWebcamErrorRef = useRef(onWebcamError)
   const onWebcamReadyRef = useRef(onWebcamReady)
+  const gapRatioRef = useRef(gapRatio)
 
   useEffect(() => {
     onWebcamErrorRef.current = onWebcamError
     onWebcamReadyRef.current = onWebcamReady
   }, [onWebcamError, onWebcamReady])
+
+  useEffect(() => {
+    gapRatioRef.current = gapRatio
+  }, [gapRatio])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -100,7 +105,6 @@ export default function WebcamPixelGrid({
     const sensitivity = clamp01(motionSensitivity)
     const smoothing = clamp01(elevationSmoothing)
     const darkenFactor = 1 - clamp01(darken)
-    const cellGapRatio = clamp01(gapRatio)
 
     const resize = () => {
       dpr = Math.min(window.devicePixelRatio || 1, 2)
@@ -122,7 +126,7 @@ export default function WebcamPixelGrid({
       const frame = sampleCtx.getImageData(0, 0, gridCols, gridRows).data
       const cellWidth = width / gridCols
       const cellHeight = height / gridRows
-      const gap = Math.min(cellWidth, cellHeight) * cellGapRatio
+      const gap = Math.min(cellWidth, cellHeight) * clamp01(gapRatioRef.current)
       const baseCellWidth = Math.max(0, cellWidth - gap)
       const baseCellHeight = Math.max(0, cellHeight - gap)
       const maxMotion = Math.max(1, 255 * (1 - sensitivity * 0.82))
@@ -224,7 +228,6 @@ export default function WebcamPixelGrid({
     colorMode,
     darken,
     elevationSmoothing,
-    gapRatio,
     gridCols,
     gridRows,
     invertColors,

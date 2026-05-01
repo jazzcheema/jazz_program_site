@@ -137,6 +137,7 @@ export default function SandPage() {
     "idle" | "requesting" | "ready" | "error"
   >("idle");
   const [webcamSkyAttempt, setWebcamSkyAttempt] = useState(0);
+  const [webcamGapRatio, setWebcamGapRatio] = useState(0.18);
 
   const retryWebcamSky = () => {
     setWebcamSkyStatus("requesting");
@@ -188,6 +189,23 @@ export default function SandPage() {
   useEffect(() => {
     webcamSkyStatusRef.current = webcamSkyStatus;
   }, [webcamSkyStatus]);
+
+  useEffect(() => {
+    if (!goalModeActive || webcamSkyStatus !== "ready") return;
+    const start = performance.now();
+    const from = 0.18;
+    const to = .68;
+    const duration = 4400;
+    let animId: number;
+    const tick = () => {
+      const p = Math.min((performance.now() - start) / duration, 1);
+      const eased = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+      setWebcamGapRatio(from + (to - from) * eased);
+      if (p < 1) animId = requestAnimationFrame(tick);
+    };
+    animId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animId);
+  }, [goalModeActive, webcamSkyStatus]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1371,13 +1389,14 @@ export default function SandPage() {
             className="w-full h-full"
             gridCols={76}
             gridRows={46}
-            maxElevation={18}
+            maxElevation={15}
             motionSensitivity={0.46}
             elevationSmoothing={0.18}
             colorMode="webcam"
             backgroundColor="#070707"
-            gapRatio={0.16}
-            darken={0.18}
+            gapRatio={webcamGapRatio}
+            darken={0}
+            invertColors={false}
             borderColor="#ffc36f"
             borderOpacity={0.09}
             onWebcamReady={() => {
