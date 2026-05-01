@@ -644,6 +644,21 @@ canvas {
     font-size: clamp(0.44rem, 2.2vw, 0.56rem);
     padding: 0.38rem 0.46rem;
   }
+
+  .sand-goal-cta-wrap[data-skyfeed="true"] .sand-goal-cta {
+    animation: sand-cta-announce 700ms ease-out forwards,
+      sand-cta-breathe 2.8s ease-in-out 700ms infinite;
+  }
+
+  .sand-sky-bio[data-skyfeed="true"] {
+    filter:
+      drop-shadow(0 0 6px #000)
+      drop-shadow(0 0 14px #000)
+      drop-shadow(0 0 28px #000)
+      drop-shadow(0 0 44px rgba(0, 0, 0, 0.98))
+      drop-shadow(0 2px 3px #000)
+      drop-shadow(0 0 60px rgba(0, 0, 0, 0.92));
+  }
 }
 
 @media (min-width: 768px) {
