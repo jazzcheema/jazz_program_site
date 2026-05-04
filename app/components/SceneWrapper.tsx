@@ -209,7 +209,7 @@ export default function SceneWrapper() {
 
       <div className="absolute inset-0">
         <CarpetScene
-          onCarpetClick={() => setPanelOpen(true)}
+          onCarpetClick={() => setPanelOpen((prev) => !prev)}
           onReachClouds={handleReachClouds}
           onReachSandcastle={handleReachSandcastle}
         />
