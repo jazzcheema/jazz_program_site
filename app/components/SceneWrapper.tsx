@@ -61,7 +61,8 @@ export default function SceneWrapper() {
 
   useEffect(() => {
     const isMobile = window.innerWidth < 768 && "ontouchstart" in window;
-    if (isMobile) {
+    const seen = localStorage.getItem("mobile-gate-seen");
+    if (isMobile && !seen) {
       setShowMobileGate(true);
       const t = setTimeout(() => setGateVisible(true), 60);
       return () => clearTimeout(t);
@@ -186,7 +187,10 @@ export default function SceneWrapper() {
           <button
             type="button"
             className="mobile-gate-btn"
-            onClick={() => setShowMobileGate(false)}
+            onClick={() => {
+              localStorage.setItem("mobile-gate-seen", "1");
+              setShowMobileGate(false);
+            }}
           >
             <span className="mobile-gate-btn-default">→ ENTER_SITE</span>
             <span className="mobile-gate-btn-reveal">→ CONFIRM_ENTRY</span>
