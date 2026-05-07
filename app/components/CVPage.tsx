@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 const ABOUT =
   'I build full-stack systems with a strong focus on 3D interactive software, cinematic digital experiences, and applications that invite participation. Drawing on a background in film directing and editing, I approach software as a medium for storytelling-- building interfaces that pull users into an experience rather than presenting them with one. I\'m drawn to interactive software where engagement becomes part of the system itself, and each user builds a personal relationship with the product through their own journey. I also bring strong mobile development experience, including leading the end-to-end migration and modernisation of a 15k+ user application as the sole mobile engineer.'
@@ -737,6 +737,7 @@ export default function CVPage() {
   const lastScrollRef = useRef({ top: 0, time: 0 })
   const ghostsRef = useRef<GhostFrame[]>([])
   const skillsUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const slotRafRef = useRef<number | null>(null)
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
@@ -769,8 +770,59 @@ export default function CVPage() {
   useEffect(() => {
     return () => {
       if (skillsUnlockTimerRef.current) clearTimeout(skillsUnlockTimerRef.current)
+      if (slotRafRef.current) cancelAnimationFrame(slotRafRef.current)
     }
   }, [])
+
+  const updateSlotRows = useCallback(() => {
+    const container = scrollRef.current
+    if (!container) return
+
+    const containerRect = container.getBoundingClientRect()
+    const focalY = containerRect.top + containerRect.height * 0.53
+    const focusRadius = Math.max(isMobile ? 170 : 180, containerRect.height * (isMobile ? 0.3 : 0.2))
+    const falloff = Math.max(isMobile ? 190 : 300, containerRect.height * (isMobile ? 0.42 : 0.4))
+
+    container.querySelectorAll<HTMLElement>('.cv-slot-row').forEach((row, index) => {
+      const rect = row.getBoundingClientRect()
+      const center = rect.top + rect.height * 0.5
+      const distance = Math.abs(center - focalY)
+      const unfocused = Math.min(1, Math.max(0, (distance - focusRadius) / falloff))
+      const intensity = unfocused * unfocused * (3 - 2 * unfocused)
+      const rowDirection = index % 2 === 0 ? 1 : -1
+      const offset = intensity * (isMobile ? 24 : 84)
+      const jitter = intensity * (isMobile ? 10 : 28)
+      const tilt = intensity * rowDirection * 0.85
+      const clarity = 1 - intensity
+
+      row.style.setProperty('--cv-slot-left-x', `${offset}px`)
+      row.style.setProperty('--cv-slot-right-x', `${-offset}px`)
+      row.style.setProperty('--cv-slot-left-y', `${jitter * rowDirection}px`)
+      row.style.setProperty('--cv-slot-right-y', `${-jitter * rowDirection}px`)
+      row.style.setProperty('--cv-slot-left-tilt', `${tilt}deg`)
+      row.style.setProperty('--cv-slot-right-tilt', `${-tilt}deg`)
+      row.style.setProperty('--cv-slot-opacity', `${0.46 + clarity * 0.54}`)
+      row.style.setProperty('--cv-slot-crunch', `${intensity * 0.052}em`)
+      row.style.setProperty('--cv-slot-nest-x', `${intensity * (isMobile ? 8 : 22)}px`)
+    })
+  }, [isMobile])
+
+  const scheduleSlotRows = useCallback(() => {
+    if (slotRafRef.current) return
+    slotRafRef.current = requestAnimationFrame(() => {
+      slotRafRef.current = null
+      updateSlotRows()
+    })
+  }, [updateSlotRows])
+
+  useEffect(() => {
+    const t = requestAnimationFrame(updateSlotRows)
+    window.addEventListener('resize', scheduleSlotRows)
+    return () => {
+      cancelAnimationFrame(t)
+      window.removeEventListener('resize', scheduleSlotRows)
+    }
+  }, [scheduleSlotRows, updateSlotRows])
 
   const handleScroll = () => {
     const top = scrollRef.current?.scrollTop ?? 0
@@ -782,6 +834,7 @@ export default function CVPage() {
     }
     lastScrollRef.current = { top, time: now }
     setScrolled(top > 52)
+    scheduleSlotRows()
   }
 
   const scrollToSection = (id: string) => {
@@ -859,6 +912,66 @@ export default function CVPage() {
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
         .cv-rise { opacity: 0; animation: cv-rise 560ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .cv-slot-row {
+          --cv-slot-left-x: 84px;
+          --cv-slot-right-x: -84px;
+          --cv-slot-left-y: 28px;
+          --cv-slot-right-y: -28px;
+          --cv-slot-left-tilt: 0.85deg;
+          --cv-slot-right-tilt: -0.85deg;
+          --cv-slot-opacity: 0.46;
+          --cv-slot-crunch: 0.052em;
+          --cv-slot-nest-x: 22px;
+          position: relative;
+          overflow: hidden;
+        }
+        .cv-slot-row > :first-child {
+          opacity: var(--cv-slot-opacity);
+          transform: translate(var(--cv-slot-left-x), var(--cv-slot-left-y)) skewY(var(--cv-slot-left-tilt));
+          letter-spacing: var(--cv-slot-crunch);
+          transition: opacity 110ms linear, transform 110ms linear, letter-spacing 110ms linear;
+          will-change: opacity, transform, letter-spacing;
+        }
+        .cv-slot-row > :last-child {
+          opacity: var(--cv-slot-opacity);
+          transform: translate(var(--cv-slot-right-x), var(--cv-slot-right-y)) skewY(var(--cv-slot-right-tilt));
+          letter-spacing: var(--cv-slot-crunch);
+          transition: opacity 110ms linear, transform 110ms linear, letter-spacing 110ms linear;
+          will-change: opacity, transform, letter-spacing;
+        }
+        .cv-slot-row > :only-child {
+          transform: translate(0, var(--cv-slot-left-y)) skewY(var(--cv-slot-left-tilt));
+        }
+        .cv-slot-row > :first-child > *:nth-child(odd) {
+          transform: translateX(calc(var(--cv-slot-nest-x) * -1));
+          transition: transform 110ms linear;
+        }
+        .cv-slot-row > :first-child > *:nth-child(even) {
+          transform: translateX(var(--cv-slot-nest-x));
+          transition: transform 110ms linear;
+        }
+        .cv-slot-row > :last-child > *:nth-child(odd) {
+          transform: translateX(var(--cv-slot-nest-x));
+          transition: transform 110ms linear;
+        }
+        .cv-slot-row > :last-child > *:nth-child(even) {
+          transform: translateX(calc(var(--cv-slot-nest-x) * -1));
+          transition: transform 110ms linear;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .cv-slot-row > :first-child,
+          .cv-slot-row > :last-child {
+            opacity: 1 !important;
+            transform: none !important;
+            letter-spacing: inherit !important;
+            transition: none !important;
+          }
+          .cv-slot-row > :first-child > *,
+          .cv-slot-row > :last-child > * {
+            transform: none !important;
+            transition: none !important;
+          }
+        }
 
         .cv-skills-shell {
           --cv-skills-frame-height: clamp(31rem, 56vw, 42rem);
@@ -1375,7 +1488,7 @@ export default function CVPage() {
           {EXPERIENCE.map((job, i) => (
             <div
               key={i}
-              className="cv-rise cv-exp-row"
+              className="cv-rise cv-exp-row cv-slot-row"
               style={{ animationDelay: `${700 + i * 70}ms` }}
             >
               <div>
@@ -1401,7 +1514,7 @@ export default function CVPage() {
           {AWARDS.map((award, i) => (
             <div
               key={i}
-              className="cv-rise"
+              className="cv-rise cv-slot-row"
               style={{
                 animationDelay: `${800 + i * 60}ms`,
                 padding: '1.2rem 0',
@@ -1430,7 +1543,7 @@ export default function CVPage() {
           {EDUCATION.map((edu, i) => (
             <div
               key={i}
-              className="cv-rise"
+              className="cv-rise cv-slot-row"
               style={{
                 animationDelay: `${920 + i * 55}ms`,
                 padding: '1.1rem 0',
@@ -1469,6 +1582,7 @@ export default function CVPage() {
             {CREDITS.map((credit, i) => (
               <div
                 key={i}
+                className="cv-slot-row"
                 style={{
                   display: 'flex',
                   flexWrap: 'wrap',
