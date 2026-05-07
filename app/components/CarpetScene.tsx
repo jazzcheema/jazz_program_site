@@ -10,28 +10,33 @@ interface CarpetSceneProps {
   onCarpetClick?: () => void
   onReachClouds: () => void
   onReachSandcastle: () => void
+  onReachBooks: () => void
 }
 
 // Desktop target; the live position is clamped to the camera's visible area.
 const DESKTOP_CLOUD_POS = new THREE.Vector3(3.0, 1.6, 0)
 const DESKTOP_SANDCASTLE_POS = new THREE.Vector3(-3.55, -2.05, 0)
+const DESKTOP_BOOKS_POS = new THREE.Vector3(3.15, -1.85, 0)
 const CAMERA_Z = 6
 const REACH_DIST = 1.3
 const SANDCASTLE_REACH_DIST = 0.72
 const SANDCASTLE_PULL_DIST = 2.15
+const BOOKS_REACH_DIST = 0.8
 const MOBILE_ASPECT = 0.74
 
-export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandcastle }: CarpetSceneProps) {
+export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandcastle, onReachBooks }: CarpetSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const onReachRef = useRef(onReachClouds)
   const onReachSandcastleRef = useRef(onReachSandcastle)
+  const onReachBooksRef = useRef(onReachBooks)
   const onClickRef = useRef(onCarpetClick)
 
   useEffect(() => {
     onReachRef.current = onReachClouds
     onReachSandcastleRef.current = onReachSandcastle
+    onReachBooksRef.current = onReachBooks
     onClickRef.current = onCarpetClick
-  }, [onCarpetClick, onReachClouds, onReachSandcastle])
+  }, [onCarpetClick, onReachClouds, onReachSandcastle, onReachBooks])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -82,8 +87,11 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
       return desktopSize * stageScale()
     }
 
+    const responsiveBooksPos = () => DESKTOP_BOOKS_POS.clone().multiplyScalar(stageScale())
+
     let cloudPos = responsiveCloudPos()
     let sandcastlePos = responsiveSandcastlePos()
+    let booksPos = responsiveBooksPos()
 
     // All lights start at 0 and ramp up cinematically
     const ambient = new THREE.AmbientLight('#ffffff', 0)
@@ -101,7 +109,11 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
     sandcastleLight.position.copy(sandcastlePos).add(new THREE.Vector3(0, 0.8, 2))
     scene.add(sandcastleLight)
 
-    const LIGHT_TARGETS = { ambient: 0.52, key: 1.9, rim: 2.8, cloud: 2.0, sandcastle: 1.15 }
+    const booksLight = new THREE.PointLight('#6688cc', 0, 7)
+    booksLight.position.copy(booksPos).add(new THREE.Vector3(0, 0.8, 2))
+    scene.add(booksLight)
+
+    const LIGHT_TARGETS = { ambient: 0.52, key: 1.9, rim: 2.8, cloud: 2.0, sandcastle: 1.15, books: 1.2 }
     const LIGHT_DURATION = 210 // ~3.5s at 60fps
     let lightT = 0
 
@@ -120,12 +132,15 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
     let carpet: THREE.Group | null = null
     let clouds: THREE.Group | null = null
     let sandcastle: THREE.Group | null = null
+    let books: THREE.Group | null = null
     let carpetBaseScale = 1
     let carpetMaxDim = 1
     let cloudsMaxDim = 1
     let sandcastleMaxDim = 1
+    let booksMaxDim = 1
     let reached = false
     let sandcastleActivated = false
+    let booksActivated = false
 
     const dracoLoader = new DRACOLoader()
     dracoLoader.setDecoderPath('/draco/gltf/')
@@ -168,6 +183,18 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
       scene.add(sandcastle)
     })
 
+    loader.load('/models/books.glb', (gltf) => {
+      books = gltf.scene
+      const box = new THREE.Box3().setFromObject(books)
+      books.position.sub(box.getCenter(new THREE.Vector3()))
+      const size = box.getSize(new THREE.Vector3())
+      booksMaxDim = Math.max(size.x, size.y, size.z)
+      books.scale.setScalar(responsiveModelSize(0.72, 0.22) / booksMaxDim)
+      books.position.copy(booksPos)
+      books.rotation.y = Math.PI / 5
+      scene.add(books)
+    })
+
     // Drag state
     let isDragging = false
     let downX = 0, downY = 0
@@ -200,13 +227,13 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
     const onPointerUp = (e: PointerEvent) => {
       isDragging = false
       const moved = Math.hypot(e.clientX - downX, e.clientY - downY)
-      if (moved < 6 && carpet) {
+      if (moved < 6) {
         const ndc = new THREE.Vector2(
           (e.clientX / window.innerWidth) * 2 - 1,
           -(e.clientY / window.innerHeight) * 2 + 1,
         )
         raycaster.setFromCamera(ndc, camera)
-        if (raycaster.intersectObject(carpet, true).length > 0) {
+        if (carpet && raycaster.intersectObject(carpet, true).length > 0) {
           onClickRef.current?.()
         }
       }
@@ -224,14 +251,17 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
       renderer.setSize(window.innerWidth, window.innerHeight)
       cloudPos = responsiveCloudPos()
       sandcastlePos = responsiveSandcastlePos()
+      booksPos = responsiveBooksPos()
       cloudLight.position.copy(cloudPos).add(new THREE.Vector3(0, 1, 2))
       sandcastleLight.position.copy(sandcastlePos).add(new THREE.Vector3(0, 0.8, 2))
+      booksLight.position.copy(booksPos).add(new THREE.Vector3(0, 0.8, 2))
       if (carpet) {
         carpetBaseScale = responsiveModelSize(2.2, 0.62) / carpetMaxDim
         carpet.scale.setScalar(carpetBaseScale)
       }
       if (clouds) clouds.scale.setScalar(responsiveModelSize(1.6, 0.44) / cloudsMaxDim)
       if (sandcastle) sandcastle.scale.setScalar(responsiveModelSize(1.35, 0.34) / sandcastleMaxDim)
+      if (books) books.scale.setScalar(responsiveModelSize(0.72, 0.22) / booksMaxDim)
     }
     window.addEventListener('resize', onResize)
 
@@ -252,6 +282,7 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
         rim.intensity       = LIGHT_TARGETS.rim     * e
         cloudLight.intensity = LIGHT_TARGETS.cloud  * e
         sandcastleLight.intensity = LIGHT_TARGETS.sandcastle * e
+        booksLight.intensity = LIGHT_TARGETS.books * e
       }
 
       if (carpet && !reached) {
@@ -313,6 +344,14 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
         } else if (sandcastleDist > SANDCASTLE_REACH_DIST * currentStageScale * 1.7) {
           sandcastleActivated = false
         }
+
+        const booksDist = cPos.distanceTo(booksPos)
+        if (booksDist < BOOKS_REACH_DIST * currentStageScale && !booksActivated) {
+          booksActivated = true
+          onReachBooksRef.current()
+        } else if (booksDist > BOOKS_REACH_DIST * currentStageScale * 1.7) {
+          booksActivated = false
+        }
       }
 
       // Clouds: gentle independent bob
@@ -326,6 +365,12 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
         sandcastle.position.y = sandcastlePos.y + Math.sin(t * 0.55) * 0.035
         sandcastle.position.x = sandcastlePos.x + Math.sin(t * 0.28) * 0.015
         sandcastle.rotation.y = -Math.PI / 7 + Math.sin(t * 0.24) * 0.035
+      }
+
+      if (books) {
+        books.position.y = booksPos.y + Math.sin(t * 0.62 + 1.1) * 0.03
+        books.position.x = booksPos.x + Math.sin(t * 0.33 + 0.7) * 0.012
+        books.rotation.y = Math.PI / 5 + Math.sin(t * 0.27 + 0.4) * 0.03
       }
 
       renderer.render(scene, camera)

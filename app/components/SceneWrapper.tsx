@@ -5,6 +5,7 @@ import CarpetScene from "./CarpetScene";
 import InfoPanel from "./InfoPanel";
 import CloudsPage from "./CloudsPage";
 import SandPage from "./SandPage";
+import CVPage from "./CVPage";
 import VortexBackground from "./VortexBackground";
 import WindTextChars from "./WindTextChars";
 import type { ObjectData } from "../data/objects";
@@ -52,6 +53,7 @@ export default function SceneWrapper() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [reached, setReached] = useState(false);
   const [reachedSand, setReachedSand] = useState(false);
+  const [reachedBooks, setReachedBooks] = useState(false);
   const [flashing, setFlashing] = useState(false);
   const [identityActive, setIdentityActive] = useState(false);
   const [showMobileGate, setShowMobileGate] = useState(false);
@@ -91,6 +93,15 @@ export default function SceneWrapper() {
     setFlashing(true);
     setTimeout(() => {
       setReachedSand(true);
+      setFlashing(false);
+    }, 450);
+  };
+
+  const handleReachBooks = () => {
+    setPanelOpen(false);
+    setFlashing(true);
+    setTimeout(() => {
+      setReachedBooks(true);
       setFlashing(false);
     }, 450);
   };
@@ -159,7 +170,7 @@ export default function SceneWrapper() {
               margin: "0 0 1.6rem",
             }}
           >
-            This experience was built for a wide viewport — 3D scenes, cinematic
+            This experience was built for a wide viewport: 3D scenes, cinematic
             camera moves, and interactive controls are optimised for desktop.
           </p>
 
@@ -204,6 +215,7 @@ export default function SceneWrapper() {
 
   if (reached) return <CloudsPage />;
   if (reachedSand) return <SandPage />;
+  if (reachedBooks) return <CVPage />;
 
   return (
     <div
@@ -227,6 +239,7 @@ export default function SceneWrapper() {
           onCarpetClick={() => setPanelOpen((prev) => !prev)}
           onReachClouds={handleReachClouds}
           onReachSandcastle={handleReachSandcastle}
+          onReachBooks={handleReachBooks}
         />
       </div>
 
@@ -268,7 +281,7 @@ export default function SceneWrapper() {
         style={{ background: "#ffffff", opacity: flashing ? 1 : 0, zIndex: 50 }}
       />
 
-      {/* Hint — shown until first interaction */}
+      {/* Hint */}
       {!panelOpen && (
         <div className="fixed bottom-5 sm:bottom-6 left-1/2 -translate-x-1/2 pointer-events-none">
           <div
@@ -280,7 +293,7 @@ export default function SceneWrapper() {
               whiteSpace: "nowrap",
             }}
           >
-            → CLICK CARPET FOR MISSION DATA → DRAG TO CLOUDS OR SANDCASTLE
+            → CLICK CARPET FOR MISSION DATA → DRAG TO CLOUDS, SANDCASTLE, OR BOOKS
           </div>
         </div>
       )}
