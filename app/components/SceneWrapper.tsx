@@ -127,13 +127,6 @@ export default function SceneWrapper() {
         <div
           style={{
             width: "min(26rem, calc(100vw - 3rem))",
-            background: "rgba(9, 9, 14, 0.72)",
-            backdropFilter: "blur(28px) saturate(136%)",
-            WebkitBackdropFilter: "blur(28px) saturate(136%)",
-            border: "1px solid rgba(255, 255, 255, 0.08)",
-            borderRadius: 16,
-            padding: "2rem 1.8rem",
-            boxShadow: "0 24px 80px rgba(0, 0, 0, 0.72), 0 1px 0 rgba(255,255,255,0.04) inset",
           }}
         >
           <div
