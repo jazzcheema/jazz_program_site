@@ -24,6 +24,14 @@ interface InfoPanelProps {
 
 export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
   const [animPcts, setAnimPcts] = useState(() => data.eqBars.map(b => b.pct))
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   useEffect(() => {
     let tick = 0
@@ -39,20 +47,33 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
     }, 50)
     return () => clearInterval(id)
   }, [data])
+
+  const gap = isMobile ? 0 : 10
+
   return (
     <div
-      className="fixed inset-y-0 right-0 w-full sm:w-[min(520px,66vw)] xl:w-1/3 transition-transform duration-300 ease-in-out z-30 flex flex-col"
+      className="fixed z-30 flex flex-col"
       style={{
-        transform: open ? 'translateX(0)' : 'translateX(100%)',
-        background: 'rgba(12, 12, 12, 0.72)',
-        backdropFilter: 'blur(18px) saturate(118%)',
-        WebkitBackdropFilter: 'blur(18px) saturate(118%)',
-        borderLeft: '1px solid rgba(200, 200, 200, 0.18)',
+        top: gap,
+        bottom: gap,
+        right: gap,
+        width: isMobile ? '100%' : 'min(500px, 66vw)',
+        transform: open ? 'translateX(0)' : `translateX(calc(100% + ${gap}px))`,
+        transition: 'transform 380ms cubic-bezier(0.16, 1, 0.3, 1)',
+        background: isMobile ? 'rgba(8, 10, 16, 0.78)' : 'rgba(8, 10, 16, 0.58)',
+        backdropFilter: 'blur(40px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+        border: '1px solid rgba(255, 255, 255, 0.13)',
+        borderRadius: isMobile ? '14px 0 0 14px' : 14,
+        boxShadow: isMobile
+          ? '-4px 0 32px rgba(0, 0, 0, 0.52)'
+          : '0 8px 48px rgba(0, 0, 0, 0.64), 0 1px 0 rgba(255, 255, 255, 0.10) inset',
         fontFamily: 'var(--font-geist-mono)',
+        overflow: 'hidden',
       }}
     >
       {/* Header */}
-      <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid #1e1e1e' }}>
+      <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
           <div className="min-w-0">
             <div className="text-[0.65rem] sm:text-xs tracking-widest mb-0.5 break-words" style={{ color: '#484848' }}>
@@ -61,7 +82,7 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
             <div className="text-sm sm:text-base font-bold tracking-widest break-words" style={{ color: '#c8c8c8' }}>
               → {data.label}
             </div>
-            <div className="text-[0.65rem] sm:text-xs tracking-widest mt-0.5 break-words" style={{ color: '#303030' }}>
+            <div className="text-[0.65rem] sm:text-xs tracking-widest mt-0.5 break-words" style={{ color: '#606060' }}>
               CLASS: {data.class} / STATUS: [{data.status}]
             </div>
           </div>
@@ -137,7 +158,7 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
             {data.specsLabel} ───────────────────────────────
           </div>
           {data.specs.map(([k, v], i) => (
-            <div key={i} className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs py-0.5" style={{ borderBottom: '1px solid #181818' }}>
+            <div key={i} className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs py-0.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <span className="w-24 shrink-0" style={{ color: '#303030' }}>{k}</span>
               <span style={{ color: '#808080' }}>{v}</span>
             </div>
@@ -150,7 +171,7 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
             {data.scanLabel} ───────────────────────────────
           </div>
           {data.materials.map(([a, b, c, d], i) => (
-            <div key={i} className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs py-0.5" style={{ borderBottom: '1px solid #181818' }}>
+            <div key={i} className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs py-0.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <span className="w-20 shrink-0" style={{ color: '#303030' }}>{a}</span>
               <span className="w-20 shrink-0" style={{ color: '#808080' }}>{b}</span>
               <span className="w-10 shrink-0" style={{ color: '#808080' }}>{c}</span>
@@ -173,7 +194,7 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
               ['MEM_ALLOC',  '384 MB'],
               ['ANTIALIAS',  'ON / 2×'],
             ].map(([k, v]) => (
-              <div key={k} className="flex justify-between" style={{ borderBottom: '1px solid #141414' }}>
+              <div key={k} className="flex justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                 <span style={{ color: '#303030' }}>{k}</span>
                 <span style={{ color: '#808080' }}>{v}</span>
               </div>
@@ -199,7 +220,7 @@ export default function InfoPanel({ open, data, onClose }: InfoPanelProps) {
       <div
         className="px-4 py-3"
         style={{
-          borderTop: '1px solid #1e1e1e',
+          borderTop: '1px solid rgba(255,255,255,0.07)',
           color: '#1e1e1e',
           fontSize: '0.6rem',
           lineHeight: 1.4,

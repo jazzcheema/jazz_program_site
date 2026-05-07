@@ -101,11 +101,12 @@ export default function SceneWrapper() {
         style={{
           position: "fixed",
           inset: 0,
-          background: "#0c0c0c",
+          background: "#09090e",
           display: "flex",
           flexDirection: "column",
+          alignItems: "center",
           justifyContent: "center",
-          padding: "0 max(1.5rem, env(safe-area-inset-left))",
+          padding: "max(1.5rem, env(safe-area-inset-top)) max(1.5rem, env(safe-area-inset-left))",
           fontFamily: "var(--font-geist-mono)",
           opacity: gateVisible ? 1 : 0,
           transition: "opacity 500ms ease",
@@ -114,79 +115,89 @@ export default function SceneWrapper() {
       >
         <div
           style={{
-            color: "#c87820",
-            fontSize: "0.52rem",
-            letterSpacing: "0.18em",
-            marginBottom: "1.1rem",
+            width: "min(26rem, calc(100vw - 3rem))",
+            background: "rgba(9, 9, 14, 0.72)",
+            backdropFilter: "blur(28px) saturate(136%)",
+            WebkitBackdropFilter: "blur(28px) saturate(136%)",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            borderRadius: 16,
+            padding: "2rem 1.8rem",
+            boxShadow: "0 24px 80px rgba(0, 0, 0, 0.72), 0 1px 0 rgba(255,255,255,0.04) inset",
           }}
         >
-          → SYS_ADVISORY // ENV_CHECK
-        </div>
+          <div
+            style={{
+              color: "#c87820",
+              fontSize: "0.52rem",
+              letterSpacing: "0.18em",
+              marginBottom: "1.1rem",
+            }}
+          >
+            → SYS_ADVISORY // ENV_CHECK
+          </div>
 
-        <h1
-          style={{
-            color: "#ededed",
-            fontSize: "clamp(1.5rem, 7vw, 2rem)",
-            fontWeight: 400,
-            letterSpacing: "0.02em",
-            lineHeight: 1.06,
-            margin: "0 0 1.1rem",
-          }}
-        >
-          DESKTOP_
-          <br />
-          RECOMMENDED
-        </h1>
+          <h1
+            style={{
+              color: "#ededed",
+              fontSize: "clamp(1.5rem, 7vw, 2rem)",
+              fontWeight: 400,
+              letterSpacing: "0.02em",
+              lineHeight: 1.06,
+              margin: "0 0 1.1rem",
+            }}
+          >
+            DESKTOP_
+            <br />
+            RECOMMENDED
+          </h1>
 
-        <p
-          style={{
-            color: "#6c6c6c",
-            fontSize: "0.68rem",
-            lineHeight: 1.65,
-            margin: "0 0 1.6rem",
-            maxWidth: "26rem",
-          }}
-        >
-          This experience was built for a wide viewport — 3D scenes, cinematic
-          camera moves, and interactive controls are optimised for desktop.
-        </p>
+          <p
+            style={{
+              color: "#6c6c6c",
+              fontSize: "0.68rem",
+              lineHeight: 1.65,
+              margin: "0 0 1.6rem",
+            }}
+          >
+            This experience was built for a wide viewport — 3D scenes, cinematic
+            camera moves, and interactive controls are optimised for desktop.
+          </p>
 
-        <div
-          style={{
-            color: "#484848",
-            fontSize: "0.52rem",
-            letterSpacing: "0.12em",
-            lineHeight: 1.8,
-            marginBottom: "2.4rem",
-            borderLeft: "1px solid #222",
-            paddingLeft: "0.8rem",
-          }}
-        >
-          <div>→ OPTIMAL: Desktop or laptop</div>
-          <div>→ BROWSER: Chrome / Safari / Firefox / Arc — latest</div>
-          <div>→ Mobile renders a reduced version</div>
-        </div>
+          <div
+            style={{
+              color: "#383838",
+              fontSize: "0.52rem",
+              letterSpacing: "0.12em",
+              lineHeight: 1.8,
+              marginBottom: "2rem",
+              borderLeft: "1px solid #1e1e1e",
+              paddingLeft: "0.8rem",
+            }}
+          >
+            <div>→ OPTIMAL: Desktop or laptop</div>
+            <div>→ BROWSER: Chrome / Safari / Firefox / Arc — latest</div>
+            <div>→ Mobile renders a reduced version</div>
+          </div>
 
-        <button
-          type="button"
-          className="mobile-gate-btn"
-          onClick={() => setShowMobileGate(false)}
-        >
-          <span className="mobile-gate-btn-default">→ ENTER_SITE</span>
-          <span className="mobile-gate-btn-reveal">→ CONFIRM_ENTRY</span>
-        </button>
+          <button
+            type="button"
+            className="mobile-gate-btn"
+            onClick={() => setShowMobileGate(false)}
+          >
+            <span className="mobile-gate-btn-default">→ ENTER_SITE</span>
+            <span className="mobile-gate-btn-reveal">→ CONFIRM_ENTRY</span>
+          </button>
 
-        <div
-          style={{
-            position: "absolute",
-            bottom: "max(1.4rem, env(safe-area-inset-bottom))",
-            left: "max(1.5rem, env(safe-area-inset-left))",
-            color: "#242424",
-            fontSize: "0.42rem",
-            letterSpacing: "0.1em",
-          }}
-        >
-          VER.01.09.26 // JAZZ.CHEEMA SYSTEMS
+          <div
+            style={{
+              marginTop: "1.6rem",
+              color: "#242424",
+              fontSize: "0.42rem",
+              letterSpacing: "0.1em",
+            }}
+          >
+            VER.01.09.26 // JAZZ.CHEEMA SYSTEMS
+          </div>
         </div>
       </div>
     );
@@ -197,13 +208,17 @@ export default function SceneWrapper() {
   return (
     <div
       className="w-dvw h-dvh overflow-hidden relative"
-      style={{ width: "100dvw", height: "100dvh", background: "#0c0c0c" }}
+      style={{ width: "100dvw", height: "100dvh", background: "#09090e" }}
     >
       <div className="absolute inset-0 pointer-events-none">
         <VortexBackground
           className="w-full h-full"
-          particleMultiplier={1.65}
-          alphaMultiplier={1.18}
+          hues={[28, 195, 262]}
+          saturation={72}
+          lightness={62}
+          particleMultiplier={2.6}
+          alphaMultiplier={2.2}
+          backgroundFill="rgba(9, 9, 13, 0.32)"
         />
       </div>
 
@@ -255,15 +270,18 @@ export default function SceneWrapper() {
 
       {/* Hint — shown until first interaction */}
       {!panelOpen && (
-        <div
-          className="fixed bottom-5 sm:bottom-6 left-1/2 -translate-x-1/2 text-[0.65rem] sm:text-xs tracking-widest pointer-events-none text-center"
-          style={{
-            color: "#282828",
-            fontFamily: "var(--font-geist-mono)",
-            width: "min(34rem, calc(100vw - 32px))",
-          }}
-        >
-          → CLICK CARPET FOR MISSION DATA → DRAG TO CLOUDS OR SANDCASTLE
+        <div className="fixed bottom-5 sm:bottom-6 left-1/2 -translate-x-1/2 pointer-events-none">
+          <div
+            style={{
+              color: "#484848",
+              fontFamily: "var(--font-geist-mono)",
+              fontSize: "clamp(0.58rem, 0.68vw, 0.68rem)",
+              letterSpacing: "0.1em",
+              whiteSpace: "nowrap",
+            }}
+          >
+            → CLICK CARPET FOR MISSION DATA → DRAG TO CLOUDS OR SANDCASTLE
+          </div>
         </div>
       )}
     </div>

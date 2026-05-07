@@ -144,7 +144,13 @@ function ProjectCard({
       };
 
   return (
-    <div style={outerStyle}>
+    <div
+      key={project.id}
+      style={{
+        ...outerStyle,
+        animation: `project-card-enter 540ms cubic-bezier(0.16, 1, 0.3, 1) both`,
+      }}
+    >
       {!isMobile && (
         <>
           <div
@@ -153,8 +159,9 @@ function ProjectCard({
               position: "absolute",
               inset: 10,
               transform: "translate3d(14px, 12px, 0)",
-              border: "1px solid rgba(128, 128, 128, 0.08)",
-              background: "rgba(12, 12, 12, 0.22)",
+              border: "1px solid rgba(128, 128, 128, 0.06)",
+              borderRadius: 14,
+              background: "rgba(10, 10, 10, 0.18)",
               pointerEvents: "none",
             }}
           />
@@ -164,8 +171,9 @@ function ProjectCard({
               position: "absolute",
               inset: 5,
               transform: "translate3d(7px, 6px, 0)",
-              border: "1px solid rgba(200, 200, 200, 0.08)",
-              background: "rgba(12, 12, 12, 0.18)",
+              border: "1px solid rgba(255, 255, 255, 0.06)",
+              borderRadius: 13,
+              background: "rgba(10, 10, 10, 0.14)",
               backdropFilter: "blur(8px)",
               WebkitBackdropFilter: "blur(8px)",
               pointerEvents: "none",
@@ -178,26 +186,28 @@ function ProjectCard({
           position: "relative",
           pointerEvents: "auto",
           overflow: "hidden",
-          border: "1px solid rgba(200, 200, 200, 0.18)",
+          border: "1px solid rgba(255, 255, 255, 0.09)",
           background: isMobile
-            ? "rgba(12, 12, 12, 0.08)"
-            : "rgba(12, 12, 12, 0.72)",
+            ? "rgba(8, 10, 16, 0.82)"
+            : "rgba(8, 10, 16, 0.62)",
           backdropFilter: isMobile
-            ? "blur(10px) saturate(115%)"
-            : "blur(18px) saturate(118%)",
+            ? "blur(28px) saturate(160%)"
+            : "blur(40px) saturate(180%)",
           WebkitBackdropFilter: isMobile
-            ? "blur(10px) saturate(115%)"
-            : "blur(18px) saturate(118%)",
+            ? "blur(28px) saturate(160%)"
+            : "blur(40px) saturate(180%)",
           color: "#808080",
-          borderRadius: isMobile ? "4px" : 0,
-          boxShadow: isMobile ? "0 18px 60px rgba(0,0,0,0.32)" : undefined,
+          borderRadius: isMobile ? 12 : 12,
+          boxShadow: isMobile
+            ? "0 18px 60px rgba(0,0,0,0.52)"
+            : "0 8px 48px rgba(0,0,0,0.56), 0 1px 0 rgba(255,255,255,0.09) inset",
         }}
       >
         <header
           style={{
             position: "relative",
             padding: isMobile ? "9px 10px 8px" : "13px 14px 11px",
-            borderBottom: "1px solid rgba(200, 200, 200, 0.12)",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
           }}
         >
           <div style={{ paddingRight: isMobile ? 62 : 78 }}>
@@ -266,7 +276,7 @@ function ProjectCard({
           style={{
             padding: isMobile ? "7px 10px" : "10px 14px",
 
-            borderBottom: "1px solid rgba(200, 200, 200, 0.08)",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
           }}
         >
           {!isMobile && (
@@ -308,7 +318,7 @@ function ProjectCard({
         <section
           style={{
             padding: isMobile ? "6px 10px 7px" : "8px 14px 10px",
-            borderBottom: "1px solid rgba(200, 200, 200, 0.08)",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
           }}
         >
           {(
@@ -327,7 +337,7 @@ function ProjectCard({
                   : "54px minmax(0, 1fr)",
                 gap: isMobile ? 7 : 10,
                 padding: isMobile ? "3px 0" : "5px 0",
-                borderBottom: "1px solid rgba(200, 200, 200, 0.05)",
+                borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
               }}
             >
               <span
@@ -359,7 +369,7 @@ function ProjectCard({
           <section
             style={{
               padding: "9px 14px 10px",
-              borderBottom: "1px solid rgba(200, 200, 200, 0.08)",
+              borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
             }}
           >
             <div
@@ -389,7 +399,7 @@ function ProjectCard({
                   <span
                     style={{
                       height: 7,
-                      background: "#101010",
+                      background: "#141414",
                       overflow: "hidden",
                     }}
                   >
@@ -398,7 +408,7 @@ function ProjectCard({
                         display: "block",
                         width: `${pct}%`,
                         height: "100%",
-                        background: i === 0 ? activeSignal : "#404040",
+                        background: i === 0 ? activeSignal : "#3a3a3a",
                       }}
                     />
                   </span>
@@ -414,7 +424,7 @@ function ProjectCard({
             style={{
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
-              borderBottom: "1px solid rgba(200, 200, 200, 0.08)",
+              borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
             }}
           >
             <button
@@ -429,7 +439,7 @@ function ProjectCard({
               style={{
                 cursor: "pointer",
                 border: 0,
-                borderRight: "1px solid rgba(200, 200, 200, 0.08)",
+                borderRight: "1px solid rgba(255, 255, 255, 0.06)",
                 background: "transparent",
                 fontFamily: "var(--font-geist-mono), monospace",
                 minHeight: isMobile ? 30 : 36,
@@ -468,7 +478,7 @@ function ProjectCard({
         <div
           style={{
             padding: "10px 14px",
-            borderBottom: "1px solid rgba(200, 200, 200, 0.06)",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
           }}
         >
           <a
@@ -503,7 +513,7 @@ function ProjectCard({
           <div
             style={{
               padding: "7px 14px 9px",
-              color: "#202020",
+              color: "#1e1e1e",
               fontSize: "0.48rem",
               lineHeight: 1.45,
               letterSpacing: "0.04em",

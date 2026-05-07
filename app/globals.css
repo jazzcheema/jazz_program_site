@@ -20,7 +20,7 @@
 }
 
 body {
-  background: #0c0c0c;
+  background: #09090e;
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
   overflow: hidden;
@@ -54,6 +54,11 @@ canvas {
   left: 50%;
 }
 
+.clouds-project-link {
+  border-radius: 8px !important;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
 .clouds-project-link:hover,
 .clouds-project-link:focus-visible {
   border-color: rgba(200, 200, 200, 0.72) !important;
@@ -85,19 +90,20 @@ canvas {
 
 .clouds-axis-button {
   color: #808080;
+  border-radius: 8px;
   transition: color 120ms ease, background-color 120ms ease;
 }
 
 .clouds-axis-button-prev:hover,
 .clouds-axis-button-prev:focus-visible {
-  background-color: rgba(42, 95, 192, 0.08) !important;
+  background-color: rgba(42, 95, 192, 0.12) !important;
   color: #2a5fc0 !important;
   outline: none;
 }
 
 .clouds-axis-button-next:hover,
 .clouds-axis-button-next:focus-visible {
-  background-color: rgba(36, 153, 88, 0.08) !important;
+  background-color: rgba(36, 153, 88, 0.12) !important;
   color: #249958 !important;
   outline: none;
 }
@@ -154,6 +160,7 @@ canvas {
   pointer-events: auto;
   cursor: pointer;
   border: 0;
+  border-radius: 6px;
   background: transparent;
   color: #808080;
   font-family: var(--font-geist-mono);
@@ -366,6 +373,7 @@ canvas {
   min-width: 10.5rem;
   background: transparent;
   border: 1px solid #2a2a2a;
+  border-radius: 8px;
   color: #808080;
   cursor: pointer;
   font-family: var(--font-geist-mono);
@@ -462,17 +470,20 @@ canvas {
   min-width: min(34rem, calc(100vw - 2rem));
   padding: 1.4rem 2.2rem;
   border: 1px solid rgba(36, 153, 88, 0.32);
-  background: rgba(12, 12, 12, 0.90);
+  border-radius: 12px;
+  background: rgba(10, 10, 10, 0.84);
   color: #c8c8c8;
   text-align: center;
   text-decoration: none;
-  backdrop-filter: blur(26px) saturate(124%);
-  -webkit-backdrop-filter: blur(26px) saturate(124%);
+  backdrop-filter: blur(28px) saturate(136%);
+  -webkit-backdrop-filter: blur(28px) saturate(136%);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.64), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
     color 160ms ease,
-    transform 160ms ease;
+    transform 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .sand-score-card:hover,
@@ -674,6 +685,19 @@ canvas {
       1px 0 3px #000,
       -1px 0 3px #000,
       0 0 22px rgba(0, 0, 0, 0.98);
+  }
+}
+
+@keyframes project-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(32px) scale(0.91);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
   }
 }
 
