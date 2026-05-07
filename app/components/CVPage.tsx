@@ -39,7 +39,7 @@ const EXPERIENCE = [
 const EDUCATION = [
   { institution: 'Rithm School', degree: 'Full Stack Software Development', period: 'Jan – Jun 2024' },
   { institution: 'London Film School', degree: 'MA · Film / Cinema / Video Studies', period: '2017 – 2021' },
-  { institution: 'Cal State Long Beach', degree: 'BA · English Literature & Creative Writing', period: '' },
+  { institution: 'California State University, Long Beach', degree: 'BA · English Literature & Creative Writing', period: '' },
 ]
 
 const AWARDS = [
