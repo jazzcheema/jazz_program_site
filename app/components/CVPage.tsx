@@ -347,7 +347,7 @@ function GhostOverlay({ ghostsRef }: { ghostsRef: { current: GhostFrame[] } }) {
 
 // ---------- Skills matrix ----------
 
-type SkillTrailBlock = { col: number; row: number; alpha: number; size: number }
+type SkillTrailBlock = { col: number; row: number; alpha: number; size: number; kind: 'snake' | 'wave'; hot: number }
 type SkillDrawPoint = { x: number; y: number }
 type SkillPixelTrailBlock = { x: number; y: number; alpha: number; size: number }
 
@@ -432,13 +432,22 @@ function SkillsMatrixCanvas({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     }
 
-    const addTrailBlock = (col: number, row: number, size = 1) => {
-      trail.push({ col, row, alpha: 0.9, size })
+    const addTrailBlock = (col: number, row: number, size = 1, kind: SkillTrailBlock['kind'] = 'snake') => {
+      trail.push({ col, row, alpha: 0.9, size, kind, hot: 0 })
       if (trail.length > 190) trail.shift()
     }
 
     const drawBlock = (x: number, y: number, size: number, alpha: number) => {
       ctx.fillStyle = `rgba(74, 178, 45, ${alpha})`
+      ctx.fillRect(x, y, size, size)
+    }
+
+    const drawCollisionBlock = (x: number, y: number, size: number, alpha: number, heat: number) => {
+      const glow = Math.min(1, Math.max(0, heat))
+      const r = Math.round(74 + glow * 126)
+      const g = Math.round(178 - glow * 58)
+      const b = Math.round(45 - glow * 27)
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`
       ctx.fillRect(x, y, size, size)
     }
 
@@ -470,7 +479,9 @@ function SkillsMatrixCanvas({
       const shaftEndX = startX + gridWidth * 0.76
       const toothOneX = startX + gridWidth * 0.62
       const toothTwoX = startX + gridWidth * 0.71
+      const toothTipX = shaftEndX
       const toothDepth = gridHeight * 0.095
+      const toothNotchY = cy + toothDepth * 0.45
       const keyBlock = blockSize * 1.08
       const eased = 1 - Math.pow(1 - progress, 3)
       const pulse = 0.72 + Math.sin(frame * 0.12) * 0.16
@@ -490,9 +501,9 @@ function SkillsMatrixCanvas({
       segments.push([shaftStartX, cy, shaftEndX, cy])
       segments.push([toothOneX, cy, toothOneX, cy + toothDepth])
       segments.push([toothOneX, cy + toothDepth, toothTwoX, cy + toothDepth])
-      segments.push([toothTwoX, cy + toothDepth, toothTwoX, cy + toothDepth * 0.45])
-      segments.push([toothTwoX, cy + toothDepth * 0.45, shaftEndX, cy + toothDepth * 0.45])
-      segments.push([shaftEndX, cy, shaftEndX, cy + toothDepth * 0.45])
+      segments.push([toothTwoX, cy + toothDepth, toothTwoX, toothNotchY])
+      segments.push([toothTwoX, toothNotchY, toothTipX, toothNotchY])
+      segments.push([toothTipX, toothNotchY, toothTipX, cy])
 
       const total = segments.length
       segments.forEach((segment, i) => {
@@ -502,6 +513,22 @@ function SkillsMatrixCanvas({
         const segmentProgress = eased >= segmentEnd ? 1 : (eased - segmentStart) / (segmentEnd - segmentStart)
         drawLineBlocks(segment[0], segment[1], segment[2], segment[3], keyBlock, pulse, segmentProgress)
       })
+
+      if (eased > 0.86) {
+        const capPoints = [
+          [shaftEndX, cy],
+          [toothTipX, toothNotchY],
+          [toothTipX, (cy + toothNotchY) / 2],
+          [toothTwoX, toothNotchY],
+          [toothTwoX, cy + toothDepth],
+          [toothOneX, cy + toothDepth],
+          [toothOneX, cy],
+        ]
+        capPoints.forEach(([x, y]) => {
+          drawBlock(x - keyBlock / 2, y - keyBlock / 2, keyBlock * 1.08, Math.min(1, pulse + 0.12))
+        })
+        drawLineBlocks(toothTipX, cy, toothTipX, toothNotchY, keyBlock * 1.08, Math.min(1, pulse + 0.16), 1)
+      }
     }
 
     const animate = () => {
@@ -542,9 +569,9 @@ function SkillsMatrixCanvas({
       const headRow = Math.max(0, Math.min(rows - 1, Math.round(targetY * (rows - 1))))
 
       if (!lockedMode && frame % 3 === 0) {
-        addTrailBlock(headCol, headRow, 1.25)
-        addTrailBlock(headCol - 1, headRow, 0.9)
-        addTrailBlock(headCol, headRow + 1, 0.9)
+        addTrailBlock(headCol, headRow, 1.25, 'snake')
+        addTrailBlock(headCol - 1, headRow, 0.9, 'snake')
+        addTrailBlock(headCol, headRow + 1, 0.9, 'snake')
       }
 
       if (lockedMode && !unlocking) {
@@ -566,21 +593,40 @@ function SkillsMatrixCanvas({
         for (let col = 0; col < cols; col++) {
           const wave = Math.sin(col * 0.56 + t * 1.8) * rows * 0.18
           const row = Math.round(rows * 0.52 + wave)
-          if ((col + frame) % 7 === 0) addTrailBlock(col, row, col % 3 === 0 ? 1.2 : 0.9)
+          if ((col + frame) % 7 === 0) addTrailBlock(col, row, col % 3 === 0 ? 1.2 : 0.9, 'wave')
         }
       }
+
+      const snakeBlocks = !lockedMode
+        ? trail.filter((block) => block.kind === 'snake' && block.alpha > 0.16)
+        : []
 
       for (let i = trail.length - 1; i >= 0; i--) {
         const block = trail[i]
         block.alpha *= 0.943
+        block.hot *= 0.9
         if (block.alpha < 0.035 || block.col < 0 || block.row < 0 || block.col >= cols || block.row >= rows) {
           trail.splice(i, 1)
           continue
         }
+
+        if (!lockedMode && block.kind === 'wave') {
+          const headDistance = Math.hypot(block.col - headCol, block.row - headRow)
+          const snakeHit = headDistance <= 1.55 || snakeBlocks.some((snake) => Math.hypot(block.col - snake.col, block.row - snake.row) <= 1.25)
+          if (snakeHit) block.hot = 1
+        } else if (!lockedMode && block.kind === 'snake') {
+          const waveHit = trail.some((wave) => wave.kind === 'wave' && wave.alpha > 0.16 && Math.hypot(block.col - wave.col, block.row - wave.row) <= 1.25)
+          if (waveHit) block.hot = Math.max(block.hot, 0.72)
+        }
+
         const size = blockSize * block.size
         const x = startX + block.col * cell - size / 2
         const y = startY + block.row * cell - size / 2
-        drawBlock(x, y, size, block.alpha)
+        if (block.hot > 0.04) {
+          drawCollisionBlock(x, y, size * (1 + block.hot * 0.08), Math.min(1, block.alpha + block.hot * 0.16), block.hot)
+        } else {
+          drawBlock(x, y, size, block.alpha)
+        }
       }
 
       const pixelTrail = pixelTrailRef.current
