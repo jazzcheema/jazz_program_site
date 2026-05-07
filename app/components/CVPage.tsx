@@ -51,6 +51,10 @@ const CREDITS = [
   { name: 'Kevin Netteberg', role: '3D Models', detail: 'Genie · Lamp · Carpet · Krate' },
 ]
 
+// ---------- Ghost trail overlay ----------
+
+type GhostFrame = { pts: Float32Array; exc: Float32Array; alpha: number }
+
 // ---------- Dot-grid canvas ----------
 
 const SPRING  = 0.036
@@ -59,7 +63,7 @@ const DAMPING = 0.84
 const REPULSE_R = 100
 const REPULSE_F = 9
 
-function DotCanvas({ isMobile }: { isMobile: boolean }) {
+function DotCanvas({ isMobile, scrollVelRef, ghostsRef }: { isMobile: boolean; scrollVelRef: { current: number }; ghostsRef: { current: GhostFrame[] } }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const waveMouseRef  = useRef({ x: 0.5, y: 0.5 })
   const canvasMouseRef = useRef({ x: -9999, y: -9999 })
@@ -91,10 +95,11 @@ function DotCanvas({ isMobile }: { isMobile: boolean }) {
     const SPACING = isMobile ? 14 : 21
 
     const N  = COLS * ROWS
-    const px = new Float32Array(N)
-    const py = new Float32Array(N)
-    const vx = new Float32Array(N)
-    const vy = new Float32Array(N)
+    const px  = new Float32Array(N)
+    const py  = new Float32Array(N)
+    const vx  = new Float32Array(N)
+    const vy  = new Float32Array(N)
+    const exc = new Float32Array(N)  // excite value per dot, for ghost snapshots
     let ready = false
 
     let animId: number
@@ -128,6 +133,7 @@ function DotCanvas({ isMobile }: { isMobile: boolean }) {
       const W = canvas.offsetWidth
       const H = canvas.offsetHeight
       ctx.clearRect(0, 0, W, H)
+
 
       const totalW = (COLS - 1) * SPACING
       const totalH = (ROWS - 1) * SPACING
@@ -184,6 +190,7 @@ function DotCanvas({ isMobile }: { isMobile: boolean }) {
           const speed  = Math.hypot(vx[idx], vy[idx])
           const sFact  = Math.min(1, speed / 2.8)
           const excite = Math.max(wProx, sFact * 0.95)
+          exc[idx] = excite
 
           const r = 1.8 + excite * 5.2
 
@@ -204,6 +211,21 @@ function DotCanvas({ isMobile }: { isMobile: boolean }) {
       }
 
       ready = true
+
+      // Snapshot in viewport coordinates so the fixed overlay can draw it
+      const vel = scrollVelRef.current
+      scrollVelRef.current *= 0.82
+      if (Math.abs(vel) > 0.15 && tick % 2 === 0) {
+        const rect = canvas.getBoundingClientRect()
+        const pts = new Float32Array(N * 2)
+        for (let i = 0; i < N; i++) {
+          pts[i * 2]     = rect.left + px[i]
+          pts[i * 2 + 1] = rect.top  + py[i]
+        }
+        const store = ghostsRef.current
+        if (store.length >= 10) store.shift()
+        store.push({ pts, exc: exc.slice() as Float32Array, alpha: Math.min(0.55, Math.abs(vel) * 0.18 + 0.2) })
+      }
     }
 
     animate()
@@ -221,6 +243,93 @@ function DotCanvas({ isMobile }: { isMobile: boolean }) {
   )
 }
 
+// ---------- Ghost overlay (fixed, full-viewport) ----------
+
+function GhostOverlay({ ghostsRef }: { ghostsRef: { current: GhostFrame[] } }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    let animId: number
+
+    const resize = () => {
+      const dpr = Math.min(window.devicePixelRatio, 2)
+      canvas.width  = window.innerWidth  * dpr
+      canvas.height = window.innerHeight * dpr
+      ctx.scale(dpr, dpr)
+    }
+    resize()
+    window.addEventListener('resize', resize)
+
+    const animate = () => {
+      animId = requestAnimationFrame(animate)
+      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight)
+
+      const store = ghostsRef.current
+      for (let g = store.length - 1; g >= 0; g--) {
+        const ghost = store[g]
+        ghost.alpha *= 0.955
+        if (ghost.alpha < 0.006) { store.splice(g, 1); continue }
+
+        ctx.globalAlpha = ghost.alpha
+        const pts = ghost.pts
+        const excG = ghost.exc
+        const n = pts.length / 2
+
+        // Two batched passes — skip background dots (excite ≤ 0.1)
+        // Pass 1: mid excite — warm brown
+        ctx.fillStyle = 'rgba(80,60,20,1)'
+        ctx.beginPath()
+        for (let i = 0; i < n; i++) {
+          const e = excG[i]
+          if (e <= 0.1 || e > 0.55) continue
+          const r = 1.8 + e * 5.2
+          ctx.moveTo(pts[i*2] + r, pts[i*2+1])
+          ctx.arc(pts[i*2], pts[i*2+1], r, 0, Math.PI * 2)
+        }
+        ctx.fill()
+
+        // Pass 2: high excite — amber/red
+        ctx.fillStyle = 'rgba(190,75,18,1)'
+        ctx.beginPath()
+        for (let i = 0; i < n; i++) {
+          const e = excG[i]
+          if (e <= 0.55) continue
+          const r = 1.8 + e * 5.2
+          ctx.moveTo(pts[i*2] + r, pts[i*2+1])
+          ctx.arc(pts[i*2], pts[i*2+1], r, 0, Math.PI * 2)
+        }
+        ctx.fill()
+        ctx.globalAlpha = 1
+      }
+    }
+
+    animate()
+    return () => {
+      cancelAnimationFrame(animId)
+      window.removeEventListener('resize', resize)
+    }
+  }, [ghostsRef])
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
+        zIndex: 6,
+      }}
+    />
+  )
+}
+
 // ---------- Page ----------
 
 export default function CVPage() {
@@ -228,6 +337,9 @@ export default function CVPage() {
   const [scrolled, setScrolled] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const scrollVelRef = useRef(0)
+  const lastScrollRef = useRef({ top: 0, time: 0 })
+  const ghostsRef = useRef<GhostFrame[]>([])
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
@@ -258,7 +370,15 @@ export default function CVPage() {
   }, [])
 
   const handleScroll = () => {
-    setScrolled((scrollRef.current?.scrollTop ?? 0) > 52)
+    const top = scrollRef.current?.scrollTop ?? 0
+    const now = performance.now()
+    const dt = now - lastScrollRef.current.time
+    // Only compute velocity when delta is in a sane range (active scrolling)
+    if (dt > 0 && dt < 250) {
+      scrollVelRef.current = (top - lastScrollRef.current.top) / dt
+    }
+    lastScrollRef.current = { top, time: now }
+    setScrolled(top > 52)
   }
 
   const scrollToSection = (id: string) => {
@@ -290,6 +410,8 @@ export default function CVPage() {
     : '100%'
 
   return (
+    <>
+    <GhostOverlay ghostsRef={ghostsRef} />
     <div
       ref={scrollRef}
       onScroll={handleScroll}
@@ -502,7 +624,7 @@ export default function CVPage() {
           cursor: isMobile ? 'default' : 'crosshair',
         }}
       >
-        <DotCanvas isMobile={isMobile} />
+        <DotCanvas isMobile={isMobile} scrollVelRef={scrollVelRef} ghostsRef={ghostsRef} />
       </div>
 
       {/* About / Interests */}
@@ -678,6 +800,7 @@ export default function CVPage() {
 
       </div>
     </div>
+    </>
   )
 }
 
