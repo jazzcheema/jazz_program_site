@@ -550,15 +550,14 @@ function SkillsMatrixCanvas({
       if (lockedMode && !unlocking) {
         const centerX = startX + gridWidth * 0.5
         const centerY = startY + gridHeight * 0.52
-        const radiusX = gridWidth * 0.17
-        const radiusY = gridHeight * 0.31
+        const radius = Math.min(gridWidth * 0.17, gridHeight * 0.34)
         for (let i = 0; i < 42; i++) {
           const angle = i / 42 * Math.PI * 2
           const pulse = 0.5 + Math.sin(t * 2.2 + i * 0.55) * 0.22
           const size = blockSize * (i % 6 === 0 ? 1.12 : 0.86)
           drawBlock(
-            centerX + Math.cos(angle) * radiusX - size / 2,
-            centerY + Math.sin(angle) * radiusY - size / 2,
+            centerX + Math.cos(angle) * radius - size / 2,
+            centerY + Math.sin(angle) * radius - size / 2,
             size,
             pulse,
           )
@@ -816,19 +815,19 @@ export default function CVPage() {
         .cv-rise { opacity: 0; animation: cv-rise 560ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
         .cv-skills-shell {
+          --cv-skills-frame-height: clamp(31rem, 56vw, 42rem);
           margin-top: 1.2rem;
           display: grid;
           grid-template-columns: minmax(0, 1.1fr) minmax(18rem, 0.9fr);
-          min-height: 21rem;
+          height: var(--cv-skills-frame-height);
           background: #d8d8da;
           border: 1px solid rgba(0,0,0,0.12);
           border-radius: 8px;
           overflow: hidden;
-          transition: min-height 720ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 520ms ease, border-color 520ms ease;
+          transition: height 720ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 520ms ease, border-color 520ms ease;
         }
         .cv-skills-shell-locked {
           grid-template-columns: 1fr;
-          min-height: clamp(25rem, 48vw, 34rem);
           cursor: crosshair;
         }
         .cv-skills-shell-opening {
@@ -845,9 +844,10 @@ export default function CVPage() {
         }
         .cv-skills-unlock-stage {
           position: relative;
-          min-height: clamp(25rem, 48vw, 34rem);
+          height: 100%;
+          min-height: 0;
           display: grid;
-          grid-template-rows: auto 1fr auto;
+          grid-template-rows: auto minmax(0, 1fr) auto;
           background: #d8d8da;
         }
         .cv-skills-shell-opening .cv-skills-unlock-stage {
@@ -888,7 +888,7 @@ export default function CVPage() {
         }
         .cv-skills-unlock-matrix {
           position: relative;
-          min-height: 18rem;
+          min-height: 0;
         }
         .cv-skills-unlock-footer {
           position: relative;
@@ -905,6 +905,7 @@ export default function CVPage() {
         .cv-skills-list {
           padding: 1.35rem 1.45rem;
           border-right: 1px solid rgba(0,0,0,0.11);
+          min-height: 0;
         }
         .cv-skill-group {
           display: grid;
@@ -941,7 +942,8 @@ export default function CVPage() {
         }
         .cv-skills-matrix {
           position: relative;
-          min-height: 21rem;
+          min-height: 0;
+          height: 100%;
           background: #d8d8da;
           cursor: crosshair;
         }
@@ -1019,6 +1021,7 @@ export default function CVPage() {
           }
           .cv-skills-shell {
             grid-template-columns: 1fr;
+            height: auto;
             min-height: 0;
           }
           .cv-skills-shell-locked {
