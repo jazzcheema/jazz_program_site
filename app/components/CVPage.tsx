@@ -348,10 +348,67 @@ function GhostOverlay({ ghostsRef }: { ghostsRef: { current: GhostFrame[] } }) {
 // ---------- Skills matrix ----------
 
 type SkillTrailBlock = { col: number; row: number; alpha: number; size: number }
+type SkillDrawPoint = { x: number; y: number }
+type SkillPixelTrailBlock = { x: number; y: number; alpha: number; size: number }
 
-function SkillsMatrixCanvas({ isMobile }: { isMobile: boolean }) {
+function isCircleGesture(points: SkillDrawPoint[]) {
+  if (points.length < 28) return false
+
+  const first = points[0]
+  const last = points[points.length - 1]
+  const xs = points.map((point) => point.x)
+  const ys = points.map((point) => point.y)
+  const minX = Math.min(...xs)
+  const maxX = Math.max(...xs)
+  const minY = Math.min(...ys)
+  const maxY = Math.max(...ys)
+  const width = maxX - minX
+  const height = maxY - minY
+  const closeDistance = Math.hypot(last.x - first.x, last.y - first.y)
+  const aspect = width / Math.max(height, 1)
+
+  if (width < 96 || height < 96) return false
+  if (aspect < 0.58 || aspect > 1.72) return false
+  if (closeDistance > Math.max(width, height) * 0.42) return false
+
+  const centerX = (minX + maxX) / 2
+  const centerY = (minY + maxY) / 2
+  const sectors = new Set<number>()
+  let pathLength = 0
+  let radiusTotal = 0
+
+  for (let i = 0; i < points.length; i++) {
+    const point = points[i]
+    const previous = points[i - 1]
+    if (previous) pathLength += Math.hypot(point.x - previous.x, point.y - previous.y)
+    radiusTotal += Math.hypot(point.x - centerX, point.y - centerY)
+    const angle = Math.atan2(point.y - centerY, point.x - centerX)
+    sectors.add(Math.floor(((angle + Math.PI) / (Math.PI * 2)) * 12))
+  }
+
+  const averageRadius = radiusTotal / points.length
+  const circumference = Math.PI * 2 * averageRadius
+  return sectors.size >= 9 && pathLength > circumference * 0.58
+}
+
+function SkillsMatrixCanvas({
+  isMobile,
+  unlockMode = false,
+  unlocked = true,
+  unlocking = false,
+  onUnlock,
+}: {
+  isMobile: boolean
+  unlockMode?: boolean
+  unlocked?: boolean
+  unlocking?: boolean
+  onUnlock?: () => void
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const pointerRef = useRef({ x: 0.32, y: 0.46, active: false })
+  const drawPointsRef = useRef<SkillDrawPoint[]>([])
+  const pixelTrailRef = useRef<SkillPixelTrailBlock[]>([])
+  const isDrawingRef = useRef(false)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -385,6 +442,68 @@ function SkillsMatrixCanvas({ isMobile }: { isMobile: boolean }) {
       ctx.fillRect(x, y, size, size)
     }
 
+    const drawLineBlocks = (
+      fromX: number,
+      fromY: number,
+      toX: number,
+      toY: number,
+      blockSize: number,
+      alpha: number,
+      progress = 1,
+    ) => {
+      const dx = toX - fromX
+      const dy = toY - fromY
+      const distance = Math.hypot(dx, dy)
+      const steps = Math.max(1, Math.floor(distance / (blockSize * 0.86)))
+      const visibleSteps = Math.floor(steps * progress)
+      for (let i = 0; i <= visibleSteps; i++) {
+        const p = i / steps
+        drawBlock(fromX + dx * p - blockSize / 2, fromY + dy * p - blockSize / 2, blockSize, alpha)
+      }
+    }
+
+    const drawKeyOutline = (startX: number, startY: number, gridWidth: number, gridHeight: number, blockSize: number, progress: number) => {
+      const cx = startX + gridWidth * 0.34
+      const cy = startY + gridHeight * 0.53
+      const radius = Math.min(gridWidth * 0.075, gridHeight * 0.18)
+      const shaftStartX = cx + radius * 1.05
+      const shaftEndX = startX + gridWidth * 0.76
+      const toothOneX = startX + gridWidth * 0.62
+      const toothTwoX = startX + gridWidth * 0.71
+      const toothDepth = gridHeight * 0.095
+      const keyBlock = blockSize * 1.08
+      const eased = 1 - Math.pow(1 - progress, 3)
+      const pulse = 0.72 + Math.sin(frame * 0.12) * 0.16
+
+      const segments: Array<[number, number, number, number]> = []
+      const circleSteps = 48
+      for (let i = 0; i < circleSteps; i++) {
+        const a1 = (i / circleSteps) * Math.PI * 2
+        const a2 = ((i + 1) / circleSteps) * Math.PI * 2
+        segments.push([
+          cx + Math.cos(a1) * radius,
+          cy + Math.sin(a1) * radius,
+          cx + Math.cos(a2) * radius,
+          cy + Math.sin(a2) * radius,
+        ])
+      }
+      segments.push([shaftStartX, cy, shaftEndX, cy])
+      segments.push([toothOneX, cy, toothOneX, cy + toothDepth])
+      segments.push([toothOneX, cy + toothDepth, toothTwoX, cy + toothDepth])
+      segments.push([toothTwoX, cy + toothDepth, toothTwoX, cy + toothDepth * 0.45])
+      segments.push([toothTwoX, cy + toothDepth * 0.45, shaftEndX, cy + toothDepth * 0.45])
+      segments.push([shaftEndX, cy, shaftEndX, cy + toothDepth * 0.45])
+
+      const total = segments.length
+      segments.forEach((segment, i) => {
+        const segmentStart = i / total
+        const segmentEnd = (i + 1) / total
+        if (eased < segmentStart) return
+        const segmentProgress = eased >= segmentEnd ? 1 : (eased - segmentStart) / (segmentEnd - segmentStart)
+        drawLineBlocks(segment[0], segment[1], segment[2], segment[3], keyBlock, pulse, segmentProgress)
+      })
+    }
+
     const animate = () => {
       animId = requestAnimationFrame(animate)
       if (!width || !height) return
@@ -401,6 +520,7 @@ function SkillsMatrixCanvas({ isMobile }: { isMobile: boolean }) {
       const startY = (height - gridHeight) / 2
       const dotRadius = isMobile ? 1.6 : 1.9
       const blockSize = isMobile ? 10 : 12
+      const lockedMode = unlockMode && !unlocked
 
       ctx.fillStyle = 'rgba(0, 0, 0, 0.86)'
       for (let row = 0; row < rows; row++) {
@@ -421,16 +541,34 @@ function SkillsMatrixCanvas({ isMobile }: { isMobile: boolean }) {
       const headCol = Math.max(0, Math.min(cols - 1, Math.round(targetX * (cols - 1))))
       const headRow = Math.max(0, Math.min(rows - 1, Math.round(targetY * (rows - 1))))
 
-      if (frame % 3 === 0) {
+      if (!lockedMode && frame % 3 === 0) {
         addTrailBlock(headCol, headRow, 1.25)
         addTrailBlock(headCol - 1, headRow, 0.9)
         addTrailBlock(headCol, headRow + 1, 0.9)
       }
 
-      for (let col = 0; col < cols; col++) {
-        const wave = Math.sin(col * 0.56 + t * 1.8) * rows * 0.18
-        const row = Math.round(rows * 0.52 + wave)
-        if ((col + frame) % 7 === 0) addTrailBlock(col, row, col % 3 === 0 ? 1.2 : 0.9)
+      if (lockedMode && !unlocking) {
+        const centerX = startX + gridWidth * 0.5
+        const centerY = startY + gridHeight * 0.52
+        const radiusX = gridWidth * 0.17
+        const radiusY = gridHeight * 0.31
+        for (let i = 0; i < 42; i++) {
+          const angle = i / 42 * Math.PI * 2
+          const pulse = 0.5 + Math.sin(t * 2.2 + i * 0.55) * 0.22
+          const size = blockSize * (i % 6 === 0 ? 1.12 : 0.86)
+          drawBlock(
+            centerX + Math.cos(angle) * radiusX - size / 2,
+            centerY + Math.sin(angle) * radiusY - size / 2,
+            size,
+            pulse,
+          )
+        }
+      } else if (!lockedMode) {
+        for (let col = 0; col < cols; col++) {
+          const wave = Math.sin(col * 0.56 + t * 1.8) * rows * 0.18
+          const row = Math.round(rows * 0.52 + wave)
+          if ((col + frame) % 7 === 0) addTrailBlock(col, row, col % 3 === 0 ? 1.2 : 0.9)
+        }
       }
 
       for (let i = trail.length - 1; i >= 0; i--) {
@@ -446,8 +584,26 @@ function SkillsMatrixCanvas({ isMobile }: { isMobile: boolean }) {
         drawBlock(x, y, size, block.alpha)
       }
 
-      const headSize = blockSize * 1.24
-      drawBlock(startX + headCol * cell - headSize / 2, startY + headRow * cell - headSize / 2, headSize, 0.96)
+      const pixelTrail = pixelTrailRef.current
+      for (let i = pixelTrail.length - 1; i >= 0; i--) {
+        const block = pixelTrail[i]
+        block.alpha *= 0.94
+        if (block.alpha < 0.035) {
+          pixelTrail.splice(i, 1)
+          continue
+        }
+        drawBlock(block.x - block.size / 2, block.y - block.size / 2, block.size, block.alpha)
+      }
+
+      if (lockedMode && unlocking) {
+        const progress = Math.min(1, frame / 54)
+        drawKeyOutline(startX, startY, gridWidth, gridHeight, blockSize, progress)
+      }
+
+      if (!lockedMode) {
+        const headSize = blockSize * 1.24
+        drawBlock(startX + headCol * cell - headSize / 2, startY + headRow * cell - headSize / 2, headSize, 0.96)
+      }
     }
 
     resize()
@@ -459,14 +615,52 @@ function SkillsMatrixCanvas({ isMobile }: { isMobile: boolean }) {
       cancelAnimationFrame(animId)
       ro.disconnect()
     }
-  }, [isMobile])
+  }, [isMobile, unlockMode, unlocked, unlocking])
+
+  const updatePointer = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width))
+    const y = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height))
+    pointerRef.current = {
+      x,
+      y,
+      active: true,
+    }
+    return {
+      x: x * rect.width,
+      y: y * rect.height,
+    }
+  }
 
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect()
-    pointerRef.current = {
-      x: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
-      y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)),
-      active: true,
+    const point = updatePointer(event)
+    if (unlockMode && !unlocked && isDrawingRef.current) {
+      drawPointsRef.current.push(point)
+      pixelTrailRef.current.push({ x: point.x, y: point.y, alpha: 0.95, size: isMobile ? 10 : 12 })
+      if (pixelTrailRef.current.length > 240) pixelTrailRef.current.shift()
+      if (isCircleGesture(drawPointsRef.current)) {
+        isDrawingRef.current = false
+        onUnlock?.()
+      }
+    }
+  }
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const point = updatePointer(event)
+    event.currentTarget.setPointerCapture(event.pointerId)
+    if (!unlockMode || unlocked) return
+    isDrawingRef.current = true
+    drawPointsRef.current = [point]
+    pixelTrailRef.current.push({ x: point.x, y: point.y, alpha: 0.95, size: isMobile ? 10 : 12 })
+  }
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!unlockMode || unlocked || !isDrawingRef.current) return
+    const point = updatePointer(event)
+    drawPointsRef.current.push(point)
+    isDrawingRef.current = false
+    if (isCircleGesture(drawPointsRef.current)) {
+      onUnlock?.()
     }
   }
 
@@ -474,7 +668,10 @@ function SkillsMatrixCanvas({ isMobile }: { isMobile: boolean }) {
     <canvas
       ref={canvasRef}
       aria-hidden="true"
+      onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={() => { isDrawingRef.current = false }}
       onPointerEnter={() => { pointerRef.current.active = true }}
       onPointerLeave={() => { pointerRef.current.active = false }}
       style={{ display: 'block', width: '100%', height: '100%', touchAction: 'none' }}
@@ -488,10 +685,13 @@ export default function CVPage() {
   const [visible, setVisible]   = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [skillsUnlocked, setSkillsUnlocked] = useState(false)
+  const [skillsUnlocking, setSkillsUnlocking] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const scrollVelRef = useRef(0)
   const lastScrollRef = useRef({ top: 0, time: 0 })
   const ghostsRef = useRef<GhostFrame[]>([])
+  const skillsUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
@@ -519,6 +719,12 @@ export default function CVPage() {
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('cv-page-active', { detail: true }))
     return () => { window.dispatchEvent(new CustomEvent('cv-page-active', { detail: false })) }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (skillsUnlockTimerRef.current) clearTimeout(skillsUnlockTimerRef.current)
+    }
   }, [])
 
   const handleScroll = () => {
@@ -550,6 +756,16 @@ export default function CVPage() {
     requestAnimationFrame(step)
   }
 
+  const openSkills = () => {
+    if (isMobile || skillsUnlocked || skillsUnlocking) return
+    setSkillsUnlocking(true)
+    skillsUnlockTimerRef.current = setTimeout(() => {
+      setSkillsUnlocked(true)
+      setSkillsUnlocking(false)
+      skillsUnlockTimerRef.current = null
+    }, 1320)
+  }
+
   // Nav sizing — smaller on mobile
   const navFontSize    = isMobile ? '0.56rem' : '0.88rem'
   const navLetterSp   = isMobile ? '0.01em'  : '0.06em'
@@ -560,6 +776,13 @@ export default function CVPage() {
   const navMaxWidth   = scrolled
     ? (isMobile ? 'min(23.25rem, calc(100vw - 16px))' : 'min(34rem, calc(100vw - 32px))')
     : '100%'
+  const skillsAreOpen = isMobile || skillsUnlocked
+  const skillsShellClass = [
+    'cv-rise',
+    'cv-skills-shell',
+    skillsAreOpen ? 'cv-skills-shell-opened' : 'cv-skills-shell-locked',
+    skillsUnlocking ? 'cv-skills-shell-opening' : '',
+  ].filter(Boolean).join(' ')
 
   return (
     <>
@@ -582,6 +805,14 @@ export default function CVPage() {
           from { opacity: 0; transform: translateY(24px); }
           to   { opacity: 1; transform: translateY(0); }
         }
+        @keyframes cv-skills-unlock-fade {
+          0% { opacity: 1; transform: scale(1); filter: blur(0); }
+          100% { opacity: 0; transform: scale(0.992); filter: blur(3px); }
+        }
+        @keyframes cv-skills-content-in {
+          from { opacity: 0; transform: translateY(18px) scale(0.985); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
         .cv-rise { opacity: 0; animation: cv-rise 560ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
         .cv-skills-shell {
@@ -593,6 +824,83 @@ export default function CVPage() {
           border: 1px solid rgba(0,0,0,0.12);
           border-radius: 8px;
           overflow: hidden;
+          transition: min-height 720ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 520ms ease, border-color 520ms ease;
+        }
+        .cv-skills-shell-locked {
+          grid-template-columns: 1fr;
+          min-height: clamp(25rem, 48vw, 34rem);
+          cursor: crosshair;
+        }
+        .cv-skills-shell-opening {
+          border-color: rgba(74,178,45,0.36);
+          box-shadow: 0 0 0 1px rgba(74,178,45,0.12), 0 18px 48px rgba(74,178,45,0.08);
+          cursor: default;
+        }
+        .cv-skills-shell-opened .cv-skills-list,
+        .cv-skills-shell-opened .cv-skills-matrix {
+          animation: cv-skills-content-in 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+        .cv-skills-shell-opened .cv-skills-matrix {
+          animation-delay: 80ms;
+        }
+        .cv-skills-unlock-stage {
+          position: relative;
+          min-height: clamp(25rem, 48vw, 34rem);
+          display: grid;
+          grid-template-rows: auto 1fr auto;
+          background: #d8d8da;
+        }
+        .cv-skills-shell-opening .cv-skills-unlock-stage {
+          pointer-events: none;
+          animation: cv-skills-unlock-fade 360ms cubic-bezier(0.16, 1, 0.3, 1) 960ms forwards;
+        }
+        .cv-skills-shell-opening .cv-skills-unlock-title {
+          opacity: 0.38;
+          transform: translateY(-0.25rem);
+          transition: opacity 360ms ease, transform 360ms ease;
+        }
+        .cv-skills-shell-opening .cv-skills-unlock-subtitle {
+          color: #4ab22d;
+          transition: color 220ms ease;
+        }
+        .cv-skills-unlock-copy {
+          position: relative;
+          z-index: 2;
+          padding: 2.1rem 1.5rem 0.3rem;
+          text-align: center;
+          pointer-events: none;
+        }
+        .cv-skills-unlock-title {
+          margin: 0;
+          color: #101012;
+          font-family: var(--font-geist-sans);
+          font-size: clamp(1.9rem, 4vw, 3rem);
+          font-weight: 500;
+          letter-spacing: 0;
+          line-height: 1;
+        }
+        .cv-skills-unlock-subtitle {
+          margin: 0.55rem 0 0;
+          color: #77726d;
+          font-size: 0.62rem;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+        }
+        .cv-skills-unlock-matrix {
+          position: relative;
+          min-height: 18rem;
+        }
+        .cv-skills-unlock-footer {
+          position: relative;
+          z-index: 2;
+          padding: 0.2rem 1.5rem 2.1rem;
+          text-align: center;
+          color: #1a1a1a;
+          font-family: var(--font-geist-sans);
+          font-size: clamp(1.35rem, 2.9vw, 2.35rem);
+          font-weight: 500;
+          line-height: 1;
+          pointer-events: none;
         }
         .cv-skills-list {
           padding: 1.35rem 1.45rem;
@@ -712,6 +1020,12 @@ export default function CVPage() {
           .cv-skills-shell {
             grid-template-columns: 1fr;
             min-height: 0;
+          }
+          .cv-skills-shell-locked {
+            min-height: 0;
+          }
+          .cv-skills-unlock-stage {
+            display: none;
           }
           .cv-skills-list {
             padding: 1rem;
@@ -944,26 +1258,66 @@ export default function CVPage() {
 
         {/* Technical Skills */}
         <Section label="Technical Skills" id="skills" delay={380}>
-          <div className="cv-rise cv-skills-shell" style={{ animationDelay: '450ms' }}>
-            <div className="cv-skills-list">
-              {TECHNICAL_SKILLS.map((group) => (
-                <div key={group.label} className="cv-skill-group">
-                  <div style={{ fontSize: '0.56rem', letterSpacing: '0.18em', color: '#77726d', textTransform: 'uppercase', paddingTop: '0.28rem' }}>
-                    {group.label}
-                  </div>
-                  <div>
-                    {group.skills.map((skill) => (
-                      <span key={skill} className="cv-skill-token">
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
+          <div className={skillsShellClass} style={{ animationDelay: '450ms' }}>
+            {skillsAreOpen ? (
+              <>
+                <div className="cv-skills-list">
+                  {TECHNICAL_SKILLS.map((group) => (
+                    <div key={group.label} className="cv-skill-group">
+                      <div style={{ fontSize: '0.56rem', letterSpacing: '0.18em', color: '#77726d', textTransform: 'uppercase', paddingTop: '0.28rem' }}>
+                        {group.label}
+                      </div>
+                      <div>
+                        {group.skills.map((skill) => (
+                          <span key={skill} className="cv-skill-token">
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className="cv-skills-matrix">
-              <SkillsMatrixCanvas isMobile={isMobile} />
-            </div>
+                <div className="cv-skills-matrix">
+                  <SkillsMatrixCanvas isMobile={isMobile} />
+                </div>
+              </>
+            ) : (
+              <div className="cv-skills-unlock-stage">
+                <div className="cv-skills-unlock-copy">
+                  <p className="cv-skills-unlock-title">Draw a circle to open</p>
+                  <p className="cv-skills-unlock-subtitle">Skills matrix locked</p>
+                </div>
+                <div className="cv-skills-unlock-matrix">
+                  <SkillsMatrixCanvas
+                    isMobile={isMobile}
+                    unlockMode
+                    unlocked={skillsAreOpen}
+                    unlocking={skillsUnlocking}
+                    onUnlock={openSkills}
+                  />
+                </div>
+                <div className="cv-skills-unlock-footer">
+                  Technical Skills
+                </div>
+                <button
+                  type="button"
+                  onClick={openSkills}
+                  style={{
+                    position: 'absolute',
+                    width: 1,
+                    height: 1,
+                    padding: 0,
+                    margin: -1,
+                    overflow: 'hidden',
+                    clip: 'rect(0, 0, 0, 0)',
+                    whiteSpace: 'nowrap',
+                    border: 0,
+                  }}
+                >
+                  Open technical skills
+                </button>
+              </div>
+            )}
           </div>
         </Section>
 
