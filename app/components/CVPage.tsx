@@ -551,14 +551,14 @@ export default function CVPage() {
   }
 
   // Nav sizing — smaller on mobile
-  const navFontSize    = isMobile ? '0.72rem' : '0.88rem'
-  const navLetterSp   = isMobile ? '0.08em'  : '0.06em'
-  const navGap        = isMobile ? '0.65rem'  : '1.35rem'
+  const navFontSize    = isMobile ? '0.56rem' : '0.88rem'
+  const navLetterSp   = isMobile ? '0.01em'  : '0.06em'
+  const navGap        = isMobile ? '0.42rem'  : '1.35rem'
   const navPadding    = scrolled
-    ? (isMobile ? '0.6rem 1.2rem' : '0.9rem 1.8rem')
-    : (isMobile ? '0.55rem 1rem'  : '0.78rem 2rem')
+    ? (isMobile ? '0.42rem 0.54rem' : '0.9rem 1.8rem')
+    : (isMobile ? '0.48rem 0.7rem'  : '0.78rem 2rem')
   const navMaxWidth   = scrolled
-    ? (isMobile ? 'min(22rem, calc(100vw - 24px))' : 'min(34rem, calc(100vw - 32px))')
+    ? (isMobile ? 'min(23.25rem, calc(100vw - 16px))' : 'min(34rem, calc(100vw - 32px))')
     : '100%'
 
   return (
@@ -659,6 +659,43 @@ export default function CVPage() {
 
         /* Mobile about — single column */
         @media (max-width: 768px) {
+          .cv-nav-inner {
+            display: flex !important;
+            align-items: center !important;
+            gap: 0.42rem;
+            padding: 0.42rem 0.54rem !important;
+            max-width: min(23.25rem, calc(100vw - 16px)) !important;
+          }
+          .cv-nav-brand {
+            font-size: 0.68rem !important;
+            letter-spacing: 0.11em !important;
+          }
+          .cv-nav-links {
+            display: flex !important;
+            align-items: center;
+            gap: 0.42rem !important;
+            width: auto;
+          }
+          .cv-nav-floating-mobile .cv-nav-links {
+            flex: 1;
+            justify-content: space-evenly;
+            margin-left: 0 !important;
+          }
+          .cv-nav-link {
+            min-width: 0;
+            font-size: 0.56rem !important;
+            letter-spacing: 0.01em !important;
+            text-align: center;
+          }
+          .cv-nav-contact {
+            font-size: 0.56rem !important;
+            letter-spacing: 0.025em !important;
+            padding: 0.26rem 0.54rem !important;
+            margin-left: 0.18rem !important;
+          }
+          .cv-nav-floating-mobile .cv-nav-contact {
+            margin-left: 0 !important;
+          }
           .cv-about-grid {
             grid-template-columns: 1fr !important;
             gap: 0.5rem 0 !important;
@@ -714,12 +751,6 @@ export default function CVPage() {
           transition: background 140ms ease, color 140ms ease;
           white-space: nowrap;
         }
-        @media (max-width: 768px) {
-          .cv-nav-contact {
-            font-size: 0.68rem;
-            padding: 0.28rem 0.75rem;
-          }
-        }
         .cv-nav-contact:hover, .cv-nav-contact:focus-visible {
           background: #e2deda;
           color: #1a1a1a;
@@ -764,6 +795,7 @@ export default function CVPage() {
         }}
       >
         <nav
+          className={`cv-nav-inner ${isMobile && scrolled ? 'cv-nav-floating-mobile' : ''}`}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -788,6 +820,7 @@ export default function CVPage() {
           }}
         >
           <button
+            className="cv-nav-brand"
             onClick={() => window.location.reload()}
             style={{
               background: 'none',
@@ -805,30 +838,33 @@ export default function CVPage() {
           >
             J · C
           </button>
-          <div style={{ display: 'flex', gap: navGap, alignItems: 'center' }}>
+          <div className="cv-nav-links" style={{ display: 'flex', gap: navGap, alignItems: 'center', marginLeft: 'auto' }}>
             <button
+              className="cv-nav-link"
               onClick={() => scrollToSection('skills')}
               style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: navFontSize, letterSpacing: navLetterSp, color: '#5a5550', fontFamily: 'var(--font-geist-mono)', whiteSpace: 'nowrap' }}
             >
               Skills
             </button>
             <button
+              className="cv-nav-link"
               onClick={() => scrollToSection('experience')}
               style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: navFontSize, letterSpacing: navLetterSp, color: '#5a5550', fontFamily: 'var(--font-geist-mono)', whiteSpace: 'nowrap' }}
             >
               Experience
             </button>
             <button
+              className="cv-nav-link"
               onClick={() => scrollToSection('credits')}
               style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: navFontSize, letterSpacing: navLetterSp, color: '#5a5550', fontFamily: 'var(--font-geist-mono)', whiteSpace: 'nowrap' }}
             >
               Credits
             </button>
-            <a href="mailto:thecyberfoolz@gmail.com" className="cv-nav-contact">
-              <span className="cv-nav-contact-default">Contact</span>
-              <span className="cv-nav-contact-reveal">Email</span>
-            </a>
           </div>
+          <a href="mailto:thecyberfoolz@gmail.com" className="cv-nav-contact" style={{ marginLeft: navGap }}>
+            <span className="cv-nav-contact-default">Contact</span>
+            <span className="cv-nav-contact-reveal">Email</span>
+          </a>
         </nav>
       </div>
 
