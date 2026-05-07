@@ -51,6 +51,21 @@ const CREDITS = [
   { name: 'Kevin Netteberg', role: '3D Models', detail: 'Genie · Lamp · Carpet · Krate' },
 ]
 
+const TECHNICAL_SKILLS = [
+  {
+    label: 'Languages',
+    skills: ['JavaScript', 'TypeScript', 'Python', 'SQL', 'HTML', 'CSS'],
+  },
+  {
+    label: 'Libraries & Frameworks',
+    skills: ['React', 'React Native', 'Expo', 'React Testing Library', 'jQuery', 'Node.js', 'Express', 'Jest', 'Flask', 'Next.js', 'Three.js', 'Tailwind CSS', 'unittest'],
+  },
+  {
+    label: 'Tools / Methodologies',
+    skills: ['SQLAlchemy', 'PostgreSQL', 'Amazon S3', 'Google Firebase', 'Xcode', 'Android Studio', 'npm', 'Cron', 'VS Code', 'Jinja', 'Git', 'GitHub', 'Sentry.io', 'PostHog', 'Microservices Architecture', 'Object-Oriented Programming', 'Agile Development', 'Scrum', 'Test-Driven Development', 'DevTools / Debugging'],
+  },
+]
+
 // ---------- Ghost trail overlay ----------
 
 type GhostFrame = { pts: Float32Array; exc: Float32Array; alpha: number }
@@ -233,7 +248,7 @@ function DotCanvas({ isMobile, scrollVelRef, ghostsRef }: { isMobile: boolean; s
       cancelAnimationFrame(animId)
       window.removeEventListener('resize', resize)
     }
-  }, [isMobile])
+  }, [ghostsRef, isMobile, scrollVelRef])
 
   return (
     <canvas
@@ -330,6 +345,143 @@ function GhostOverlay({ ghostsRef }: { ghostsRef: { current: GhostFrame[] } }) {
   )
 }
 
+// ---------- Skills matrix ----------
+
+type SkillTrailBlock = { col: number; row: number; alpha: number; size: number }
+
+function SkillsMatrixCanvas({ isMobile }: { isMobile: boolean }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const pointerRef = useRef({ x: 0.32, y: 0.46, active: false })
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    let width = 0
+    let height = 0
+    let dpr = 1
+    let frame = 0
+    let animId = 0
+    const trail: SkillTrailBlock[] = []
+
+    const resize = () => {
+      dpr = Math.min(window.devicePixelRatio || 1, 2)
+      width = canvas.offsetWidth
+      height = canvas.offsetHeight
+      canvas.width = Math.max(1, Math.floor(width * dpr))
+      canvas.height = Math.max(1, Math.floor(height * dpr))
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    }
+
+    const addTrailBlock = (col: number, row: number, size = 1) => {
+      trail.push({ col, row, alpha: 0.9, size })
+      if (trail.length > 190) trail.shift()
+    }
+
+    const drawBlock = (x: number, y: number, size: number, alpha: number) => {
+      ctx.fillStyle = `rgba(74, 178, 45, ${alpha})`
+      ctx.fillRect(x, y, size, size)
+    }
+
+    const animate = () => {
+      animId = requestAnimationFrame(animate)
+      if (!width || !height) return
+
+      frame++
+      ctx.clearRect(0, 0, width, height)
+
+      const cell = isMobile ? 14 : 17
+      const cols = Math.max(12, Math.floor(width / cell))
+      const rows = Math.max(8, Math.floor(height / cell))
+      const gridWidth = (cols - 1) * cell
+      const gridHeight = (rows - 1) * cell
+      const startX = (width - gridWidth) / 2
+      const startY = (height - gridHeight) / 2
+      const dotRadius = isMobile ? 1.6 : 1.9
+      const blockSize = isMobile ? 10 : 12
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.86)'
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const x = startX + col * cell
+          const y = startY + row * cell
+          ctx.beginPath()
+          ctx.arc(x, y, dotRadius, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
+
+      const t = frame * 0.026
+      const autoX = 0.5 + Math.sin(t * 0.72) * 0.38
+      const autoY = 0.5 + Math.cos(t * 0.57) * 0.26
+      const targetX = pointerRef.current.active ? pointerRef.current.x : autoX
+      const targetY = pointerRef.current.active ? pointerRef.current.y : autoY
+      const headCol = Math.max(0, Math.min(cols - 1, Math.round(targetX * (cols - 1))))
+      const headRow = Math.max(0, Math.min(rows - 1, Math.round(targetY * (rows - 1))))
+
+      if (frame % 3 === 0) {
+        addTrailBlock(headCol, headRow, 1.25)
+        addTrailBlock(headCol - 1, headRow, 0.9)
+        addTrailBlock(headCol, headRow + 1, 0.9)
+      }
+
+      for (let col = 0; col < cols; col++) {
+        const wave = Math.sin(col * 0.56 + t * 1.8) * rows * 0.18
+        const row = Math.round(rows * 0.52 + wave)
+        if ((col + frame) % 7 === 0) addTrailBlock(col, row, col % 3 === 0 ? 1.2 : 0.9)
+      }
+
+      for (let i = trail.length - 1; i >= 0; i--) {
+        const block = trail[i]
+        block.alpha *= 0.943
+        if (block.alpha < 0.035 || block.col < 0 || block.row < 0 || block.col >= cols || block.row >= rows) {
+          trail.splice(i, 1)
+          continue
+        }
+        const size = blockSize * block.size
+        const x = startX + block.col * cell - size / 2
+        const y = startY + block.row * cell - size / 2
+        drawBlock(x, y, size, block.alpha)
+      }
+
+      const headSize = blockSize * 1.24
+      drawBlock(startX + headCol * cell - headSize / 2, startY + headRow * cell - headSize / 2, headSize, 0.96)
+    }
+
+    resize()
+    const ro = new ResizeObserver(resize)
+    ro.observe(canvas)
+    animId = requestAnimationFrame(animate)
+
+    return () => {
+      cancelAnimationFrame(animId)
+      ro.disconnect()
+    }
+  }, [isMobile])
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    pointerRef.current = {
+      x: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
+      y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)),
+      active: true,
+    }
+  }
+
+  return (
+    <canvas
+      ref={canvasRef}
+      aria-hidden="true"
+      onPointerMove={handlePointerMove}
+      onPointerEnter={() => { pointerRef.current.active = true }}
+      onPointerLeave={() => { pointerRef.current.active = false }}
+      style={{ display: 'block', width: '100%', height: '100%', touchAction: 'none' }}
+    />
+  )
+}
+
 // ---------- Page ----------
 
 export default function CVPage() {
@@ -401,7 +553,7 @@ export default function CVPage() {
   // Nav sizing — smaller on mobile
   const navFontSize    = isMobile ? '0.72rem' : '0.88rem'
   const navLetterSp   = isMobile ? '0.08em'  : '0.06em'
-  const navGap        = isMobile ? '1rem'     : '1.6rem'
+  const navGap        = isMobile ? '0.65rem'  : '1.35rem'
   const navPadding    = scrolled
     ? (isMobile ? '0.6rem 1.2rem' : '0.9rem 1.8rem')
     : (isMobile ? '0.55rem 1rem'  : '0.78rem 2rem')
@@ -432,6 +584,68 @@ export default function CVPage() {
         }
         .cv-rise { opacity: 0; animation: cv-rise 560ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
+        .cv-skills-shell {
+          margin-top: 1.2rem;
+          display: grid;
+          grid-template-columns: minmax(0, 1.1fr) minmax(18rem, 0.9fr);
+          min-height: 21rem;
+          background: #d8d8da;
+          border: 1px solid rgba(0,0,0,0.12);
+          border-radius: 8px;
+          overflow: hidden;
+        }
+        .cv-skills-list {
+          padding: 1.35rem 1.45rem;
+          border-right: 1px solid rgba(0,0,0,0.11);
+        }
+        .cv-skill-group {
+          display: grid;
+          grid-template-columns: minmax(8.5rem, 0.34fr) 1fr;
+          gap: 0.8rem 1rem;
+          padding: 1rem 0;
+          border-bottom: 1px solid rgba(0,0,0,0.11);
+        }
+        .cv-skill-group:first-child { padding-top: 0; }
+        .cv-skill-group:last-child {
+          border-bottom: none;
+          padding-bottom: 0;
+        }
+        .cv-skill-token {
+          display: inline-flex;
+          align-items: center;
+          min-height: 1.45rem;
+          margin: 0 0.28rem 0.38rem 0;
+          padding: 0.22rem 0.42rem;
+          background: rgba(255,255,255,0.3);
+          border: 1px solid rgba(0,0,0,0.09);
+          border-radius: 4px;
+          color: #252525;
+          font-size: 0.62rem;
+          letter-spacing: 0.03em;
+          line-height: 1.1;
+          transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
+        }
+        .cv-skill-token:hover {
+          background: #4ab22d;
+          border-color: #4ab22d;
+          color: #071106;
+          transform: translateY(-1px);
+        }
+        .cv-skills-matrix {
+          position: relative;
+          min-height: 21rem;
+          background: #d8d8da;
+          cursor: crosshair;
+        }
+        .cv-skills-matrix::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          border-left: 1px solid rgba(255,255,255,0.22);
+          box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1);
+        }
+
         .cv-exp-row {
           padding: 1.4rem 0;
           border-bottom: 1px solid rgba(0,0,0,0.1);
@@ -457,6 +671,33 @@ export default function CVPage() {
           .cv-exp-detail {
             font-size: 0.68rem !important;
             letter-spacing: 0.01em !important;
+          }
+          .cv-skills-shell {
+            grid-template-columns: 1fr;
+            min-height: 0;
+          }
+          .cv-skills-list {
+            padding: 1rem;
+            border-right: none;
+            border-bottom: 1px solid rgba(0,0,0,0.11);
+          }
+          .cv-skill-group {
+            grid-template-columns: 1fr;
+            gap: 0.55rem;
+            padding: 0.9rem 0;
+          }
+          .cv-skill-token {
+            font-size: 0.58rem;
+            min-height: 1.35rem;
+            margin: 0 0.22rem 0.32rem 0;
+          }
+          .cv-skills-matrix {
+            min-height: 14.5rem;
+            cursor: default;
+          }
+          .cv-skills-matrix::after {
+            border-left: none;
+            border-top: 1px solid rgba(255,255,255,0.22);
           }
         }
 
@@ -566,6 +807,12 @@ export default function CVPage() {
           </button>
           <div style={{ display: 'flex', gap: navGap, alignItems: 'center' }}>
             <button
+              onClick={() => scrollToSection('skills')}
+              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: navFontSize, letterSpacing: navLetterSp, color: '#5a5550', fontFamily: 'var(--font-geist-mono)', whiteSpace: 'nowrap' }}
+            >
+              Skills
+            </button>
+            <button
               onClick={() => scrollToSection('experience')}
               style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: navFontSize, letterSpacing: navLetterSp, color: '#5a5550', fontFamily: 'var(--font-geist-mono)', whiteSpace: 'nowrap' }}
             >
@@ -659,13 +906,38 @@ export default function CVPage() {
       {/* Main content */}
       <div style={{ maxWidth: '80rem', margin: '0 auto', padding: isMobile ? '2.4rem 1.2rem 5rem' : '3.5rem 2rem 7rem' }}>
 
+        {/* Technical Skills */}
+        <Section label="Technical Skills" id="skills" delay={380}>
+          <div className="cv-rise cv-skills-shell" style={{ animationDelay: '450ms' }}>
+            <div className="cv-skills-list">
+              {TECHNICAL_SKILLS.map((group) => (
+                <div key={group.label} className="cv-skill-group">
+                  <div style={{ fontSize: '0.56rem', letterSpacing: '0.18em', color: '#77726d', textTransform: 'uppercase', paddingTop: '0.28rem' }}>
+                    {group.label}
+                  </div>
+                  <div>
+                    {group.skills.map((skill) => (
+                      <span key={skill} className="cv-skill-token">
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="cv-skills-matrix">
+              <SkillsMatrixCanvas isMobile={isMobile} />
+            </div>
+          </div>
+        </Section>
+
         {/* Experience */}
-        <Section label="Experience" id="experience" delay={380}>
+        <Section label="Experience" id="experience" delay={620}>
           {EXPERIENCE.map((job, i) => (
             <div
               key={i}
               className="cv-rise cv-exp-row"
-              style={{ animationDelay: `${460 + i * 70}ms` }}
+              style={{ animationDelay: `${700 + i * 70}ms` }}
             >
               <div>
                 <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#18181a', marginBottom: '0.3rem', letterSpacing: '0.01em' }}>
