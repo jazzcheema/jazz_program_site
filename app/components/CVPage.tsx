@@ -58,7 +58,7 @@ const TECHNICAL_SKILLS = [
   },
   {
     label: 'Libraries & Frameworks',
-    skills: ['React', 'React Native', 'Expo', 'React Testing Library', 'jQuery', 'Node.js', 'Express', 'Jest', 'Flask', 'Next.js', 'Three.js', 'Tailwind CSS', 'unittest'],
+    skills: ['React', 'React Native', 'Three.js', 'Expo', 'React Testing Library', 'jQuery', 'Node.js', 'Express', 'Jest', 'Flask', 'Next.js', 'Tailwind CSS', 'unittest'],
   },
   {
     label: 'Tools / Methodologies',
@@ -641,7 +641,7 @@ function SkillsMatrixCanvas({
       }
 
       if (lockedMode && unlocking) {
-        const progress = Math.min(1, frame / 54)
+        const progress = Math.min(1, frame / 76)
         drawKeyOutline(startX, startY, gridWidth, gridHeight, blockSize, progress)
       }
 
@@ -808,7 +808,7 @@ export default function CVPage() {
       setSkillsUnlocked(true)
       setSkillsUnlocking(false)
       skillsUnlockTimerRef.current = null
-    }, 1320)
+    }, 1680)
   }
 
   // Nav sizing — smaller on mobile
@@ -898,7 +898,7 @@ export default function CVPage() {
         }
         .cv-skills-shell-opening .cv-skills-unlock-stage {
           pointer-events: none;
-          animation: cv-skills-unlock-fade 360ms cubic-bezier(0.16, 1, 0.3, 1) 960ms forwards;
+          animation: cv-skills-unlock-fade 420ms cubic-bezier(0.16, 1, 0.3, 1) 1220ms forwards;
         }
         .cv-skills-shell-opening .cv-skills-unlock-title {
           opacity: 0.38;
