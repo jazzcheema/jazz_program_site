@@ -215,7 +215,7 @@ function DotCanvas({ isMobile, scrollVelRef, ghostsRef }: { isMobile: boolean; s
       // Snapshot in viewport coordinates so the fixed overlay can draw it
       const vel = scrollVelRef.current
       scrollVelRef.current *= 0.82
-      if (Math.abs(vel) > 0.15 && tick % 2 === 0) {
+      if (Math.abs(vel) > 0.15) {
         const rect = canvas.getBoundingClientRect()
         const pts = new Float32Array(N * 2)
         for (let i = 0; i < N; i++) {
@@ -223,7 +223,7 @@ function DotCanvas({ isMobile, scrollVelRef, ghostsRef }: { isMobile: boolean; s
           pts[i * 2 + 1] = rect.top  + py[i]
         }
         const store = ghostsRef.current
-        if (store.length >= 10) store.shift()
+        if (store.length >= 22) store.shift()
         store.push({ pts, exc: exc.slice() as Float32Array, alpha: Math.min(0.55, Math.abs(vel) * 0.18 + 0.2) })
       }
     }
