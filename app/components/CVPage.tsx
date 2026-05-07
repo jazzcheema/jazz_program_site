@@ -733,6 +733,7 @@ export default function CVPage() {
   const [skillsUnlocked, setSkillsUnlocked] = useState(false)
   const [skillsUnlocking, setSkillsUnlocking] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const aboutRef = useRef<HTMLDivElement>(null)
   const scrollVelRef = useRef(0)
   const lastScrollRef = useRef({ top: 0, time: 0 })
   const ghostsRef = useRef<GhostFrame[]>([])
@@ -782,6 +783,22 @@ export default function CVPage() {
     const focalY = containerRect.top + containerRect.height * 0.53
     const focusRadius = Math.max(isMobile ? 170 : 180, containerRect.height * (isMobile ? 0.3 : 0.2))
     const falloff = Math.max(isMobile ? 190 : 300, containerRect.height * (isMobile ? 0.42 : 0.4))
+
+    const about = aboutRef.current
+    if (about) {
+      const rect = about.getBoundingClientRect()
+      const exitStart = containerRect.top + containerRect.height * 0.36
+      const exitEnd = containerRect.top + containerRect.height * 0.08
+      const rawExit = (exitStart - rect.top) / (exitStart - exitEnd)
+      const exit = Math.min(1, Math.max(0, rawExit))
+      const easedExit = exit * exit * (3 - 2 * exit)
+      const velocity = Math.min(1, Math.abs(scrollVelRef.current) * 0.42)
+      const copyLift = easedExit * (isMobile ? -14 : -30) - velocity * (isMobile ? 2 : 4)
+      const labelDrift = easedExit * (isMobile ? -8 : -20)
+
+      about.style.setProperty('--cv-about-copy-y', `${copyLift}px`)
+      about.style.setProperty('--cv-about-label-y', `${labelDrift}px`)
+    }
 
     container.querySelectorAll<HTMLElement>('.cv-slot-row').forEach((row, index) => {
       const rect = row.getBoundingClientRect()
@@ -912,6 +929,20 @@ export default function CVPage() {
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
         .cv-rise { opacity: 0; animation: cv-rise 560ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .cv-about-motion {
+          --cv-about-copy-y: 0px;
+          --cv-about-label-y: 0px;
+        }
+        .cv-about-motion .cv-about-label {
+          transform: translate3d(0, var(--cv-about-label-y), 0);
+          transition: transform 120ms linear;
+          will-change: transform;
+        }
+        .cv-about-motion .cv-body-text {
+          transform: translate3d(0, var(--cv-about-copy-y), 0);
+          transition: transform 120ms linear;
+          will-change: transform;
+        }
         .cv-slot-row {
           --cv-slot-left-x: 84px;
           --cv-slot-right-x: -84px;
@@ -968,6 +999,11 @@ export default function CVPage() {
           }
           .cv-slot-row > :first-child > *,
           .cv-slot-row > :last-child > * {
+            transform: none !important;
+            transition: none !important;
+          }
+          .cv-about-motion .cv-about-label,
+          .cv-about-motion .cv-body-text {
             transform: none !important;
             transition: none !important;
           }
@@ -1388,7 +1424,8 @@ export default function CVPage() {
 
       {/* About / Interests */}
       <div
-        className="cv-rise"
+        ref={aboutRef}
+        className="cv-rise cv-about-motion"
         style={{
           animationDelay: '300ms',
           maxWidth: '80rem',
