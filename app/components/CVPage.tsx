@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 const ABOUT =
-  'I build full-stack systems with a strong focus on 3D interactive software and cinematic digital experiences. Drawing on a background in film directing and editing, I approach software as a medium for storytelling-- building interfaces that pull users into an experience rather than presenting them with one. I\'m particularly interested in mobile; I\'ve led the end-to-end migration and modernisation of a 15k+ user application as the sole mobile engineer.'
+  'I build full-stack systems with a strong focus on 3D interactive software, cinematic digital experiences, and applications that invite participation. Drawing on a background in film directing and editing, I approach software as a medium for storytelling-- building interfaces that pull users into an experience rather than presenting them with one. I\'m drawn to interactive software where engagement becomes part of the system itself, and each user builds a personal relationship with the product through their own journey. I also bring strong mobile development experience, including leading the end-to-end migration and modernisation of a 15k+ user application as the sole mobile engineer.'
 
 const EXPERIENCE = [
   {
