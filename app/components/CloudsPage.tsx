@@ -93,6 +93,182 @@ type MatrixDot = {
   rgb: [number, number, number];
 };
 
+type ParticleDot = {
+  x: number;
+  y: number;
+  tx: number;
+  ty: number;
+  sx: number;
+  sy: number;
+  vx: number;
+  vy: number;
+  size: number;
+};
+
+function ParticleButton({
+  label,
+  rgb,
+  isMobile,
+  scatterDir,
+  onClick,
+  href,
+  stopEvent,
+}: {
+  label: string;
+  rgb: [number, number, number];
+  isMobile: boolean;
+  scatterDir: "left" | "right" | "up";
+  onClick?: () => void;
+  href?: string;
+  stopEvent: (e: React.SyntheticEvent) => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const hoverRef = useRef(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let dots: ParticleDot[] = [];
+    let raf = 0;
+
+    const buildDots = () => {
+      const rect = canvas.getBoundingClientRect();
+      const cssW = Math.max(1, Math.floor(rect.width));
+      const cssH = Math.max(1, Math.floor(rect.height));
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = cssW * dpr;
+      canvas.height = cssH * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const off = document.createElement("canvas");
+      off.width = cssW;
+      off.height = cssH;
+      const offCtx = off.getContext("2d");
+      if (!offCtx) return;
+      offCtx.fillStyle = "#fff";
+      offCtx.textBaseline = "middle";
+      offCtx.textAlign = "center";
+      // Fill ~70% of canvas height so text is bold and readable as particles
+      let fontSize = Math.floor(cssH * 0.72);
+      offCtx.font = `900 ${fontSize}px monospace`;
+      while (offCtx.measureText(label).width > cssW * 0.86 && fontSize > 10) {
+        fontSize -= 2;
+        offCtx.font = `900 ${fontSize}px monospace`;
+      }
+      offCtx.fillText(label, cssW / 2, cssH / 2);
+
+      const img = offCtx.getImageData(0, 0, cssW, cssH);
+      const step = isMobile ? 3 : 4;
+      const dotSize = isMobile ? 4.6 : 5.4;
+      const next: ParticleDot[] = [];
+
+      for (let y = 0; y < cssH; y += step) {
+        for (let x = 0; x < cssW; x += step) {
+          if (img.data[(y * cssW + x) * 4 + 3] < 80) continue;
+
+          // Start randomly scattered inside the canvas — assembly is visible on load
+          const ix = Math.random() * cssW;
+          const iy = Math.random() * cssH;
+
+          // Scatter targets: small local spread around each dot's rest position
+          const spread = cssH * 0.55;
+          let sx: number, sy: number;
+          if (scatterDir === "left") {
+            sx = x + (Math.random() - 0.65) * spread;
+            sy = y + (Math.random() - 0.5) * spread * 0.7;
+          } else if (scatterDir === "right") {
+            sx = x + (Math.random() - 0.35) * spread;
+            sy = y + (Math.random() - 0.5) * spread * 0.7;
+          } else {
+            sx = x + (Math.random() - 0.5) * spread * 0.8;
+            sy = y + (Math.random() - 0.7) * spread;
+          }
+
+          next.push({ x: ix, y: iy, tx: x, ty: y, sx, sy, vx: 0, vy: 0, size: dotSize });
+        }
+      }
+      dots = next;
+    };
+
+    const animate = () => {
+      raf = requestAnimationFrame(animate);
+      const rect = canvas.getBoundingClientRect();
+      const cssW = Math.max(1, rect.width);
+      const cssH = Math.max(1, rect.height);
+      ctx.clearRect(0, 0, cssW, cssH);
+
+      const hovering = hoverRef.current;
+      dots.forEach((dot) => {
+        const tx = hovering ? dot.sx : dot.tx;
+        const ty = hovering ? dot.sy : dot.ty;
+        dot.vx += (tx - dot.x) * 0.1;
+        dot.vy += (ty - dot.y) * 0.1;
+        dot.vx *= 0.76;
+        dot.vy *= 0.76;
+        dot.x += dot.vx;
+        dot.y += dot.vy;
+        ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${hovering ? 0.58 : 0.88})`;
+        ctx.fillRect(dot.x - dot.size * 0.5, dot.y - dot.size * 0.5, dot.size, dot.size);
+      });
+    };
+
+    buildDots();
+    const ro = new ResizeObserver(buildDots);
+    ro.observe(canvas);
+    animate();
+
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [label, rgb, isMobile, scatterDir]);
+
+  const canvasEl = (
+    <canvas
+      ref={canvasRef}
+      style={{ display: "block", width: "100%", height: "100%", pointerEvents: "none" }}
+      aria-hidden="true"
+    />
+  );
+
+  if (href) {
+    return (
+      <a
+        className="clouds-particle-btn"
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onMouseEnter={() => { hoverRef.current = true; }}
+        onMouseLeave={() => { hoverRef.current = false; }}
+        onPointerDown={stopEvent}
+        onPointerUp={stopEvent}
+        onClick={stopEvent}
+      >
+        {canvasEl}
+        <span className="sr-only">{label}</span>
+      </a>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="clouds-particle-btn"
+      onMouseEnter={() => { hoverRef.current = true; }}
+      onMouseLeave={() => { hoverRef.current = false; }}
+      onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+      onPointerDown={stopEvent}
+      onPointerUp={stopEvent}
+    >
+      {canvasEl}
+      <span className="sr-only">{label}</span>
+    </button>
+  );
+}
+
 type MatrixGhost = { pts: Float32Array; alpha: number };
 
 const hexToRgb = (hex: string): [number, number, number] => {
@@ -456,7 +632,6 @@ function ProjectCard({
   project,
   carouselOpen,
   isMobile,
-  onClose,
   onPrev,
   onNext,
 }: {
@@ -464,7 +639,6 @@ function ProjectCard({
   project: ProjectData;
   carouselOpen: boolean;
   isMobile: boolean;
-  onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
 }) {
@@ -474,8 +648,8 @@ function ProjectCard({
     project.id === "episode"
       ? "#c87820"
       : project.id === "krate"
-        ? "#249958"
-        : "#808080";
+        ? "#2a5fc0"
+        : "#249958";
   const displayLabel = project.label
     .replace(".VERCEL.APP", "")
     .replace(".COM", "");
@@ -533,58 +707,35 @@ function ProjectCard({
             <span className="clouds-matrix-meta-value">{project.type}</span>
           </span>
         </div>
-        <div className="clouds-matrix-controls">
+        <div className="clouds-particle-controls">
           {carouselOpen && (
-            <nav>
-              <button
-                type="button"
-                className="clouds-matrix-control clouds-axis-button clouds-axis-button-prev"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onPrev();
-                }}
-                onPointerDown={stop}
-                onPointerUp={stop}
-              >
-                &lt;
-              </button>
-              <button
-                type="button"
-                className="clouds-matrix-control clouds-axis-button clouds-axis-button-next"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onNext();
-                }}
-                onPointerDown={stop}
-                onPointerUp={stop}
-              >
-                &gt;
-              </button>
-            </nav>
+            <ParticleButton
+              label="<"
+              rgb={[42, 95, 192]}
+              isMobile={isMobile}
+              scatterDir="left"
+              onClick={onPrev}
+              stopEvent={stop}
+            />
           )}
-          <a
+          <ParticleButton
+            label="VISIT"
+            rgb={[200, 120, 32]}
+            isMobile={isMobile}
+            scatterDir="up"
             href={project.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="clouds-project-link"
-            onPointerDown={stop}
-            onPointerUp={stop}
-            onClick={stop}
-          >
-            VISIT
-          </a>
-          <button
-            type="button"
-            className="clouds-matrix-control clouds-project-close"
-            onClick={(event) => {
-              event.stopPropagation();
-              onClose();
-            }}
-            onPointerDown={stop}
-            onPointerUp={stop}
-          >
-            ×
-          </button>
+            stopEvent={stop}
+          />
+          {carouselOpen && (
+            <ParticleButton
+              label=">"
+              rgb={[36, 153, 88]}
+              isMobile={isMobile}
+              scatterDir="right"
+              onClick={onNext}
+              stopEvent={stop}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -1131,7 +1282,6 @@ export default function CloudsPage() {
         project={PROJECTS[activeProject]}
         carouselOpen={carouselOpen}
         isMobile={isMobileLayout}
-        onClose={() => setShowProject(false)}
         onPrev={selectPrev}
         onNext={selectNext}
       />

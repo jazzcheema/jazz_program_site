@@ -82,64 +82,7 @@ canvas {
 }
 
 .clouds-matrix-info::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  transition:
-    opacity 160ms ease,
-    background-position 160ms steps(2, end),
-    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    filter 180ms ease;
-  background-position:
-    left top,
-    left bottom,
-    left top,
-    right top;
-  background:
-    radial-gradient(circle, var(--matrix-frame-dot) 1px, transparent 1.5px)
-      left top / 10px 2px repeat-x,
-    radial-gradient(circle, rgba(200, 200, 200, 0.22) 1px, transparent 1.5px)
-      left bottom / 10px 2px repeat-x,
-    radial-gradient(circle, rgba(200, 200, 200, 0.24) 1px, transparent 1.5px)
-      left top / 2px 10px repeat-y,
-    radial-gradient(circle, rgba(200, 200, 200, 0.24) 1px, transparent 1.5px)
-      right top / 2px 10px repeat-y;
-}
-
-.clouds-matrix-info:hover::before,
-.clouds-matrix-info:focus-within::before {
-  --matrix-frame-dot: rgba(200, 200, 200, 0.48);
-  animation: clouds-frame-distort 560ms steps(2, end) infinite;
-  filter: brightness(1.16);
-  transform: translate3d(3px, -2px, 0) skewX(-1.2deg);
-  background-position:
-    6px -1px,
-    -4px 100%,
-    1px 5px,
-    100% -4px;
-}
-
-@keyframes clouds-frame-distort {
-  0%,
-  100% {
-    transform: translate3d(3px, -2px, 0) skewX(-1.2deg);
-    background-position:
-      6px -1px,
-      -4px 100%,
-      1px 5px,
-      100% -4px;
-  }
-
-  50% {
-    transform: translate3d(-2px, 2px, 0) skewX(1deg);
-    background-position:
-      -3px 2px,
-      5px calc(100% - 2px),
-      -1px -4px,
-      calc(100% - 2px) 5px;
-  }
+  content: none;
 }
 
 .clouds-matrix-field {
@@ -209,6 +152,35 @@ canvas {
     0 1px 2px rgba(0, 0, 0, 0.95);
 }
 
+.clouds-particle-controls {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: stretch;
+  gap: clamp(0.25rem, 0.6vw, 0.4rem);
+  width: 100%;
+  height: clamp(52px, 7.5vw, 72px);
+  margin-top: clamp(0.78rem, 1.2vw, 1rem);
+  pointer-events: auto;
+}
+
+.clouds-particle-btn {
+  flex: 1;
+  display: block;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  text-decoration: none;
+}
+
+/* VISIT gets more horizontal room so its 5-char label can be bigger */
+.clouds-particle-btn:nth-child(2):not(:only-child),
+a.clouds-particle-btn {
+  flex: 2;
+}
+
 .clouds-matrix-controls {
   position: relative;
   z-index: 3;
@@ -245,23 +217,7 @@ canvas {
 
 .clouds-matrix-control::before,
 .clouds-project-link::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(circle, var(--control-dot) 1px, transparent 1.5px)
-      left top / 8px 2px repeat-x,
-    radial-gradient(circle, var(--control-dot) 1px, transparent 1.5px)
-      left bottom / 8px 2px repeat-x,
-    radial-gradient(circle, var(--control-dot) 1px, transparent 1.5px)
-      left top / 2px 8px repeat-y,
-    radial-gradient(circle, var(--control-dot) 1px, transparent 1.5px)
-      right top / 2px 8px repeat-y;
-  transition:
-    filter 140ms ease,
-    opacity 140ms ease,
-    transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  content: none;
 }
 
 .clouds-matrix-control:hover,
