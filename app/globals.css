@@ -978,7 +978,7 @@ canvas {
 
 @media (max-width: 767px) {
   .clouds-matrix-stage {
-    height: clamp(7.2rem, 32vw, 9.5rem);
+    height: clamp(8.8rem, 38vw, 11rem);
   }
 
   .clouds-matrix-info {
@@ -998,6 +998,27 @@ canvas {
   .clouds-axis-button,
   .clouds-project-link {
     font-size: 0.56rem;
+  }
+
+  .clouds-matrix-controls {
+    gap: 0.5rem;
+  }
+
+  .clouds-matrix-controls nav {
+    gap: 0.5rem;
+  }
+
+  .clouds-matrix-control {
+    width: 3rem;
+    min-width: 3rem;
+    height: 2.25rem;
+    padding: 0;
+  }
+
+  .clouds-project-link {
+    width: 5.5rem;
+    min-height: 2.25rem;
+    padding: 0;
   }
 }
 

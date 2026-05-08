@@ -126,7 +126,7 @@ function DotMatrixProjectSignal({
     let ghosts: MatrixGhost[] = [];
     let raf = 0;
     let tick = 0;
-    const signalRgb = hexToRgb(activeSignal);
+    const signalRgb = isMobile && activeSignal === "#808080" ? hexToRgb("#c8c8c8") : hexToRgb(activeSignal);
 
     const buildDots = () => {
       const rect = canvas.getBoundingClientRect();
@@ -148,19 +148,19 @@ function DotMatrixProjectSignal({
       offCtx.textBaseline = "top";
 
       const title = `→ ${displayLabel}`;
-      let titleSize = isMobile ? 32 : 68;
+      let titleSize = isMobile ? 40 : 68;
       offCtx.font = `700 ${titleSize}px monospace`;
-      while (offCtx.measureText(title).width > cssW - 18 && titleSize > (isMobile ? 20 : 38)) {
+      while (offCtx.measureText(title).width > cssW - 18 && titleSize > (isMobile ? 26 : 38)) {
         titleSize -= 2;
         offCtx.font = `700 ${titleSize}px monospace`;
       }
 
-      const startY = isMobile ? 18 : 36;
+      const startY = isMobile ? 12 : 36;
       offCtx.font = `700 ${titleSize}px monospace`;
       offCtx.fillText(title, 0, startY);
 
       const image = offCtx.getImageData(0, 0, cssW, cssH);
-      const step = isMobile ? 5 : 7;
+      const step = isMobile ? 4 : 7;
       const next: MatrixDot[] = [];
       let minX = cssW;
       let minY = cssH;
@@ -182,7 +182,7 @@ function DotMatrixProjectSignal({
             ty: y,
             vx: 0,
             vy: 0,
-            size: isMobile ? 4.4 : 6,
+            size: isMobile ? 5.2 : 6,
             phase: Math.random() * Math.PI * 2,
             rgb: signalRgb,
           });
@@ -267,7 +267,7 @@ function DotMatrixProjectSignal({
         dot.vy *= 0.78;
         dot.x += dot.vx;
         dot.y += dot.vy;
-        drawDot(dot.x, dot.y, dot.size, dot.rgb, 0.88);
+        drawDot(dot.x, dot.y, dot.size, dot.rgb, isMobile ? 0.96 : 0.88);
       });
 
       if (tick % 5 === 0 && dots.length > 0) {
