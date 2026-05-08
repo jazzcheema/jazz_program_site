@@ -81,6 +81,376 @@ const PROJECTS: ProjectData[] = [
   },
 ];
 
+type MatrixDot = {
+  x: number;
+  y: number;
+  tx: number;
+  ty: number;
+  vx: number;
+  vy: number;
+  size: number;
+  phase: number;
+  rgb: [number, number, number];
+};
+
+type MatrixGhost = { pts: Float32Array; alpha: number };
+
+const hexToRgb = (hex: string): [number, number, number] => {
+  const normalized = hex.replace("#", "");
+  return [
+    Number.parseInt(normalized.slice(0, 2), 16),
+    Number.parseInt(normalized.slice(2, 4), 16),
+    Number.parseInt(normalized.slice(4, 6), 16),
+  ];
+};
+
+function DotMatrixProjectSignal({
+  activeSignal,
+  displayLabel,
+  isMobile,
+}: {
+  activeSignal: string;
+  displayLabel: string;
+  isMobile: boolean;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const pointerRef = useRef({ x: 0.5, y: 0.5, active: false });
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let dots: MatrixDot[] = [];
+    let ghosts: MatrixGhost[] = [];
+    let raf = 0;
+    let tick = 0;
+    const signalRgb = hexToRgb(activeSignal);
+
+    const buildDots = () => {
+      const rect = canvas.getBoundingClientRect();
+      const cssW = Math.max(1, Math.floor(rect.width));
+      const cssH = Math.max(1, Math.floor(rect.height));
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = cssW * dpr;
+      canvas.height = cssH * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const off = document.createElement("canvas");
+      off.width = cssW;
+      off.height = cssH;
+      const offCtx = off.getContext("2d");
+      if (!offCtx) return;
+
+      offCtx.clearRect(0, 0, cssW, cssH);
+      offCtx.fillStyle = "#fff";
+      offCtx.textBaseline = "top";
+
+      const title = `→ ${displayLabel}`;
+      let titleSize = isMobile ? 32 : 68;
+      offCtx.font = `700 ${titleSize}px monospace`;
+      while (offCtx.measureText(title).width > cssW - 18 && titleSize > (isMobile ? 20 : 38)) {
+        titleSize -= 2;
+        offCtx.font = `700 ${titleSize}px monospace`;
+      }
+
+      const startY = isMobile ? 18 : 36;
+      offCtx.font = `700 ${titleSize}px monospace`;
+      offCtx.fillText(title, 0, startY);
+
+      const image = offCtx.getImageData(0, 0, cssW, cssH);
+      const step = isMobile ? 5 : 7;
+      const next: MatrixDot[] = [];
+      let minX = cssW;
+      let minY = cssH;
+      let maxX = 0;
+      let maxY = 0;
+
+      for (let y = 0; y < cssH; y += step) {
+        for (let x = 0; x < cssW; x += step) {
+          const alpha = image.data[(y * cssW + x) * 4 + 3];
+          if (alpha < 80) continue;
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+          next.push({
+            x: x + (Math.random() - 0.5) * cssW * 0.12,
+            y: y + (Math.random() - 0.5) * cssH * 0.18,
+            tx: x,
+            ty: y,
+            vx: 0,
+            vy: 0,
+            size: isMobile ? 4.4 : 6,
+            phase: Math.random() * Math.PI * 2,
+            rgb: signalRgb,
+          });
+        }
+      }
+
+      const textW = Math.max(1, maxX - minX);
+      const textH = Math.max(1, maxY - minY);
+      const offsetX = (cssW - textW) * 0.5 - minX;
+      const offsetY = (cssH - textH) * 0.5 - minY;
+      next.forEach((dot) => {
+        dot.tx += offsetX;
+        dot.ty += offsetY;
+        dot.x += offsetX;
+        dot.y += offsetY;
+      });
+
+      dots = next;
+      ghosts = [];
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      pointerRef.current = {
+        x: Math.min(1, Math.max(0, (event.clientX - rect.left) / Math.max(rect.width, 1))),
+        y: Math.min(1, Math.max(0, (event.clientY - rect.top) / Math.max(rect.height, 1))),
+        active: true,
+      };
+    };
+
+    const onPointerLeave = () => {
+      pointerRef.current = { x: 0.5, y: 0.5, active: false };
+    };
+
+    const drawDot = (x: number, y: number, size: number, rgb: [number, number, number], alpha: number) => {
+      ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha})`;
+      ctx.fillRect(x - size * 0.5, y - size * 0.5, size, size);
+    };
+
+    const animate = () => {
+      raf = requestAnimationFrame(animate);
+      tick += 1;
+      const rect = canvas.getBoundingClientRect();
+      const cssW = Math.max(1, rect.width);
+      const cssH = Math.max(1, rect.height);
+      ctx.clearRect(0, 0, cssW, cssH);
+
+      ghosts.forEach((ghost) => {
+        for (let i = 0; i < dots.length && i * 2 + 1 < ghost.pts.length; i++) {
+          drawDot(ghost.pts[i * 2], ghost.pts[i * 2 + 1], dots[i].size, dots[i].rgb, ghost.alpha);
+        }
+        ghost.alpha *= 0.86;
+      });
+      ghosts = ghosts.filter((ghost) => ghost.alpha > 0.025);
+
+      const pointer = pointerRef.current;
+      const driftX = (pointer.x - 0.5) * (isMobile ? 10 : 28);
+      const driftY = (pointer.y - 0.5) * (isMobile ? 7 : 18);
+      const mouseX = pointer.x * cssW;
+      const mouseY = pointer.y * cssH;
+
+      dots.forEach((dot) => {
+        const wave = Math.sin(tick * 0.018 + dot.phase) * (isMobile ? 0.45 : 0.7);
+        let targetX = dot.tx + driftX + wave;
+        let targetY = dot.ty + driftY;
+
+        if (pointer.active) {
+          const dx = targetX - mouseX;
+          const dy = targetY - mouseY;
+          const dist = Math.hypot(dx, dy);
+          const radius = isMobile ? 62 : 86;
+          if (dist > 0.01 && dist < radius) {
+            const force = ((1 - dist / radius) ** 2) * (isMobile ? 16 : 28);
+            targetX += (dx / dist) * force;
+            targetY += (dy / dist) * force;
+          }
+        }
+
+        dot.vx += (targetX - dot.x) * 0.08;
+        dot.vy += (targetY - dot.y) * 0.08;
+        dot.vx *= 0.78;
+        dot.vy *= 0.78;
+        dot.x += dot.vx;
+        dot.y += dot.vy;
+        drawDot(dot.x, dot.y, dot.size, dot.rgb, 0.88);
+      });
+
+      if (tick % 5 === 0 && dots.length > 0) {
+        const pts = new Float32Array(dots.length * 2);
+        dots.forEach((dot, i) => {
+          pts[i * 2] = dot.x;
+          pts[i * 2 + 1] = dot.y;
+        });
+        if (ghosts.length > 8) ghosts.shift();
+        ghosts.push({ pts, alpha: 0.16 });
+      }
+    };
+
+    buildDots();
+    window.addEventListener("resize", buildDots);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerleave", onPointerLeave);
+    animate();
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", buildDots);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerleave", onPointerLeave);
+    };
+  }, [activeSignal, displayLabel, isMobile]);
+
+  return <canvas ref={canvasRef} className="clouds-matrix-canvas" aria-label={`${displayLabel} project signal`} />;
+}
+
+type MatrixFieldDot = {
+  x: number;
+  y: number;
+  tx: number;
+  ty: number;
+  vx: number;
+  vy: number;
+  phase: number;
+  size: number;
+};
+
+function DotMatrixPanelField({ isMobile }: { isMobile: boolean }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const pointerRef = useRef({ x: 0.5, y: 0.5, active: false });
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let dots: MatrixFieldDot[] = [];
+    let raf = 0;
+    let tick = 0;
+
+    const buildDots = () => {
+      const rect = canvas.getBoundingClientRect();
+      const cssW = Math.max(1, Math.floor(rect.width));
+      const cssH = Math.max(1, Math.floor(rect.height));
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = cssW * dpr;
+      canvas.height = cssH * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const step = isMobile ? 3 : 4;
+      const inset = isMobile ? 5 : 7;
+      const cols = Math.max(1, Math.floor((cssW - inset * 2) / step) + 1);
+      const rows = Math.max(1, Math.floor((cssH - inset * 2) / step) + 1);
+      const startX = (cssW - (cols - 1) * step) * 0.5;
+      const startY = (cssH - (rows - 1) * step) * 0.5;
+      const next: MatrixFieldDot[] = [];
+
+      for (let row = 0; row < rows; row += 1) {
+        for (let col = 0; col < cols; col += 1) {
+          const x = startX + col * step;
+          const y = startY + row * step;
+          next.push({
+            x,
+            y,
+            tx: x,
+            ty: y,
+            vx: 0,
+            vy: 0,
+            phase: Math.random() * Math.PI * 2,
+            size: isMobile ? 2.8 : 3.4,
+          });
+        }
+      }
+
+      dots = next;
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const inside =
+        event.clientX >= rect.left &&
+        event.clientX <= rect.right &&
+        event.clientY >= rect.top &&
+        event.clientY <= rect.bottom;
+
+      pointerRef.current = {
+        x: Math.min(1, Math.max(0, (event.clientX - rect.left) / Math.max(rect.width, 1))),
+        y: Math.min(1, Math.max(0, (event.clientY - rect.top) / Math.max(rect.height, 1))),
+        active: inside,
+      };
+    };
+
+    const drawDot = (x: number, y: number, size: number, alpha: number, lightAlpha: number) => {
+      ctx.fillStyle = `rgba(3,3,3,${alpha})`;
+      ctx.fillRect(x - size * 0.5, y - size * 0.5, size, size);
+      ctx.fillStyle = `rgba(200,200,200,${lightAlpha})`;
+      ctx.fillRect(x - 0.5, y - 0.5, 1, 1);
+    };
+
+    const animate = () => {
+      raf = requestAnimationFrame(animate);
+      tick += 1;
+
+      const rect = canvas.getBoundingClientRect();
+      const cssW = Math.max(1, rect.width);
+      const cssH = Math.max(1, rect.height);
+      ctx.clearRect(0, 0, cssW, cssH);
+      ctx.fillStyle = "rgba(0,0,0,0.24)";
+      ctx.fillRect(0, 0, cssW, cssH);
+
+      const pointer = pointerRef.current;
+      const mouseX = pointer.x * cssW;
+      const mouseY = pointer.y * cssH;
+      const driftX = pointer.active ? (pointer.x - 0.5) * (isMobile ? 8 : 16) : 0;
+      const driftY = pointer.active ? (pointer.y - 0.5) * (isMobile ? 5 : 10) : 0;
+
+      dots.forEach((dot) => {
+        const wave = Math.sin(tick * 0.03 + dot.phase) * (pointer.active ? 1.4 : 0.18);
+        let targetX = dot.tx + driftX + wave;
+        let targetY = dot.ty + driftY - wave * 0.35;
+        let proximity = 0;
+
+        if (pointer.active) {
+          const dx = targetX - mouseX;
+          const dy = targetY - mouseY;
+          const dist = Math.hypot(dx, dy);
+          const radius = isMobile ? 78 : 112;
+          if (dist > 0.01 && dist < radius) {
+            proximity = 1 - dist / radius;
+            const force = proximity ** 2 * (isMobile ? 28 : 46);
+            targetX += (dx / dist) * force;
+            targetY += (dy / dist) * force;
+          }
+        }
+
+        dot.vx += (targetX - dot.x) * 0.09;
+        dot.vy += (targetY - dot.y) * 0.09;
+        dot.vx *= 0.76;
+        dot.vy *= 0.76;
+        dot.x += dot.vx;
+        dot.y += dot.vy;
+
+        drawDot(
+          dot.x,
+          dot.y,
+          dot.size + proximity * 1.35,
+          pointer.active ? 0.66 + proximity * 0.18 : 0.58,
+          pointer.active ? 0.13 + proximity * 0.16 : 0.1,
+        );
+      });
+    };
+
+    buildDots();
+    const observer = new ResizeObserver(buildDots);
+    observer.observe(canvas);
+    window.addEventListener("pointermove", onPointerMove);
+    animate();
+
+    return () => {
+      cancelAnimationFrame(raf);
+      observer.disconnect();
+      window.removeEventListener("pointermove", onPointerMove);
+    };
+  }, [isMobile]);
+
+  return <canvas ref={canvasRef} className="clouds-matrix-field" aria-hidden="true" />;
+}
+
 function ProjectCard({
   visible,
   project,
@@ -100,387 +470,98 @@ function ProjectCard({
 }) {
   if (!visible) return null;
 
-  const scanBars =
-    project.id === "episode"
-      ? [88, 72, 41, 66, 24]
-      : project.id === "krate"
-        ? [96, 82, 75, 70, 44]
-        : [78, 63, 57, 38, 21];
   const activeSignal =
     project.id === "episode"
       ? "#c87820"
       : project.id === "krate"
         ? "#249958"
         : "#808080";
-  const projectIndex = PROJECTS.findIndex(({ id }) => id === project.id) + 1;
+  const displayLabel = project.label
+    .replace(".VERCEL.APP", "")
+    .replace(".COM", "");
 
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();
 
   const outerStyle: React.CSSProperties = isMobile
     ? {
         position: "fixed",
-        bottom: 12,
-        left: 10,
-        right: 10,
+        bottom: 18,
+        left: 14,
+        right: 14,
         zIndex: 30,
         width: "auto",
         pointerEvents: "auto",
         fontFamily: "var(--font-geist-mono), monospace",
-        scrollbarWidth: "none",
       }
     : {
         position: "fixed",
-        top: carouselOpen ? "max(76px, 10dvh)" : "max(82px, 12dvh)",
-        right: "clamp(14px, 5vw, 76px)",
+        top: carouselOpen ? "max(102px, 15dvh)" : "max(110px, 16dvh)",
+        right: "clamp(28px, 7vw, 128px)",
         zIndex: 30,
-        width: "min(430px, calc(100vw - 28px))",
-        maxHeight: carouselOpen
-          ? "min(680px, calc(100dvh - 116px))"
-          : "min(620px, calc(100dvh - 132px))",
-        overflowY: "auto",
+        width: "min(620px, calc(100vw - 56px))",
         pointerEvents: "none",
         fontFamily: "var(--font-geist-mono), monospace",
-        scrollbarWidth: "none",
       };
 
   return (
     <div
       key={project.id}
+      className="clouds-matrix-shell"
       style={{
         ...outerStyle,
-        animation: `project-card-enter 540ms cubic-bezier(0.16, 1, 0.3, 1) both`,
+        animation: "project-card-enter 680ms cubic-bezier(0.16, 1, 0.3, 1) both",
       }}
     >
-      {!isMobile && (
-        <>
-          <div
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              inset: 10,
-              transform: "translate3d(14px, 12px, 0)",
-              border: "1px solid rgba(128, 128, 128, 0.06)",
-              borderRadius: 14,
-              background: "rgba(10, 10, 10, 0.18)",
-              pointerEvents: "none",
-            }}
-          />
-          <div
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              inset: 5,
-              transform: "translate3d(7px, 6px, 0)",
-              border: "1px solid rgba(255, 255, 255, 0.06)",
-              borderRadius: 13,
-              background: "rgba(10, 10, 10, 0.14)",
-              backdropFilter: "blur(8px)",
-              WebkitBackdropFilter: "blur(8px)",
-              pointerEvents: "none",
-            }}
-          />
-        </>
-      )}
-      <div
-        style={{
-          position: "relative",
-          pointerEvents: "auto",
-          overflow: "hidden",
-          border: "1px solid rgba(255, 255, 255, 0.09)",
-          background: isMobile
-            ? "rgba(8, 10, 16, 0.82)"
-            : "rgba(8, 10, 16, 0.62)",
-          backdropFilter: isMobile
-            ? "blur(28px) saturate(160%)"
-            : "blur(40px) saturate(180%)",
-          WebkitBackdropFilter: isMobile
-            ? "blur(28px) saturate(160%)"
-            : "blur(40px) saturate(180%)",
-          color: "#808080",
-          borderRadius: isMobile ? 12 : 12,
-          boxShadow: isMobile
-            ? "0 18px 60px rgba(0,0,0,0.52)"
-            : "0 8px 48px rgba(0,0,0,0.56), 0 1px 0 rgba(255,255,255,0.09) inset",
-        }}
-      >
-        <header
-          style={{
-            position: "relative",
-            padding: isMobile ? "9px 10px 8px" : "13px 14px 11px",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-          }}
-        >
-          <div style={{ paddingRight: isMobile ? 62 : 78 }}>
-            <div
-              style={{
-                marginBottom: 6,
-                color: "#303030",
-                fontSize: "0.55rem",
-                fontWeight: 700,
-                letterSpacing: 0,
-              }}
-            >
-              PROJECT_DATA.SYS -------- AXIS:
-              {String(projectIndex).padStart(2, "0")} / VER.02.01.14
-            </div>
-            <h2
-              style={{
-                margin: 0,
-                color: "#c8c8c8",
-                fontSize: isMobile ? "0.72rem" : "0.86rem",
-                fontWeight: 800,
-                letterSpacing: "0.08em",
-                lineHeight: 1.2,
-              }}
-            >
-              → {project.label}
-            </h2>
-            <div
-              style={{
-                marginTop: 4,
-                color: "#303030",
-                fontSize: "0.6rem",
-                letterSpacing: "0.06em",
-              }}
-            >
-              CLASS: {project.className}
-            </div>
-          </div>
-          <button
-            type="button"
-            className="clouds-project-close"
-            onClick={(event) => {
-              event.stopPropagation();
-              onClose();
-            }}
-            onPointerDown={stop}
-            onPointerUp={stop}
-            style={{
-              position: "absolute",
-              top: isMobile ? 8 : 11,
-              right: isMobile ? 9 : 12,
-              fontSize: isMobile ? "0.52rem" : "0.58rem",
-              cursor: "pointer",
-              border: 0,
-              background: "transparent",
-              fontFamily: "var(--font-geist-mono), monospace",
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-            }}
-          >
-            [×] close
-          </button>
-        </header>
+      <div className="clouds-matrix-stage">
+        <DotMatrixProjectSignal
+          activeSignal={activeSignal}
+          displayLabel={displayLabel}
+          isMobile={isMobile}
+        />
+      </div>
 
-        <section
-          style={{
-            padding: isMobile ? "7px 10px" : "10px 14px",
-
-            borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
-          }}
-        >
-          {!isMobile && (
-            <div
-              style={{
-                color: "#303030",
-                fontSize: "0.58rem",
-                letterSpacing: "0.06em",
-                marginBottom: 6,
-              }}
-            >
-              MISSION_BRIEF --------------------------------
-            </div>
+      <div className="clouds-matrix-info">
+        <DotMatrixPanelField isMobile={isMobile} />
+        <p className="clouds-matrix-caption">{project.description}</p>
+        <div className="clouds-matrix-meta" aria-label="Project details">
+          <span className="clouds-matrix-meta-row">
+            <span className="clouds-matrix-meta-key">STACK</span>
+            <span className="clouds-matrix-meta-value">{project.stack}</span>
+          </span>
+          <span className="clouds-matrix-meta-row">
+            <span className="clouds-matrix-meta-key">TYPE</span>
+            <span className="clouds-matrix-meta-value">{project.type}</span>
+          </span>
+        </div>
+        <div className="clouds-matrix-controls">
+          {carouselOpen && (
+            <nav>
+              <button
+                type="button"
+                className="clouds-matrix-control clouds-axis-button clouds-axis-button-prev"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onPrev();
+                }}
+                onPointerDown={stop}
+                onPointerUp={stop}
+              >
+                &lt;
+              </button>
+              <button
+                type="button"
+                className="clouds-matrix-control clouds-axis-button clouds-axis-button-next"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onNext();
+                }}
+                onPointerDown={stop}
+                onPointerUp={stop}
+              >
+                &gt;
+              </button>
+            </nav>
           )}
-
-          <p
-            style={{
-              margin: 0,
-
-              color: "#808080",
-
-              fontSize: isMobile ? "0.58rem" : "0.66rem",
-
-              lineHeight: isMobile ? 1.42 : 1.65,
-
-              display: isMobile ? "-webkit-box" : undefined,
-
-              WebkitLineClamp: isMobile ? 3 : undefined,
-
-              WebkitBoxOrient: isMobile ? "vertical" : undefined,
-
-              overflow: isMobile ? "hidden" : undefined,
-            }}
-          >
-            {project.description}
-          </p>
-        </section>
-
-        <section
-          style={{
-            padding: isMobile ? "6px 10px 7px" : "8px 14px 10px",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
-          }}
-        >
-          {(
-            [
-              ["STACK", project.stack],
-              ...(isMobile ? [] : [["TYPE", project.type] as [string, string]]),
-              ["STATUS", project.status],
-            ] as [string, string][]
-          ).map(([k, v]) => (
-            <div
-              key={k}
-              style={{
-                display: "grid",
-                gridTemplateColumns: isMobile
-                  ? "44px minmax(0, 1fr)"
-                  : "54px minmax(0, 1fr)",
-                gap: isMobile ? 7 : 10,
-                padding: isMobile ? "3px 0" : "5px 0",
-                borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
-              }}
-            >
-              <span
-                style={{
-                  color: "#303030",
-                  fontSize: isMobile ? "0.5rem" : "0.58rem",
-                  letterSpacing: "0.04em",
-                }}
-              >
-                {k}
-              </span>
-              <span
-                style={{
-                  color: "#808080",
-                  fontSize: isMobile ? "0.52rem" : "0.6rem",
-                  lineHeight: 1.35,
-                  whiteSpace: isMobile ? "nowrap" : undefined,
-                  overflow: isMobile ? "hidden" : undefined,
-                  textOverflow: isMobile ? "ellipsis" : undefined,
-                }}
-              >
-                {v}
-              </span>
-            </div>
-          ))}
-        </section>
-
-        {!isMobile && (
-          <section
-            style={{
-              padding: "9px 14px 10px",
-              borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
-            }}
-          >
-            <div
-              style={{
-                color: "#303030",
-                fontSize: "0.58rem",
-                letterSpacing: "0.06em",
-                marginBottom: 8,
-              }}
-            >
-              SIGNAL_SCAN / MHz ----------------------------
-            </div>
-            <div style={{ display: "grid", gap: 5 }}>
-              {scanBars.map((pct, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "30px minmax(0, 1fr) 26px",
-                    gap: 7,
-                    alignItems: "center",
-                    color: "#303030",
-                    fontSize: "0.56rem",
-                  }}
-                >
-                  <span>{String(i + 1).padStart(2, "0")}</span>
-                  <span
-                    style={{
-                      height: 7,
-                      background: "#141414",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <i
-                      style={{
-                        display: "block",
-                        width: `${pct}%`,
-                        height: "100%",
-                        background: i === 0 ? activeSignal : "#3a3a3a",
-                      }}
-                    />
-                  </span>
-                  <span style={{ textAlign: "right" }}>{pct}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {carouselOpen && (
-          <nav
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
-            }}
-          >
-            <button
-              type="button"
-              className="clouds-axis-button clouds-axis-button-prev"
-              onClick={(event) => {
-                event.stopPropagation();
-                onPrev();
-              }}
-              onPointerDown={stop}
-              onPointerUp={stop}
-              style={{
-                cursor: "pointer",
-                border: 0,
-                borderRight: "1px solid rgba(255, 255, 255, 0.06)",
-                background: "transparent",
-                fontFamily: "var(--font-geist-mono), monospace",
-                minHeight: isMobile ? 30 : 36,
-                fontSize: isMobile ? "0.54rem" : "0.62rem",
-                letterSpacing: "0.08em",
-                pointerEvents: "auto",
-              }}
-            >
-              ← PREV_AXIS
-            </button>
-            <button
-              type="button"
-              className="clouds-axis-button clouds-axis-button-next"
-              onClick={(event) => {
-                event.stopPropagation();
-                onNext();
-              }}
-              onPointerDown={stop}
-              onPointerUp={stop}
-              style={{
-                cursor: "pointer",
-                border: 0,
-                background: "transparent",
-                fontFamily: "var(--font-geist-mono), monospace",
-                minHeight: isMobile ? 30 : 36,
-                fontSize: isMobile ? "0.54rem" : "0.62rem",
-                letterSpacing: "0.08em",
-                pointerEvents: "auto",
-              }}
-            >
-              NEXT_AXIS →
-            </button>
-          </nav>
-        )}
-
-        <div
-          style={{
-            padding: "10px 14px",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
-          }}
-        >
           <a
             href={project.href}
             target="_blank"
@@ -489,40 +570,22 @@ function ProjectCard({
             onPointerDown={stop}
             onPointerUp={stop}
             onClick={stop}
-            style={{
-              display: "flex",
-              minHeight: 38,
-              alignItems: "center",
-              justifyContent: "space-between",
-              width: "100%",
-              padding: "0 10px",
-              border: "1px solid rgba(128, 128, 128, 0.28)",
-              color: "#909090",
-              fontSize: "0.64rem",
-              letterSpacing: "0.1em",
-              textDecoration: "none",
-              pointerEvents: "auto",
-            }}
           >
-            <span>VISIT SITE</span>
-            <span>→</span>
+            VISIT
           </a>
-        </div>
-
-        {!isMobile && (
-          <div
-            style={{
-              padding: "7px 14px 9px",
-              color: "#1e1e1e",
-              fontSize: "0.48rem",
-              lineHeight: 1.45,
-              letterSpacing: "0.04em",
-              wordBreak: "break-all",
+          <button
+            type="button"
+            className="clouds-matrix-control clouds-project-close"
+            onClick={(event) => {
+              event.stopPropagation();
+              onClose();
             }}
+            onPointerDown={stop}
+            onPointerUp={stop}
           >
-            {project.finePrint}
-          </div>
-        )}
+            ×
+          </button>
+        </div>
       </div>
     </div>
   );

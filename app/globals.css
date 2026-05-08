@@ -54,16 +54,251 @@ canvas {
   left: 50%;
 }
 
+.clouds-matrix-shell {
+  transform-style: preserve-3d;
+}
+
+.clouds-matrix-stage {
+  position: relative;
+  width: 100%;
+  height: clamp(9.5rem, 19vw, 14rem);
+  pointer-events: none;
+}
+
+.clouds-matrix-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.clouds-matrix-info {
+  --matrix-frame-dot: rgba(200, 200, 200, 0.28);
+  position: relative;
+  max-width: 32rem;
+  margin: clamp(0.36rem, 0.8vw, 0.62rem) auto 0;
+  padding: clamp(0.78rem, 1.25vw, 1rem);
+  pointer-events: auto;
+  isolation: isolate;
+}
+
+.clouds-matrix-info::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  transition:
+    opacity 160ms ease,
+    background-position 160ms steps(2, end),
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 180ms ease;
+  background-position:
+    left top,
+    left bottom,
+    left top,
+    right top;
+  background:
+    radial-gradient(circle, var(--matrix-frame-dot) 1px, transparent 1.5px)
+      left top / 10px 2px repeat-x,
+    radial-gradient(circle, rgba(200, 200, 200, 0.22) 1px, transparent 1.5px)
+      left bottom / 10px 2px repeat-x,
+    radial-gradient(circle, rgba(200, 200, 200, 0.24) 1px, transparent 1.5px)
+      left top / 2px 10px repeat-y,
+    radial-gradient(circle, rgba(200, 200, 200, 0.24) 1px, transparent 1.5px)
+      right top / 2px 10px repeat-y;
+}
+
+.clouds-matrix-info:hover::before,
+.clouds-matrix-info:focus-within::before {
+  --matrix-frame-dot: rgba(200, 200, 200, 0.48);
+  animation: clouds-frame-distort 560ms steps(2, end) infinite;
+  filter: brightness(1.16);
+  transform: translate3d(3px, -2px, 0) skewX(-1.2deg);
+  background-position:
+    6px -1px,
+    -4px 100%,
+    1px 5px,
+    100% -4px;
+}
+
+@keyframes clouds-frame-distort {
+  0%,
+  100% {
+    transform: translate3d(3px, -2px, 0) skewX(-1.2deg);
+    background-position:
+      6px -1px,
+      -4px 100%,
+      1px 5px,
+      100% -4px;
+  }
+
+  50% {
+    transform: translate3d(-2px, 2px, 0) skewX(1deg);
+    background-position:
+      -3px 2px,
+      5px calc(100% - 2px),
+      -1px -4px,
+      calc(100% - 2px) 5px;
+  }
+}
+
+.clouds-matrix-field {
+  position: absolute;
+  inset: 1px;
+  z-index: 0;
+  display: block;
+  width: calc(100% - 2px);
+  height: calc(100% - 2px);
+  opacity: 1;
+  pointer-events: none;
+}
+
+.clouds-matrix-caption {
+  position: relative;
+  z-index: 3;
+  margin: 0;
+  color: rgba(236, 236, 236, 0.82);
+  font-family: var(--font-geist-mono);
+  font-size: clamp(0.58rem, 0.9vw, 0.72rem);
+  line-height: 1.55;
+  text-align: center;
+  text-wrap: balance;
+  pointer-events: none;
+  text-shadow:
+    0 0 4px #000,
+    0 0 10px #000,
+    0 0 18px rgba(0, 0, 0, 0.96),
+    0 1px 2px rgba(0, 0, 0, 0.95);
+}
+
+.clouds-matrix-meta {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  gap: 0.24rem;
+  width: min(100%, 26rem);
+  margin: clamp(0.58rem, 1vw, 0.84rem) auto 0;
+  color: rgba(200, 200, 200, 0.5);
+  font-family: var(--font-geist-mono);
+  font-size: clamp(0.48rem, 0.72vw, 0.58rem);
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+.clouds-matrix-meta-row {
+  display: grid;
+  grid-template-columns: 3.2rem minmax(0, 1fr);
+  gap: 0.62rem;
+  align-items: baseline;
+}
+
+.clouds-matrix-meta-key {
+  color: rgba(220, 220, 220, 0.54);
+  text-shadow:
+    0 0 4px #000,
+    0 1px 2px rgba(0, 0, 0, 0.95);
+}
+
+.clouds-matrix-meta-value {
+  overflow: hidden;
+  color: rgba(230, 230, 230, 0.72);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow:
+    0 0 4px #000,
+    0 1px 2px rgba(0, 0, 0, 0.95);
+}
+
+.clouds-matrix-controls {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.75rem, 1.4vw, 1.1rem);
+  margin-top: clamp(0.78rem, 1.2vw, 1rem);
+  pointer-events: auto;
+}
+
+.clouds-matrix-controls nav {
+  display: flex;
+  gap: clamp(0.42rem, 0.9vw, 0.7rem);
+}
+
+.clouds-matrix-control {
+  --control-dot: rgba(200, 200, 200, 0.34);
+  position: relative;
+  min-width: 2.1rem;
+  height: 2rem;
+  padding: 0 0.56rem;
+  border: 0;
+  background: transparent;
+  color: rgba(200, 200, 200, 0.64);
+  font-family: var(--font-geist-mono);
+  font-size: 0.86rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    transform 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.clouds-matrix-control::before,
+.clouds-project-link::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle, var(--control-dot) 1px, transparent 1.5px)
+      left top / 8px 2px repeat-x,
+    radial-gradient(circle, var(--control-dot) 1px, transparent 1.5px)
+      left bottom / 8px 2px repeat-x,
+    radial-gradient(circle, var(--control-dot) 1px, transparent 1.5px)
+      left top / 2px 8px repeat-y,
+    radial-gradient(circle, var(--control-dot) 1px, transparent 1.5px)
+      right top / 2px 8px repeat-y;
+  transition:
+    filter 140ms ease,
+    opacity 140ms ease,
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.clouds-matrix-control:hover,
+.clouds-matrix-control:focus-visible {
+  color: #c8c8c8 !important;
+  outline: none;
+}
+
 .clouds-project-link {
-  border-radius: 8px !important;
-  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  --control-dot: rgba(200, 200, 200, 0.34);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0.55rem 0.9rem;
+  color: rgba(200, 200, 200, 0.68) !important;
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  transition:
+    color 160ms ease,
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .clouds-project-link:hover,
 .clouds-project-link:focus-visible {
-  border-color: rgba(200, 200, 200, 0.72) !important;
-  color: #ffffff !important;
+  --control-dot: rgba(200, 120, 32, 0.95);
+  color: #c87820 !important;
+  transform: translateY(-1px);
   outline: none;
+}
+
+.clouds-project-link:hover::before,
+.clouds-project-link:focus-visible::before {
+  filter: brightness(1.18);
+  transform: translate3d(1px, -1px, 0);
 }
 
 .clouds-project-close {
@@ -71,10 +306,28 @@ canvas {
   transition: color 120ms ease;
 }
 
+.clouds-matrix-control.clouds-project-close {
+  --control-dot: rgba(200, 200, 200, 0.34);
+  color: rgba(200, 200, 200, 0.56);
+}
+
 .clouds-project-close:hover,
 .clouds-project-close:focus-visible {
-  color: #ff2a2a !important;
+  color: #c8c8c8 !important;
   outline: none;
+}
+
+.clouds-matrix-control.clouds-project-close:hover,
+.clouds-matrix-control.clouds-project-close:focus-visible {
+  --control-dot: rgba(255, 42, 42, 0.92);
+  color: #ff2a2a !important;
+  transform: translateY(-1px);
+}
+
+.clouds-matrix-control.clouds-project-close:hover::before,
+.clouds-matrix-control.clouds-project-close:focus-visible::before {
+  filter: brightness(1.18);
+  transform: translate3d(1px, -1px, 0);
 }
 
 .info-panel-close {
@@ -89,23 +342,45 @@ canvas {
 }
 
 .clouds-axis-button {
-  color: #808080;
-  border-radius: 8px;
-  transition: color 120ms ease, background-color 120ms ease;
+  color: rgba(200, 200, 200, 0.68);
+}
+
+.clouds-axis-button-prev {
+  --control-dot: rgba(200, 200, 200, 0.34);
+  color: rgba(200, 200, 200, 0.68);
+}
+
+.clouds-axis-button-next {
+  --control-dot: rgba(200, 200, 200, 0.34);
+  color: rgba(200, 200, 200, 0.68);
 }
 
 .clouds-axis-button-prev:hover,
 .clouds-axis-button-prev:focus-visible {
-  background-color: rgba(42, 95, 192, 0.12) !important;
+  --control-dot: rgba(42, 95, 192, 0.95);
   color: #2a5fc0 !important;
+  transform: translateX(-2px);
   outline: none;
+}
+
+.clouds-axis-button-prev:hover::before,
+.clouds-axis-button-prev:focus-visible::before {
+  filter: brightness(1.2);
+  transform: translateX(-1px);
 }
 
 .clouds-axis-button-next:hover,
 .clouds-axis-button-next:focus-visible {
-  background-color: rgba(36, 153, 88, 0.12) !important;
+  --control-dot: rgba(36, 153, 88, 0.95);
   color: #249958 !important;
+  transform: translateX(2px);
   outline: none;
+}
+
+.clouds-axis-button-next:hover::before,
+.clouds-axis-button-next:focus-visible::before {
+  filter: brightness(1.2);
+  transform: translateX(1px);
 }
 
 .sand-sky-bio {
@@ -691,13 +966,46 @@ canvas {
 @keyframes project-card-enter {
   from {
     opacity: 0;
-    transform: translateY(32px) scale(0.91);
-    filter: blur(6px);
+    transform: translate3d(28px, 18px, 0) scale(0.96);
+    filter: blur(5px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
     filter: blur(0px);
+  }
+}
+
+@media (max-width: 767px) {
+  .clouds-matrix-stage {
+    height: clamp(7.2rem, 32vw, 9.5rem);
+  }
+
+  .clouds-matrix-info {
+    padding: 0.72rem;
+  }
+
+  .clouds-matrix-caption {
+    display: -webkit-box;
+    overflow: hidden;
+    max-width: 22rem;
+    font-size: 0.58rem;
+    line-height: 1.42;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .clouds-axis-button,
+  .clouds-project-link {
+    font-size: 0.56rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clouds-matrix-control,
+  .clouds-axis-button,
+  .clouds-project-link {
+    transition: none !important;
   }
 }
 
