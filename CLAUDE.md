@@ -5,7 +5,7 @@ My programming portfolio — a 3D interactive experience built with Next.js and 
 
 ## Vision
 
-A portfolio that *feels* like a game. Navigating projects, skills, and contact through immersive 3D scenes, smooth camera transitions, and a PS-era technical interface built from darkness, low-contrast gray text, sparse instrument-color data, and quiet product-site precision.
+A portfolio that *feels* like a game. Navigating projects, skills, and contact through immersive 3D scenes, smooth camera transitions, and a PS-era technical interface built from darkness, low-contrast gray text, sparse instrument-color data, and quiet product-site precision...
 
 ## Stack
 
