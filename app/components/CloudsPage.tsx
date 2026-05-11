@@ -34,6 +34,7 @@ type ProjectData = {
   description: string;
   status: string;
   finePrint: string;
+  scaleFactor?: number;
 };
 
 const PROJECTS: ProjectData[] = [
@@ -53,7 +54,8 @@ const PROJECTS: ProjectData[] = [
   },
   {
     id: "krate",
-    model: "/models/lamp1.glb",
+    model: "/models/krate.glb",
+    scaleFactor: 0.72,
     label: "KRATE",
     className: "SOCIAL / MUSIC / MOBILE",
     href: "https://apps.apple.com/us/app/krate-rate-music/id1540002251",
@@ -945,7 +947,7 @@ export default function CloudsPage() {
         group.position.sub(box.getCenter(new THREE.Vector3()));
         const size = box.getSize(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
-        const baseRotationY = index === 1 ? Math.PI / 4 : 0;
+        const baseRotationY = index === 1 ? Math.PI / 10 : 0;
         const eyeMeshes: EyeRigMesh[] = [];
         if (project.id === "teva") {
           group.traverse((child) => {
@@ -1118,7 +1120,7 @@ export default function CloudsPage() {
 
         const targetY = Math.sin(t * 0.7 + index * 0.8) * 0.1 + mobileCardLift;
         const targetScale =
-          (responsiveModelSize() / maxDim) * (0.76 + focus * 0.28);
+          (responsiveModelSize() / maxDim) * (PROJECTS[index].scaleFactor ?? 1) * (0.76 + focus * 0.28);
 
         group.visible = visible;
         if (!visible) return;
