@@ -280,14 +280,13 @@ export default function SceneWrapper() {
 
       {/* Hint */}
       {!panelOpen && (
-        <div className="fixed bottom-5 sm:bottom-6 left-1/2 -translate-x-1/2 pointer-events-none">
+        <div className="fixed bottom-5 sm:bottom-6 left-1/2 -translate-x-1/2 pointer-events-none w-[90vw] sm:w-auto text-center">
           <div
             style={{
               color: "#484848",
               fontFamily: "var(--font-geist-mono)",
               fontSize: "clamp(0.58rem, 0.68vw, 0.68rem)",
               letterSpacing: "0.1em",
-              whiteSpace: "nowrap",
             }}
           >
             → CLICK CARPET FOR MISSION DATA → DRAG TO CLOUDS, SANDCASTLE, OR BOOKS
