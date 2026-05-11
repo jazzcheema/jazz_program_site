@@ -55,7 +55,7 @@ const PROJECTS: ProjectData[] = [
   {
     id: "krate",
     model: "/models/krate.glb",
-    scaleFactor: 0.72,
+    scaleFactor: 0.82,
     label: "KRATE",
     className: "SOCIAL / MUSIC / MOBILE",
     href: "https://apps.apple.com/us/app/krate-rate-music/id1540002251",
@@ -951,7 +951,7 @@ export default function CloudsPage() {
         group.position.sub(box.getCenter(new THREE.Vector3()));
         const size = box.getSize(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
-        const baseRotationY = index === 1 ? Math.PI / 10 : 0;
+        const baseRotationY = index === 1 ? Math.PI / 24 : 0;
         const eyeMeshes: EyeRigMesh[] = [];
         const browNodes: BrowRigNode[] = [];
         if (project.id === "teva") {
