@@ -48,7 +48,7 @@ const AWARDS = [
 
 const CREDITS = [
   { name: 'Jazz Cheema', role: 'Program & Software', detail: 'Three.js · Next.js 16 · React 19 · TypeScript · Tailwind CSS 4 · WebGL' },
-  { name: 'Kevin Netteberg', role: '3D Models', detail: 'Genie · Lamp · Carpet · Krate' },
+  { name: 'Kevin Netteberg', role: '3D Models', detail: 'Genie · Lamp · Carpet · Krate · Mobile TV' },
 ]
 
 const TECHNICAL_SKILLS = [
