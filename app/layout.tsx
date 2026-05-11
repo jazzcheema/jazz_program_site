@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import LampCorner from "./components/LampCorner";
+import BackSwipeGuard from "./components/BackSwipeGuard";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -38,6 +39,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         {children}
         <LampCorner />
+        <BackSwipeGuard />
       </body>
     </html>
   );
