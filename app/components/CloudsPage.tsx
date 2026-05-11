@@ -900,14 +900,18 @@ export default function CloudsPage() {
       baseRotation: THREE.Euler;
     };
 
+    type BrowRigNode = {
+      node: THREE.Object3D;
+      basePosition: THREE.Vector3;
+    };
+
     type ProjectObject = {
       group: THREE.Group;
       maxDim: number;
       index: number;
       baseRotationY: number;
-      eyeRig?: {
-        meshes: EyeRigMesh[];
-      };
+      eyeRig?: { meshes: EyeRigMesh[]; sensitivity: number };
+      browRig?: BrowRigNode[];
     };
 
     const projectObjects: ProjectObject[] = [];
@@ -949,15 +953,35 @@ export default function CloudsPage() {
         const maxDim = Math.max(size.x, size.y, size.z);
         const baseRotationY = index === 1 ? Math.PI / 10 : 0;
         const eyeMeshes: EyeRigMesh[] = [];
+        const browNodes: BrowRigNode[] = [];
         if (project.id === "teva") {
           group.traverse((child) => {
             if (!(child instanceof THREE.Mesh)) return;
-            const name = child.name.toLowerCase();
-            if (name === "sphere") {
+            if (child.name.toLowerCase() === "sphere") {
               eyeMeshes.push({
                 mesh: child,
                 basePosition: child.position.clone(),
                 baseRotation: child.rotation.clone(),
+              });
+            }
+          });
+        }
+        if (project.id === "krate") {
+          const eyeNodes = new Set(["l_iris", "r_iris", "l_hilite", "r_hilite"]);
+          const browNodeNames = new Set(["l_brow", "r_brow"]);
+          group.traverse((child) => {
+            if (!(child instanceof THREE.Mesh)) return;
+            if (eyeNodes.has(child.name)) {
+              eyeMeshes.push({
+                mesh: child,
+                basePosition: child.position.clone(),
+                baseRotation: child.rotation.clone(),
+              });
+            }
+            if (browNodeNames.has(child.name)) {
+              browNodes.push({
+                node: child,
+                basePosition: child.position.clone(),
               });
             }
           });
@@ -972,7 +996,8 @@ export default function CloudsPage() {
           maxDim,
           index,
           baseRotationY,
-          eyeRig: eyeMeshes.length > 0 ? { meshes: eyeMeshes } : undefined,
+          eyeRig: eyeMeshes.length > 0 ? { meshes: eyeMeshes, sensitivity: project.id === "krate" ? 3.2 : 1 } : undefined,
+          browRig: browNodes.length > 0 ? browNodes : undefined,
         };
       });
     });
@@ -1157,13 +1182,22 @@ export default function CloudsPage() {
           0.08,
         );
         if (projectObject.eyeRig) {
-          const gazeX = pointerCurrent.x * (0.008 + focus * 0.01);
-          const gazeY = pointerCurrent.y * (0.006 + focus * 0.008);
+          const s = projectObject.eyeRig.sensitivity;
+          const gazeX = pointerCurrent.x * (0.008 + focus * 0.01) * s;
+          const gazeY = pointerCurrent.y * (0.006 + focus * 0.008) * s;
           projectObject.eyeRig.meshes.forEach(({ mesh, basePosition, baseRotation }) => {
             mesh.position.x = THREE.MathUtils.lerp(mesh.position.x, basePosition.x + gazeX, 0.18);
             mesh.position.y = THREE.MathUtils.lerp(mesh.position.y, basePosition.y + gazeY, 0.18);
-            mesh.rotation.y = THREE.MathUtils.lerp(mesh.rotation.y, baseRotation.y + pointerCurrent.x * 0.045, 0.14);
-            mesh.rotation.x = THREE.MathUtils.lerp(mesh.rotation.x, baseRotation.x - pointerCurrent.y * 0.035, 0.14);
+            mesh.rotation.y = THREE.MathUtils.lerp(mesh.rotation.y, baseRotation.y + pointerCurrent.x * 0.045 * s, 0.14);
+            mesh.rotation.x = THREE.MathUtils.lerp(mesh.rotation.x, baseRotation.x - pointerCurrent.y * 0.035 * s, 0.14);
+          });
+        }
+        if (projectObject.browRig) {
+          const browX = pointerCurrent.x * (0.018 + focus * 0.022);
+          const browY = pointerCurrent.y * (0.028 + focus * 0.032);
+          projectObject.browRig.forEach(({ node, basePosition }) => {
+            node.position.x = THREE.MathUtils.lerp(node.position.x, basePosition.x + browX, 0.14);
+            node.position.y = THREE.MathUtils.lerp(node.position.y, basePosition.y + browY, 0.14);
           });
         }
         applyMaterialOpacity(group, 0.34 + focus * 0.66);
