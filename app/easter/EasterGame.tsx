@@ -518,9 +518,19 @@ export default function EasterGame() {
     if (synth) applySynthMode(synth, synthModeRef.current)
   }, [applySynthMode, resetRailSpin])
 
+  const triggerBlueMode = useCallback(() => {
+    if (!evilModeRef.current) return
+    evilModeRef.current = false
+    evilStartedAt.current = 0
+    resetRailSpin()
+    setEvilMode(false)
+    setPattern(p => p + 7)
+    const synth = synthRef.current
+    if (synth) applySynthMode(synth, synthModeRef.current)
+  }, [applySynthMode, resetRailSpin])
+
   const trackRailSpin = useCallback((clientX: number, clientY: number, eventTime: number) => {
     if (
-      evilModeRef.current ||
       phaseRef.current !== 'signal' ||
       synthModeRef.current !== 1 ||
       modeSwitchDragging.current
@@ -550,18 +560,27 @@ export default function EasterGame() {
       if (delta < -Math.PI) delta += Math.PI * 2
 
       if (now - lastRailSpinAt.current > 1500) railSpinTurns.current = 0
-      if (delta > 0.015) {
+
+      if (evilModeRef.current) {
+        if (delta < -0.015) {
+          railSpinTurns.current += Math.abs(delta) / (Math.PI * 2)
+        } else if (delta > 0.09) {
+          railSpinTurns.current = Math.max(0, railSpinTurns.current - (delta / (Math.PI * 2)) * 1.6)
+        }
+
+        if (railSpinTurns.current >= 5) triggerBlueMode()
+      } else if (delta > 0.015) {
         railSpinTurns.current += delta / (Math.PI * 2)
       } else if (delta < -0.09) {
         railSpinTurns.current = Math.max(0, railSpinTurns.current + delta / (Math.PI * 2) * 1.6)
       }
 
-      if (railSpinTurns.current >= 5) triggerEvilMode(now)
+      if (!evilModeRef.current && railSpinTurns.current >= 5) triggerEvilMode(now)
     }
 
     railSpinAngle.current = angle
     lastRailSpinAt.current = now
-  }, [resetRailSpin, triggerEvilMode])
+  }, [resetRailSpin, triggerBlueMode, triggerEvilMode])
 
   const selectSynthMode = (next: number) => {
     if (next === synthModeRef.current) return
@@ -1113,6 +1132,28 @@ export default function EasterGame() {
       ['--lab-x' as string]: '50vw',
       ['--lab-y' as string]: '50vh',
     }}>
+      <style>{`
+        @keyframes railRiddlePulse {
+          0%, 100% {
+            opacity: 0.48;
+            text-shadow: 0 0 5px rgba(211, 50, 47, 0.2);
+          }
+          50% {
+            opacity: 0.82;
+            text-shadow: 0 0 10px rgba(211, 50, 47, 0.46);
+          }
+        }
+        @keyframes railBlueRiddlePulse {
+          0%, 100% {
+            opacity: 0.48;
+            text-shadow: 0 0 5px rgba(42, 95, 192, 0.22);
+          }
+          50% {
+            opacity: 0.84;
+            text-shadow: 0 0 10px rgba(42, 95, 192, 0.5);
+          }
+        }
+      `}</style>
       <div style={{
         position: 'absolute',
         left: 'var(--lab-x)',
@@ -1264,6 +1305,40 @@ export default function EasterGame() {
               <span style={{ marginTop: 2, fontSize: 11, lineHeight: 1.1, color: mutedColor, fontFamily: mono, letterSpacing: 0 }}>
                 synth select
               </span>
+              {synthMode === 1 && !evilMode && (
+                <span style={{
+                  marginTop: 6,
+                  maxWidth: 150,
+                  color: EVIL_RED,
+                  fontFamily: mono,
+                  fontSize: 10,
+                  lineHeight: 1.15,
+                  letterSpacing: 0,
+                  opacity: 0.72,
+                  textAlign: 'right',
+                  textShadow: '0 0 7px rgba(211, 50, 47, 0.32)',
+                  animation: 'railRiddlePulse 2.8s ease-in-out infinite',
+                }}>
+                  five clockwise sparks open the red room
+                </span>
+              )}
+              {synthMode === 1 && evilMode && (
+                <span style={{
+                  marginTop: 6,
+                  maxWidth: 150,
+                  color: BLUE,
+                  fontFamily: mono,
+                  fontSize: 10,
+                  lineHeight: 1.15,
+                  letterSpacing: 0,
+                  opacity: 0.72,
+                  textAlign: 'right',
+                  textShadow: '0 0 7px rgba(42, 95, 192, 0.34)',
+                  animation: 'railBlueRiddlePulse 2.8s ease-in-out infinite',
+                }}>
+                  five counterclockwise sparks return the blue room
+                </span>
+              )}
             </>
           )}
         </div>
