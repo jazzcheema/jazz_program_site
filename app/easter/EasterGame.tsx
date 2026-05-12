@@ -403,7 +403,7 @@ export default function EasterGame() {
         }
 
         ctx.fillStyle = evilModeRef.current
-          ? `rgba(244, 240, 234, ${dot.alpha * 0.9})`
+          ? `rgba(211, 50, 47, ${dot.alpha})`
           : `rgba(42, 95, 192, ${dot.alpha})`
         ctx.fillRect(dot.x - dot.size / 2, dot.y - dot.size / 2, dot.size, dot.size)
       }
@@ -418,18 +418,22 @@ export default function EasterGame() {
     }
   }, [])
 
-  const applySynthMode = (synth: SynthGraph, nextMode: number) => {
+  const applySynthMode = useCallback((synth: SynthGraph, nextMode: number) => {
     const mode = SYNTH_MODES[nextMode]
     const now = synth.ctx.currentTime
-    synth.oscA.type = mode.oscA
-    synth.oscB.type = mode.oscB
-    synth.filter.type = mode.filter
+    const evilOscA: OscillatorType[] = ['sawtooth', 'square', 'sawtooth']
+    const evilOscB: OscillatorType[] = ['square', 'sawtooth', 'sine']
+    const evilFilter: BiquadFilterType[] = ['bandpass', 'bandpass', 'highpass']
+
+    synth.oscA.type = evilModeRef.current ? evilOscA[nextMode] : mode.oscA
+    synth.oscB.type = evilModeRef.current ? evilOscB[nextMode] : mode.oscB
+    synth.filter.type = evilModeRef.current ? evilFilter[nextMode] : mode.filter
     synth.filter.frequency.cancelScheduledValues(now)
     synth.filter.Q.cancelScheduledValues(now)
-    synth.shaper.curve = makeDistortionCurve(nextMode === 1 ? 28 : 0)
-    synth.filter.frequency.setTargetAtTime(mode.filter === 'highpass' ? 820 : 520, now, 0.035)
-    synth.filter.Q.setTargetAtTime(1.4 + mode.resonance * 1.2, now, 0.035)
-  }
+    synth.shaper.curve = makeDistortionCurve(evilModeRef.current ? 120 + nextMode * 38 : nextMode === 1 ? 28 : 0)
+    synth.filter.frequency.setTargetAtTime(evilModeRef.current ? 180 + nextMode * 110 : mode.filter === 'highpass' ? 820 : 520, now, 0.035)
+    synth.filter.Q.setTargetAtTime(evilModeRef.current ? 7 + nextMode * 2.5 : 1.4 + mode.resonance * 1.2, now, 0.035)
+  }, [])
 
   const markAudioReady = (ctx: AudioContext) => {
     if (ctx.state === 'running') {
@@ -510,7 +514,9 @@ export default function EasterGame() {
     resetRailSpin()
     setEvilMode(true)
     setPattern(p => p + 13)
-  }, [resetRailSpin])
+    const synth = synthRef.current
+    if (synth) applySynthMode(synth, synthModeRef.current)
+  }, [applySynthMode, resetRailSpin])
 
   const trackRailSpin = useCallback((clientX: number, clientY: number, eventTime: number) => {
     if (
@@ -591,17 +597,19 @@ export default function EasterGame() {
 
       if (evilModeRef.current) {
         const snarl = Math.sin(now * (9 + collision * 18) + patternRef.current)
-        const midi = 23 + railStep * 2 - rowStep * 3 + Math.round(snarl * (2 + collision * 5))
+        const bite = Math.sin(now * (29 + breakup * 42) + railStep * 0.8)
+        const midi = 20 + railStep * 2 - rowStep * 4 + Math.round(snarl * (3 + collision * 6))
         const base = 440 * 2 ** ((midi - 69) / 12)
-        const split = 0.5 + Math.sin(now * 3.7 + vx * 5) * 0.035
-        const gain = (0.04 + energy * 0.055 + collision * 0.15 + center * 0.04) * (snarl > -0.42 ? 1 : 0.24)
+        const split = 0.48 + Math.sin(now * 3.7 + vx * 5) * 0.045
+        const gate = snarl > -0.42 || bite > 0.72 ? 1 : 0.18
+        const gain = (0.045 + energy * 0.06 + collision * 0.16 + center * 0.045) * gate
 
-        synth.shaper.curve = makeDistortionCurve(140 + breakup * 230 + collision * 260)
-        synth.oscA.frequency.setTargetAtTime(base * (0.68 + collision * 0.18), now, 0.018)
-        synth.oscB.frequency.setTargetAtTime(base * split * (1.41 + breakup * 0.2), now, 0.022)
-        synth.oscB.detune.setTargetAtTime(-42 + railStep * 14 + snarl * 38, now, 0.018)
-        synth.filter.frequency.setTargetAtTime(130 + center * 360 + collision * 1200 + energy * 420, now, 0.018)
-        synth.filter.Q.setTargetAtTime(6 + breakup * 18 + collision * 14, now, 0.02)
+        synth.shaper.curve = makeDistortionCurve(180 + breakup * 260 + collision * 310)
+        synth.oscA.frequency.setTargetAtTime(base * (0.62 + collision * 0.22), now, 0.014)
+        synth.oscB.frequency.setTargetAtTime(base * split * (1.33 + breakup * 0.24), now, 0.016)
+        synth.oscB.detune.setTargetAtTime(-68 + railStep * 16 + snarl * 46 + bite * 22, now, 0.014)
+        synth.filter.frequency.setTargetAtTime(90 + center * 320 + collision * 1350 + energy * 460, now, 0.014)
+        synth.filter.Q.setTargetAtTime(8 + breakup * 22 + collision * 16, now, 0.016)
         synth.master.gain.setTargetAtTime(gain, now, 0.018)
         return
       }
@@ -626,6 +634,25 @@ export default function EasterGame() {
 
     if (synthModeRef.current === 2) {
       const sweep = Math.sin((vx - 0.5) * Math.PI)
+
+      if (evilModeRef.current) {
+        const shard = Math.sin(now * (4.5 + energy * 8) + vx * 9 - vy * 6)
+        const ratchet = Math.round(Math.max(0, Math.sin(now * (11 + collision * 22) + patternRef.current)) * 7)
+        const midi = 18 + Math.round((1 - vy) * 13) + ratchet - Math.round(vx * 5)
+        const base = 440 * 2 ** ((midi - 69) / 12)
+        const choke = collision > 0.22 ? 0.42 : 1
+        const gain = (0.035 + energy * 0.06 + collision * 0.17) * (shard > -0.72 ? 1 : 0.26)
+
+        synth.shaper.curve = makeDistortionCurve(110 + energy * 190 + collision * 300)
+        synth.oscA.frequency.setTargetAtTime(base * (0.72 + shard * 0.035), now, 0.045)
+        synth.oscB.frequency.setTargetAtTime(base * (2.02 + sweep * 0.34) * choke, now, 0.038)
+        synth.oscB.detune.setTargetAtTime(-120 + vx * 90 - collision * 70 + shard * 26, now, 0.034)
+        synth.filter.frequency.setTargetAtTime(420 + Math.abs(sweep) * 1200 + collision * 1800 + energy * 900, now, 0.036)
+        synth.filter.Q.setTargetAtTime(9 + energy * 8 + collision * 13, now, 0.04)
+        synth.master.gain.setTargetAtTime(gain, now, 0.048)
+        return
+      }
+
       const midi = 26 + Math.round((1 - vy) * 10) + (patternRef.current % 3) * 2
       const base = 440 * 2 ** ((midi - 69) / 12)
       const collisionBend = collision > 0.28 ? 0.5 : 1
@@ -646,6 +673,23 @@ export default function EasterGame() {
     const spread = (0.5 + vy * 1.5) * mode.spread
     const compression = 1 + energy * (0.55 + mode.drive * 0.28)
     const gain = (0.014 + energy * 0.024 + collision * 0.048) * mode.drive
+
+    if (evilModeRef.current) {
+      const crawl = Math.sin(now * 2.4 + vx * 8 + patternRef.current * 0.6)
+      const tremor = Math.sin(now * (16 + collision * 30) + vy * 5)
+      const evilMidi = 24 + Math.round(vx * 9) - Math.round(vy * 12) + (patternRef.current % 2) * 6
+      const evilBase = 440 * 2 ** ((evilMidi - 69) / 12)
+      const evilGain = (0.028 + energy * 0.052 + collision * 0.12) * (tremor > -0.18 ? 1 : 0.33)
+
+      synth.shaper.curve = makeDistortionCurve(95 + energy * 170 + collision * 280)
+      synth.oscA.frequency.setTargetAtTime(evilBase * (0.5 + collision * 0.18), now, 0.05)
+      synth.oscB.frequency.setTargetAtTime(evilBase * (0.99 + crawl * 0.08), now, 0.055)
+      synth.oscB.detune.setTargetAtTime(-240 + vy * 120 + collision * 90 + tremor * 32, now, 0.045)
+      synth.filter.frequency.setTargetAtTime(120 + vx * 260 + collision * 1450 + energy * 380, now, 0.05)
+      synth.filter.Q.setTargetAtTime(10 + collision * 18 + energy * 5, now, 0.045)
+      synth.master.gain.setTargetAtTime(evilGain, now, 0.052)
+      return
+    }
 
     synth.oscA.frequency.setTargetAtTime(base * compression, now, 0.035)
     synth.oscB.frequency.setTargetAtTime(base * spread * (collision > 0.42 ? 1.5 : 0.5), now, 0.045)
