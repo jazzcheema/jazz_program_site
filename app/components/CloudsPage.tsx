@@ -777,9 +777,12 @@ export default function CloudsPage() {
   const [activeProject, setActiveProject] = useState(0);
   const [isMobileLayout, setIsMobileLayout] = useState(false);
   const [krateEasterCue, setKrateEasterCue] = useState(false);
+  const [hiddenRoomTransition, setHiddenRoomTransition] = useState(false);
   const carouselOpenRef = useRef(false);
   const activeProjectRef = useRef(0);
   const krateEasterCueRef = useRef(false);
+  const hiddenRoomTransitionRef = useRef(false);
+  const hiddenRoomTimer = useRef<number | null>(null);
 
   const selectProject = useCallback((nextIndex: number) => {
     const normalized = (nextIndex + PROJECTS.length) % PROJECTS.length;
@@ -805,6 +808,21 @@ export default function CloudsPage() {
     [selectProject],
   );
 
+  const triggerHiddenRoomTransition = useCallback(() => {
+    if (hiddenRoomTransitionRef.current) return;
+    hiddenRoomTransitionRef.current = true;
+    krateEasterCueRef.current = false;
+    setKrateEasterCue(false);
+    setHiddenRoomTransition(true);
+    if (hiddenRoomTimer.current) window.clearTimeout(hiddenRoomTimer.current);
+    hiddenRoomTimer.current = window.setTimeout(() => {
+      setShowEaster(true);
+      setHiddenRoomTransition(false);
+      hiddenRoomTransitionRef.current = false;
+      hiddenRoomTimer.current = null;
+    }, 2300);
+  }, []);
+
   useEffect(() => {
     const check = () => setIsMobileLayout(window.innerWidth < 768);
     check();
@@ -815,6 +833,12 @@ export default function CloudsPage() {
   useEffect(() => {
     const t = setTimeout(() => setShow(true), 60);
     return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (hiddenRoomTimer.current) window.clearTimeout(hiddenRoomTimer.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -1111,8 +1135,8 @@ export default function CloudsPage() {
       }
 
       // Easter egg: click krate again while it's already the active project — desktop only
-      if (clickedProject.index === 1 && activeProjectRef.current === 1 && e.pointerType !== 'touch') {
-        setShowEaster(true);
+      if (clickedProject.index === 1 && activeProjectRef.current === 1 && e.pointerType !== "touch" && window.innerWidth >= 768) {
+        triggerHiddenRoomTransition();
         return;
       }
 
@@ -1294,7 +1318,7 @@ export default function CloudsPage() {
       dracoLoader.dispose();
       renderer.dispose();
     };
-  }, [openCarousel, selectProject, setShowEaster]);
+  }, [openCarousel, selectProject, triggerHiddenRoomTransition]);
 
   return (
     <div
@@ -1305,6 +1329,7 @@ export default function CloudsPage() {
         height: "100dvh",
         background: "#0c0c0c",
         opacity: show ? 1 : 0,
+        cursor: hiddenRoomTransition ? "none" : undefined,
         ["--krate-cursor-x" as string]: "50vw",
         ["--krate-cursor-y" as string]: "50vh",
       }}
@@ -1332,6 +1357,44 @@ export default function CloudsPage() {
           100% {
             transform: translate(-34px, -50%) scaleX(0.64);
             opacity: 0;
+          }
+        }
+        @keyframes hiddenRoomWash {
+          0% {
+            opacity: 0;
+            background: rgba(0, 0, 0, 0);
+          }
+          34% {
+            opacity: 0.24;
+            background: rgba(0, 0, 0, 0.22);
+          }
+          100% {
+            opacity: 1;
+            background: rgba(0, 0, 0, 0.78);
+          }
+        }
+        @keyframes hiddenRoomPortal {
+          0% {
+            left: var(--krate-cursor-x);
+            top: var(--krate-cursor-y);
+            opacity: 0.95;
+            transform: translate(-50%, -50%) rotate(0deg) scale(0.62);
+          }
+          26% {
+            left: 50%;
+            top: 50%;
+            opacity: 1;
+            transform: translate(-50%, -50%) rotate(0deg) scale(1.12);
+          }
+          82% {
+            left: 50%;
+            top: 50%;
+            opacity: 1;
+            transform: translate(-50%, -50%) rotate(1800deg) scale(1.42);
+          }
+          100% {
+            opacity: 0;
+            transform: translate(-50%, -50%) rotate(1800deg) scale(1.78);
           }
         }
       `}</style>
@@ -1395,13 +1458,84 @@ export default function CloudsPage() {
         style={{
           width: "100%",
           height: "100%",
-          cursor: krateEasterCue && !isMobileLayout
+          cursor: (krateEasterCue || hiddenRoomTransition) && !isMobileLayout
             ? "none"
             : carouselOpen ? "grab" : "pointer",
         }}
       />
 
-      {krateEasterCue && !isMobileLayout && (
+      {hiddenRoomTransition && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 900,
+            pointerEvents: "none",
+            overflow: "hidden",
+            animation: "hiddenRoomWash 2300ms cubic-bezier(0.16, 1, 0.3, 1) both",
+          }}
+        >
+          <div
+            style={{
+              position: "fixed",
+              left: "var(--krate-cursor-x)",
+              top: "var(--krate-cursor-y)",
+              width: 96,
+              height: 96,
+              animation: "hiddenRoomPortal 2300ms cubic-bezier(0.12, 0.86, 0.18, 1) both",
+              mixBlendMode: "screen",
+            }}
+          >
+            <span
+              style={{
+                position: "absolute",
+                left: 45,
+                top: 0,
+                width: 6,
+                height: 96,
+                background: "rgba(211, 50, 47, 0.96)",
+                boxShadow: "0 0 18px rgba(211, 50, 47, 0.62)",
+              }}
+            />
+            <span
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 45,
+                width: 96,
+                height: 6,
+                background: "rgba(211, 50, 47, 0.96)",
+                boxShadow: "0 0 18px rgba(211, 50, 47, 0.62)",
+              }}
+            />
+            <span
+              style={{
+                position: "absolute",
+                left: 21,
+                top: 21,
+                width: 54,
+                height: 54,
+                border: "5px solid rgba(233, 229, 224, 0.9)",
+                boxShadow: "0 0 24px rgba(211, 50, 47, 0.62), inset 0 0 16px rgba(211, 50, 47, 0.42)",
+              }}
+            />
+            <span
+              style={{
+                position: "absolute",
+                left: 40,
+                top: 40,
+                width: 16,
+                height: 16,
+                background: "#0c0c0c",
+                boxShadow: "0 0 14px rgba(211, 50, 47, 0.8)",
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {krateEasterCue && !hiddenRoomTransition && !isMobileLayout && (
         <div
           aria-hidden="true"
           style={{
@@ -1509,7 +1643,7 @@ export default function CloudsPage() {
         project={PROJECTS[activeProject]}
         carouselOpen={carouselOpen}
         isMobile={isMobileLayout}
-        showEasterCue={!isMobileLayout && krateEasterCue}
+        showEasterCue={!isMobileLayout && krateEasterCue && !hiddenRoomTransition}
         onPrev={selectPrev}
         onNext={selectNext}
       />
