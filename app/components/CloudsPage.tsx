@@ -9,6 +9,7 @@ import {
   worldFrameAtDistance,
 } from "../lib/responsiveScene";
 import Sparkles from "./Sparkles";
+import EasterGame from "../easter/EasterGame";
 
 const CAM = {
   startDist: 14,
@@ -747,6 +748,7 @@ function ProjectCard({
 export default function CloudsPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [show, setShow] = useState(false);
+  const [showEaster, setShowEaster] = useState(false);
   const [showProject, setShowProject] = useState(false);
   const [carouselOpen, setCarouselOpen] = useState(false);
   const [activeProject, setActiveProject] = useState(0);
@@ -1057,6 +1059,12 @@ export default function CloudsPage() {
         return;
       }
 
+      // Easter egg: click krate again while it's already the active project — desktop only
+      if (clickedProject.index === 1 && activeProjectRef.current === 1 && e.pointerType !== 'touch') {
+        setShowEaster(true);
+        return;
+      }
+
       selectProject(clickedProject.index);
     };
 
@@ -1220,7 +1228,7 @@ export default function CloudsPage() {
       dracoLoader.dispose();
       renderer.dispose();
     };
-  }, [openCarousel, selectProject]);
+  }, [openCarousel, selectProject, setShowEaster]);
 
   return (
     <div
@@ -1321,6 +1329,26 @@ export default function CloudsPage() {
         onPrev={selectPrev}
         onNext={selectNext}
       />
+
+      {showEaster && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 1000 }}
+          onKeyDown={e => { if (e.key === 'Escape') setShowEaster(false) }}
+        >
+          <button
+            onClick={() => setShowEaster(false)}
+            style={{
+              position: 'absolute', top: 14, right: 18, zIndex: 1001,
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontFamily: '"Courier New", Courier, monospace',
+              fontSize: 11, color: '#aaa6a0', letterSpacing: '0.05em',
+            }}
+          >
+            ESC
+          </button>
+          <EasterGame />
+        </div>
+      )}
     </div>
   );
 }

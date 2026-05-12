@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
@@ -11,6 +12,8 @@ export default function LampCorner() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [hiddenForPanel, setHiddenForPanel] = useState(false)
   const [hiddenForCV, setHiddenForCV] = useState(false)
+  const pathname = usePathname()
+  const router = useRouter()
 
   useEffect(() => {
     const isMobileViewport = () =>
@@ -108,14 +111,14 @@ export default function LampCorner() {
       className="lamp-corner"
       aria-label="Reload site"
       title="RELOAD_SITE"
-      onClick={() => window.location.reload()}
+      onClick={() => pathname === '/' ? window.location.reload() : router.push('/')}
       style={{
         position: 'fixed',
         top: 10,
         left: 10,
         width: CSS_SIZE,
         height: CSS_SIZE,
-        zIndex: 200,
+        zIndex: 1100,
         opacity: (hiddenForPanel || hiddenForCV) ? 0 : 1,
         pointerEvents: (hiddenForPanel || hiddenForCV) ? 'none' : 'auto',
         transition: 'opacity 180ms ease, transform 160ms ease',
