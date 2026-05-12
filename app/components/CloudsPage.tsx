@@ -1049,16 +1049,32 @@ export default function CloudsPage() {
         loadedObjects.map(({ group }) => group),
         true,
       )[0];
-      if (!hit) return undefined;
+      if (hit) {
+        return loadedObjects.find(({ group }) => {
+          let current: THREE.Object3D | null = hit.object;
+          while (current) {
+            if (current === group) return true;
+            current = current.parent;
+          }
+          return false;
+        });
+      }
 
-      return loadedObjects.find(({ group }) => {
-        let current: THREE.Object3D | null = hit.object;
-        while (current) {
-          if (current === group) return true;
-          current = current.parent;
-        }
-        return false;
-      });
+      const krateObject = projectObjects[1];
+      if (!krateObject || !carouselOpenRef.current || activeProjectRef.current !== 1) return undefined;
+
+      const center = new THREE.Vector3();
+      krateObject.group.getWorldPosition(center);
+      const edge = center.clone().add(new THREE.Vector3(krateObject.maxDim * krateObject.group.scale.x * 0.46, 0, 0));
+      const centerScreen = center.clone().project(camera);
+      const edgeScreen = edge.project(camera);
+      const centerX = ((centerScreen.x + 1) / 2) * window.innerWidth;
+      const centerY = ((1 - centerScreen.y) / 2) * window.innerHeight;
+      const edgeX = ((edgeScreen.x + 1) / 2) * window.innerWidth;
+      const edgeY = ((1 - edgeScreen.y) / 2) * window.innerHeight;
+      const krateRadius = Math.max(72, Math.hypot(edgeX - centerX, edgeY - centerY) * 1.28);
+
+      return Math.hypot(clientX - centerX, clientY - centerY) <= krateRadius ? krateObject : undefined;
     };
 
     const setKrateCue = (next: boolean) => {
