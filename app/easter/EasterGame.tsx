@@ -127,6 +127,8 @@ export default function EasterGame() {
   const [pattern, setPattern] = useState(0)
   const [metrics, setMetrics] = useState<LabMetrics>({ axis: 'xy', index: 24, energy: 0, collision: 0 })
   const [audioOn, setAudioOn] = useState(false)
+  const [audioPrompt, setAudioPrompt] = useState(false)
+  const [audioUnsupported, setAudioUnsupported] = useState(false)
 
   useEffect(() => {
     const check = () => setSmall(window.innerWidth < 760)
@@ -156,19 +158,36 @@ export default function EasterGame() {
     }
   }, [])
 
+  const markAudioReady = (ctx: AudioContext) => {
+    if (ctx.state === 'running') {
+      audioOnRef.current = true
+      setAudioOn(true)
+      setAudioPrompt(false)
+    } else {
+      audioOnRef.current = false
+      setAudioOn(false)
+      setAudioPrompt(true)
+    }
+  }
+
   const ensureSynth = () => {
     const existing = synthRef.current
     if (existing) {
-      void existing.ctx.resume()
-      audioOnRef.current = true
-      setAudioOn(true)
+      void existing.ctx.resume().then(() => markAudioReady(existing.ctx)).catch(() => {
+        setAudioPrompt(true)
+      })
+      markAudioReady(existing.ctx)
       return
     }
 
     const AudioCtor =
       window.AudioContext ||
       (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-    if (!AudioCtor) return
+    if (!AudioCtor) {
+      setAudioUnsupported(true)
+      setAudioPrompt(false)
+      return
+    }
 
     const ctx = new AudioCtor()
     const master = ctx.createGain()
@@ -193,8 +212,11 @@ export default function EasterGame() {
     oscB.start()
 
     synthRef.current = { ctx, master, oscA, oscB, filter }
-    audioOnRef.current = true
-    setAudioOn(true)
+    ctx.addEventListener('statechange', () => markAudioReady(ctx))
+    void ctx.resume().then(() => markAudioReady(ctx)).catch(() => {
+      setAudioPrompt(true)
+    })
+    markAudioReady(ctx)
   }
 
   const updateSynth = useCallback((vx: number, vy: number, energy: number, collision: number) => {
@@ -636,7 +658,7 @@ export default function EasterGame() {
                 {phase === 'draw' ? 'Easter frequency' : phase === 'castle' ? 'Gate sequence' : '4-bit blue room'}
               </p>
               <p style={{ margin: '4px 0 0', fontSize: 11, lineHeight: 1.1, color: MUTED, fontFamily: mono, letterSpacing: 0 }}>
-                {phase === 'draw' ? 'square gesture + reactive matrix' : phase === 'castle' ? 'terminal reveal + synth warmup' : audioOn ? 'mouse field + collision synth' : 'click canvas for synth'}
+                {phase === 'draw' ? 'square gesture + reactive matrix' : phase === 'castle' ? 'terminal reveal + synth warmup' : audioOn ? 'mouse field + collision synth' : audioUnsupported ? 'visual signal only' : 'sound permission required'}
               </p>
             </div>
 
@@ -652,11 +674,47 @@ export default function EasterGame() {
               transition: 'opacity 0.45s ease',
               textAlign: 'right',
             }}>
-              {phase === 'draw' ? 'draw a square.' : phase === 'castle' ? 'opening.' : audioOn ? 'synth live.' : 'click for sound.'}
+              {phase === 'draw' ? 'draw a square.' : phase === 'castle' ? 'opening.' : audioOn ? 'synth live.' : audioUnsupported ? 'visual only.' : 'enable sound.'}
             </p>
           </div>
         </section>
       </main>
+
+      {phase === 'signal' && audioPrompt && !audioOn && !audioUnsupported && (
+        <div style={{
+          position: 'absolute',
+          right: 28,
+          bottom: 54,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '8px 10px',
+          border: '1px solid rgba(12, 12, 12, 0.12)',
+          background: 'rgba(233, 229, 224, 0.86)',
+          backdropFilter: 'blur(8px)',
+          fontFamily: mono,
+          fontSize: 11,
+          color: INK,
+        }}>
+          <span style={{ color: MUTED }}>sound locked</span>
+          <button
+            type="button"
+            onClick={ensureSynth}
+            style={{
+              border: '1px solid rgba(42, 95, 192, 0.36)',
+              background: 'rgba(42, 95, 192, 0.08)',
+              color: BLUE,
+              cursor: 'pointer',
+              fontFamily: mono,
+              fontSize: 11,
+              fontWeight: 700,
+              padding: '4px 7px',
+            }}
+          >
+            enable
+          </button>
+        </div>
+      )}
 
       <footer style={{
         position: 'absolute',
