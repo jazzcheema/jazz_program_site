@@ -1335,17 +1335,6 @@ export default function CloudsPage() {
           style={{ position: 'fixed', inset: 0, zIndex: 1000 }}
           onKeyDown={e => { if (e.key === 'Escape') setShowEaster(false) }}
         >
-          <button
-            onClick={() => setShowEaster(false)}
-            style={{
-              position: 'absolute', top: 14, right: 18, zIndex: 1001,
-              background: 'none', border: 'none', cursor: 'pointer',
-              fontFamily: '"Courier New", Courier, monospace',
-              fontSize: 11, color: '#aaa6a0', letterSpacing: '0.05em',
-            }}
-          >
-            ESC
-          </button>
           <EasterGame />
         </div>
       )}

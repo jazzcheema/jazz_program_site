@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 type Pt = { x: number; y: number }
-type Phase = 'draw' | 'signal'
+type Phase = 'draw' | 'castle' | 'signal'
 type LabMetrics = {
   axis: 'x' | 'y' | 'xy'
   index: number
@@ -33,6 +33,29 @@ const GRID_W = (COLS - 1) * GAP
 const GRID_H = (ROWS - 1) * GAP
 const GRID_X = Math.round((CW - GRID_W) / 2)
 const GRID_Y = Math.round((CH - GRID_H) / 2)
+const CASTLE_ASCII = [
+  '                       /\\                       ',
+  '                      /  \\                      ',
+  '                     /____\\                     ',
+  '        /\\              ||              /\\      ',
+  '       /  \\             ||             /  \\     ',
+  '      /____\\     _______||_______     /____\\    ',
+  '      | [] |    /  ___  ||  ___  \\    | [] |    ',
+  '  ____|____|___/__/___\\_||_/___\\__\\___|____|____',
+  ' /  _   _   _   _   _   _   _   _   _   _   _  \\',
+  '/__/ \\_/ \\_/ \\_/ \\_/ \\_/ \\_/ \\_/ \\_/ \\_/ \\_/ \\__\\',
+  '|  |   |   |   |   |   |   |   |   |   |   |  |',
+  '|[]|   |[] |   |[] |   |[] |   |[] |   |[] |[]|',
+  '|__|___|___|___|___|___|___|___|___|___|___|__|',
+  '             |  |              |  |             ',
+  '             |__|____      ____|__|             ',
+  '                    |      |                    ',
+  '                    |______|                    ',
+]
+const CASTLE_COLS = Math.max(...CASTLE_ASCII.map(line => line.length))
+const CASTLE_ASSEMBLE_MS = 2500
+const CASTLE_HOLD_MS = 650
+const CASTLE_FADE_MS = 620
 
 function isSquareGesture(pts: Pt[]): boolean {
   if (pts.length < 14) return false
@@ -255,7 +278,18 @@ export default function EasterGame() {
           let size = 2
           let color = DOT
 
-          if (phaseRef.current === 'signal') {
+          if (phaseRef.current === 'castle') {
+            const castleElapsed = time - unlockTime.current
+            const scan = Math.min(COLS + 2, (castleElapsed / CASTLE_ASSEMBLE_MS) * (COLS + 4) - 2)
+            const distanceToScan = Math.abs(c - scan)
+            if (distanceToScan < 3) {
+              color = BLUE
+              size = 2.5 + (3 - distanceToScan)
+            } else if ((c + r) % 11 === 0) {
+              color = '#b9b5b0'
+              size = 2
+            }
+          } else if (phaseRef.current === 'signal') {
             const upperWave = Math.round(6 + Math.sin(c * (0.22 + vx * 0.2) + waveOffset) * (4 + energy * 5) + ny * 5)
             const lowerWave = Math.round(18 + Math.cos(c * (0.2 + vy * 0.18) - waveOffset * 1.2) * (3 + energy * 4) - nx * 4)
             const spine = Math.round(12 + Math.sin(c * 0.15 + waveOffset * 0.7 + vx * 2) * (2 + energy * 2))
@@ -310,7 +344,55 @@ export default function EasterGame() {
         ctx.stroke()
       }
 
-      if (phaseRef.current === 'signal') {
+      if (phaseRef.current === 'castle') {
+        const elapsed = time - unlockTime.current
+        const lineH = 16
+        const charW = 7.4
+        const scanCol = Math.min(CASTLE_COLS + 2, (elapsed / CASTLE_ASSEMBLE_MS) * (CASTLE_COLS + 4) - 2)
+        const fadeIn = Math.min(1, elapsed / 360)
+        const fadeStart = CASTLE_ASSEMBLE_MS + CASTLE_HOLD_MS
+        const fadeOut = elapsed > fadeStart ? Math.max(0, 1 - (elapsed - fadeStart) / CASTLE_FADE_MS) : 1
+        const alpha = fadeIn * fadeOut
+        const startY = CH / 2 - ((CASTLE_ASCII.length - 1) * lineH) / 2
+        const startX = CW / 2 - (CASTLE_COLS * charW) / 2
+
+        ctx.save()
+        ctx.globalAlpha = alpha
+        ctx.font = 'bold 12px "Courier New", Courier, monospace'
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'middle'
+        for (let row = 0; row < CASTLE_ASCII.length; row++) {
+          const line = CASTLE_ASCII[row]
+          for (let col = 0; col < line.length; col++) {
+            const glyph = line[col]
+            if (glyph === ' ' || col > scanCol) continue
+
+            const scanDistance = Math.abs(col - scanCol)
+            const isFront = scanDistance < 1.9 && elapsed < CASTLE_ASSEMBLE_MS
+            ctx.fillStyle = isFront ? BLUE : INK
+            ctx.shadowColor = isFront ? 'rgba(42, 95, 192, 0.38)' : `rgba(42, 95, 192, ${0.08 * alpha})`
+            ctx.shadowBlur = isFront ? 10 : 4 * alpha
+            ctx.fillText(glyph, startX + col * charW, startY + row * lineH)
+          }
+        }
+
+        if (elapsed < CASTLE_ASSEMBLE_MS) {
+          ctx.fillStyle = BLUE
+          ctx.shadowColor = 'rgba(42, 95, 192, 0.42)'
+          ctx.shadowBlur = 10
+          const x = startX + scanCol * charW
+          for (let y = startY - lineH; y <= startY + CASTLE_ASCII.length * lineH; y += 20) {
+            drawMark(ctx, x + Math.sin(y * 0.07 + time * 0.02) * 2, y, 4)
+          }
+        }
+        ctx.restore()
+
+        if (elapsed > CASTLE_ASSEMBLE_MS + CASTLE_HOLD_MS + CASTLE_FADE_MS) {
+          phaseRef.current = 'signal'
+          unlockTime.current = time
+          setPhase('signal')
+        }
+      } else if (phaseRef.current === 'signal') {
         const elapsed = time - unlockTime.current
         const pulse = Math.max(0, 1 - elapsed / 900)
         if (pulse > 0) {
@@ -379,11 +461,11 @@ export default function EasterGame() {
   }
 
   const unlock = () => {
-    phaseRef.current = 'signal'
+    phaseRef.current = 'castle'
     unlockTime.current = performance.now()
     drawPts.current = []
     ensureSynth()
-    setPhase('signal')
+    setPhase('castle')
   }
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -455,7 +537,7 @@ export default function EasterGame() {
         top: 0,
         width: 1,
         height: '100%',
-        background: phase === 'signal' ? 'rgba(42, 95, 192, 0.12)' : 'rgba(12, 12, 12, 0.035)',
+        background: phase !== 'draw' ? 'rgba(42, 95, 192, 0.12)' : 'rgba(12, 12, 12, 0.035)',
         transform: 'translateX(-0.5px)',
         pointerEvents: 'none',
       }} />
@@ -465,7 +547,7 @@ export default function EasterGame() {
         top: 'var(--lab-y)',
         width: '100%',
         height: 1,
-        background: phase === 'signal' ? 'rgba(42, 95, 192, 0.10)' : 'rgba(12, 12, 12, 0.03)',
+        background: phase !== 'draw' ? 'rgba(42, 95, 192, 0.10)' : 'rgba(12, 12, 12, 0.03)',
         transform: 'translateY(-0.5px)',
         pointerEvents: 'none',
       }} />
@@ -485,17 +567,15 @@ export default function EasterGame() {
           <span style={{ color: phase === 'signal' && metrics.axis !== 'y' ? BLUE : INK, opacity: phase === 'draw' ? 0.42 : 1 }}>
             <span style={{ fontFamily: mono, fontSize: 17, marginRight: 8 }}>{metrics.energy > 66 ? '✹' : '✦'}</span>Signal
           </span>
-          <span style={{ color: phase === 'draw' ? BLUE : metrics.axis === 'xy' ? INK : MUTED }}>
-            <span style={{ fontFamily: mono, fontSize: 17, marginRight: 8 }}>{phase === 'draw' ? '◯' : '●'}</span>Draw
+          <span style={{ color: phase === 'draw' ? BLUE : phase === 'castle' ? BLUE : metrics.axis === 'xy' ? INK : MUTED }}>
+            <span style={{ fontFamily: mono, fontSize: 17, marginRight: 8 }}>{phase === 'draw' ? '◯' : phase === 'castle' ? '□' : '●'}</span>Draw
           </span>
           <span style={{ color: phase === 'signal' && metrics.axis !== 'x' ? BLUE : INK, opacity: phase === 'draw' ? 0.42 : 1 }}>
             <span style={{ fontFamily: mono, fontSize: 17, marginRight: 8 }}>{metrics.axis === 'y' ? '↕' : '⌁'}</span>Lab
           </span>
         </nav>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', fontFamily: mono, fontSize: 10, color: MUTED }}>
-          ESC
-        </div>
+        <div />
       </header>
 
       <main style={{
@@ -520,10 +600,10 @@ export default function EasterGame() {
               letterSpacing: 0,
               textAlign: 'center',
             }}>
-              {phase === 'draw' ? 'draw the box' : 'krate signal lab'}
+              {phase === 'draw' ? 'draw the box' : phase === 'castle' ? 'unlocking gate' : 'krate signal lab'}
             </h1>
             <p style={{ margin: 0, fontSize: 12, fontFamily: mono, color: MUTED, textAlign: 'right' }}>
-              {phase === 'draw' ? 'unlock' : 'move / click'}
+              {phase === 'draw' ? 'unlock' : phase === 'castle' ? 'stand by' : 'move / click'}
             </p>
           </div>
 
@@ -553,10 +633,10 @@ export default function EasterGame() {
           }}>
             <div>
               <p style={{ margin: 0, fontSize: 18, lineHeight: 1.05, fontWeight: 500, letterSpacing: 0 }}>
-                {phase === 'draw' ? 'Easter frequency' : '4-bit blue room'}
+                {phase === 'draw' ? 'Easter frequency' : phase === 'castle' ? 'Gate sequence' : '4-bit blue room'}
               </p>
               <p style={{ margin: '4px 0 0', fontSize: 11, lineHeight: 1.1, color: MUTED, fontFamily: mono, letterSpacing: 0 }}>
-                {phase === 'draw' ? 'square gesture + reactive matrix' : audioOn ? 'mouse field + collision synth' : 'click canvas for synth'}
+                {phase === 'draw' ? 'square gesture + reactive matrix' : phase === 'castle' ? 'terminal reveal + synth warmup' : audioOn ? 'mouse field + collision synth' : 'click canvas for synth'}
               </p>
             </div>
 
@@ -572,7 +652,7 @@ export default function EasterGame() {
               transition: 'opacity 0.45s ease',
               textAlign: 'right',
             }}>
-              {phase === 'draw' ? 'draw a square.' : audioOn ? 'synth live.' : 'click for sound.'}
+              {phase === 'draw' ? 'draw a square.' : phase === 'castle' ? 'opening.' : audioOn ? 'synth live.' : 'click for sound.'}
             </p>
           </div>
         </section>
