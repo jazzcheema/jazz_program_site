@@ -10,12 +10,33 @@ type LabMetrics = {
   energy: number
   collision: number
 }
+type RailGhostDot = {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  size: number
+  alpha: number
+}
+type SynthMode = {
+  name: string
+  shortName: string
+  oscA: OscillatorType
+  oscB: OscillatorType
+  filter: BiquadFilterType
+  midiOffset: number
+  spread: number
+  drive: number
+  resonance: number
+  phase: number
+}
 type SynthGraph = {
   ctx: AudioContext
   master: GainNode
   oscA: OscillatorNode
   oscB: OscillatorNode
   filter: BiquadFilterNode
+  shaper: WaveShaperNode
 }
 
 const PAGE = '#e9e5e0'
@@ -56,6 +77,88 @@ const CASTLE_COLS = Math.max(...CASTLE_ASCII.map(line => line.length))
 const CASTLE_ASSEMBLE_MS = 2500
 const CASTLE_HOLD_MS = 650
 const CASTLE_FADE_MS = 620
+const SYNTH_MODES: SynthMode[] = [
+  {
+    name: 'wavefold',
+    shortName: 'fold',
+    oscA: 'sawtooth',
+    oscB: 'triangle',
+    filter: 'lowpass',
+    midiOffset: 0,
+    spread: 1,
+    drive: 1,
+    resonance: 1,
+    phase: 0,
+  },
+  {
+    name: 'pulse rail',
+    shortName: 'rail',
+    oscA: 'square',
+    oscB: 'square',
+    filter: 'bandpass',
+    midiOffset: 7,
+    spread: 1.32,
+    drive: 1.72,
+    resonance: 1.35,
+    phase: 1.8,
+  },
+  {
+    name: 'glass scan',
+    shortName: 'scan',
+    oscA: 'sine',
+    oscB: 'triangle',
+    filter: 'lowpass',
+    midiOffset: -10,
+    spread: 0.74,
+    drive: 1.9,
+    resonance: 1.15,
+    phase: 3.4,
+  },
+]
+
+function positiveMod(value: number, modulo: number) {
+  return ((value % modulo) + modulo) % modulo
+}
+
+function makeDistortionCurve(amount: number) {
+  const samples = 384
+  const curve = new Float32Array(samples)
+  const k = amount
+  for (let i = 0; i < samples; i++) {
+    const x = (i * 2) / samples - 1
+    curve[i] = k === 0 ? x : ((3 + k) * x * 20 * (Math.PI / 180)) / (Math.PI + k * Math.abs(x))
+  }
+  return curve
+}
+
+function signalRows(c: number, vx: number, vy: number, nx: number, ny: number, energy: number, waveOffset: number, modeIndex: number, modePhase: number) {
+  if (modeIndex === 1) {
+    const rail = Math.sin(c * 0.72 - waveOffset * 2.35 + vx * 5.2)
+    const step = rail >= 0 ? 1 : -1
+    const lock = Math.sin(c * 0.29 + waveOffset * 1.6 + vy * 4) >= 0 ? 1 : -1
+    return {
+      upper: 6 + step * (2.2 + energy * 3.3) + ny * 3.2,
+      lower: 18 - step * (2 + energy * 3) - nx * 3.4,
+      spine: 12 + lock * (1.8 + energy * 2.8),
+    }
+  }
+
+  if (modeIndex === 2) {
+    const scan = positiveMod(c * 0.48 + waveOffset * 2.8 + vx * 6 + modePhase, 8)
+    const diagonal = Math.sin(c * 0.5 - waveOffset * 2.1 + vy * 7)
+    return {
+      upper: 3.8 + scan + ny * 2.1,
+      lower: 21.5 - scan * 0.92 - nx * 2.8,
+      spine: 12 + diagonal * (4.2 + energy * 3.6),
+    }
+  }
+
+  return {
+    upper: 6 + Math.sin(c * (0.2 + vx * 0.16) + waveOffset + modePhase) * (4 + energy * 4.5) + ny * 5,
+    lower: 18 + Math.cos(c * (0.18 + vy * 0.14) - waveOffset * 1.05 - modePhase) * (3 + energy * 3.5) - nx * 4,
+    spine: 12 + Math.sin(c * 0.13 + waveOffset * 0.65 + vx * 2) * (2 + energy * 2),
+  }
+}
 
 function isSquareGesture(pts: Pt[]): boolean {
   if (pts.length < 14) return false
@@ -109,9 +212,12 @@ function drawMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: num
 export default function EasterGame() {
   const rootRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const railGhostCanvasRef = useRef<HTMLCanvasElement>(null)
   const raf = useRef(0)
   const pointer = useRef<Pt>({ x: CW / 2, y: CH / 2 })
   const viewportPointer = useRef<Pt>({ x: 0.5, y: 0.5 })
+  const lastViewportMouse = useRef<Pt | null>(null)
+  const mouseVelocity = useRef<Pt>({ x: 0, y: 0 })
   const drawPts = useRef<Pt[]>([])
   const isDrawing = useRef(false)
   const phaseRef = useRef<Phase>('draw')
@@ -120,15 +226,29 @@ export default function EasterGame() {
   const synthRef = useRef<SynthGraph | null>(null)
   const audioOnRef = useRef(false)
   const patternRef = useRef(0)
+  const synthModeRef = useRef(0)
+  const railGhostsRef = useRef<RailGhostDot[]>([])
 
   const [phase, setPhase] = useState<Phase>('draw')
   const [small, setSmall] = useState(false)
   const [drawVisible, setDrawVisible] = useState(true)
   const [pattern, setPattern] = useState(0)
+  const [synthMode, setSynthMode] = useState(0)
   const [metrics, setMetrics] = useState<LabMetrics>({ axis: 'xy', index: 24, energy: 0, collision: 0 })
   const [audioOn, setAudioOn] = useState(false)
   const [audioPrompt, setAudioPrompt] = useState(false)
   const [audioUnsupported, setAudioUnsupported] = useState(false)
+
+  const updateViewportMotion = useCallback((clientX: number, clientY: number) => {
+    const previous = lastViewportMouse.current
+    if (previous) {
+      mouseVelocity.current = {
+        x: mouseVelocity.current.x * 0.34 + (clientX - previous.x) * 0.66,
+        y: mouseVelocity.current.y * 0.34 + (clientY - previous.y) * 0.66,
+      }
+    }
+    lastViewportMouse.current = { x: clientX, y: clientY }
+  }, [])
 
   useEffect(() => {
     const check = () => setSmall(window.innerWidth < 760)
@@ -142,10 +262,19 @@ export default function EasterGame() {
   }, [pattern])
 
   useEffect(() => {
+    synthModeRef.current = synthMode
+  }, [synthMode])
+
+  useEffect(() => {
     if (phase !== 'draw') return
     const t = setInterval(() => setDrawVisible(v => !v), 1100)
     return () => clearInterval(t)
   }, [phase])
+
+  useEffect(() => {
+    if (phase === 'signal' && synthMode === 1) return
+    railGhostsRef.current = []
+  }, [phase, synthMode])
 
   useEffect(() => {
     return () => {
@@ -157,6 +286,80 @@ export default function EasterGame() {
       }, 80)
     }
   }, [])
+
+  useEffect(() => {
+    const canvas = railGhostCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    let animId = 0
+    let width = 0
+    let height = 0
+    let dpr = 1
+
+    const resize = () => {
+      dpr = Math.min(window.devicePixelRatio || 1, 2)
+      width = window.innerWidth
+      height = window.innerHeight
+      canvas.width = Math.max(1, Math.floor(width * dpr))
+      canvas.height = Math.max(1, Math.floor(height * dpr))
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    }
+
+    const animate = () => {
+      animId = requestAnimationFrame(animate)
+      ctx.clearRect(0, 0, width, height)
+      mouseVelocity.current.x *= 0.92
+      mouseVelocity.current.y *= 0.92
+
+      const ghosts = railGhostsRef.current
+      for (let i = ghosts.length - 1; i >= 0; i--) {
+        const dot = ghosts[i]
+        dot.x += dot.vx
+        dot.y += dot.vy
+        dot.vx *= 0.993
+        dot.vy *= 0.993
+        dot.size *= 0.996
+        dot.alpha *= 0.972
+
+        if (
+          dot.alpha < 0.012 ||
+          dot.x < -360 ||
+          dot.x > width + 360 ||
+          dot.y < -360 ||
+          dot.y > height + 360
+        ) {
+          ghosts.splice(i, 1)
+          continue
+        }
+
+        ctx.fillStyle = `rgba(42, 95, 192, ${dot.alpha})`
+        ctx.fillRect(dot.x - dot.size / 2, dot.y - dot.size / 2, dot.size, dot.size)
+      }
+    }
+
+    resize()
+    window.addEventListener('resize', resize)
+    animate()
+    return () => {
+      cancelAnimationFrame(animId)
+      window.removeEventListener('resize', resize)
+    }
+  }, [])
+
+  const applySynthMode = (synth: SynthGraph, nextMode: number) => {
+    const mode = SYNTH_MODES[nextMode]
+    const now = synth.ctx.currentTime
+    synth.oscA.type = mode.oscA
+    synth.oscB.type = mode.oscB
+    synth.filter.type = mode.filter
+    synth.filter.frequency.cancelScheduledValues(now)
+    synth.filter.Q.cancelScheduledValues(now)
+    synth.shaper.curve = makeDistortionCurve(nextMode === 1 ? 28 : 0)
+    synth.filter.frequency.setTargetAtTime(mode.filter === 'highpass' ? 820 : 520, now, 0.035)
+    synth.filter.Q.setTargetAtTime(1.4 + mode.resonance * 1.2, now, 0.035)
+  }
 
   const markAudioReady = (ctx: AudioContext) => {
     if (ctx.state === 'running') {
@@ -192,26 +395,31 @@ export default function EasterGame() {
     const ctx = new AudioCtor()
     const master = ctx.createGain()
     const filter = ctx.createBiquadFilter()
+    const shaper = ctx.createWaveShaper()
     const oscA = ctx.createOscillator()
     const oscB = ctx.createOscillator()
+    const mode = SYNTH_MODES[synthModeRef.current]
 
-    oscA.type = 'sawtooth'
-    oscB.type = 'triangle'
+    oscA.type = mode.oscA
+    oscB.type = mode.oscB
     oscA.frequency.value = 146
     oscB.frequency.value = 73
-    filter.type = 'lowpass'
+    filter.type = mode.filter
     filter.frequency.value = 680
     filter.Q.value = 2.4
+    shaper.curve = makeDistortionCurve(synthModeRef.current === 1 ? 28 : 0)
+    shaper.oversample = '2x'
     master.gain.value = 0
 
     oscA.connect(filter)
     oscB.connect(filter)
-    filter.connect(master)
+    filter.connect(shaper)
+    shaper.connect(master)
     master.connect(ctx.destination)
     oscA.start()
     oscB.start()
 
-    synthRef.current = { ctx, master, oscA, oscB, filter }
+    synthRef.current = { ctx, master, oscA, oscB, filter, shaper }
     ctx.addEventListener('statechange', () => markAudioReady(ctx))
     void ctx.resume().then(() => markAudioReady(ctx)).catch(() => {
       setAudioPrompt(true)
@@ -219,22 +427,76 @@ export default function EasterGame() {
     markAudioReady(ctx)
   }
 
+  const cycleSynthMode = () => {
+    const next = (synthModeRef.current + 1) % SYNTH_MODES.length
+    synthModeRef.current = next
+    setSynthMode(next)
+    const synth = synthRef.current
+    if (synth) applySynthMode(synth, next)
+    if (phaseRef.current === 'signal') {
+      ensureSynth()
+      setPattern(p => p + 1)
+    }
+  }
+
   const updateSynth = useCallback((vx: number, vy: number, energy: number, collision: number) => {
     const synth = synthRef.current
     if (!synth || !audioOnRef.current || phaseRef.current !== 'signal') return
 
+    const mode = SYNTH_MODES[synthModeRef.current]
     const now = synth.ctx.currentTime
-    const midi = 36 + Math.round(vx * 26) + (patternRef.current % 4) * 2
+
+    if (synthModeRef.current === 1) {
+      const center = Math.max(0, 1 - Math.hypot(vx - 0.5, vy - 0.5) * 2.25)
+      const breakup = Math.min(1, center * 0.82 + collision * 0.72)
+      const railStep = Math.round(vx * 7)
+      const rowStep = Math.round((1 - vy) * 4)
+      const crumble = Math.round(Math.sin(now * (28 + breakup * 56) + patternRef.current * 0.7) * breakup * 5)
+      const midi = 31 + railStep * 3 + rowStep * 2 + crumble
+      const base = 440 * 2 ** ((midi - 69) / 12)
+      const split = breakup > 0.46 ? 0.5 : 2
+      const stutterRate = 18 + breakup * 58 + collision * 24
+      const stutter = Math.sin(now * stutterRate + railStep * 1.7) > 0.18 + (1 - breakup) * 0.62 ? 1 : 0.34
+      const gain = (0.026 + energy * 0.036 + collision * 0.09 + center * 0.035) * stutter
+
+      synth.shaper.curve = makeDistortionCurve(20 + breakup * 170 + collision * 190)
+      synth.oscA.frequency.setTargetAtTime(base * (1 - collision * 0.08), now, 0.026)
+      synth.oscB.frequency.setTargetAtTime(base * split * (1 + center * 0.04), now, 0.018)
+      synth.oscB.detune.setTargetAtTime((railStep - 3.5) * 9 + collision * 34 - breakup * 22, now, 0.024)
+      synth.filter.frequency.setTargetAtTime(280 + railStep * 190 + center * 620 + collision * 850, now, 0.02)
+      synth.filter.Q.setTargetAtTime(2.4 + breakup * 12 + collision * 7, now, 0.025)
+      synth.master.gain.setTargetAtTime(gain, now, breakup > 0.35 ? 0.018 : 0.045)
+      return
+    }
+
+    if (synthModeRef.current === 2) {
+      const sweep = Math.sin((vx - 0.5) * Math.PI)
+      const midi = 26 + Math.round((1 - vy) * 10) + (patternRef.current % 3) * 2
+      const base = 440 * 2 ** ((midi - 69) / 12)
+      const collisionBend = collision > 0.28 ? 0.5 : 1
+      const subDrop = 1 - collision * 0.34
+      const gain = 0.052 + energy * 0.046 + collision * 0.13
+
+      synth.oscA.frequency.setTargetAtTime(base * subDrop, now, 0.065)
+      synth.oscB.frequency.setTargetAtTime(base * (1.48 + sweep * 0.22) * collisionBend, now, 0.075)
+      synth.oscB.detune.setTargetAtTime(-18 + vx * 36 - collision * 42, now, 0.06)
+      synth.filter.frequency.setTargetAtTime(150 + (1 - vy) * 760 + energy * 620 + collision * 280, now, 0.08)
+      synth.filter.Q.setTargetAtTime(0.9 + energy * 1.4 + collision * 4.6, now, 0.07)
+      synth.master.gain.setTargetAtTime(gain, now, 0.075)
+      return
+    }
+
+    const midi = 36 + mode.midiOffset + Math.round(vx * (26 - mode.midiOffset * 0.45)) + (patternRef.current % 4) * 2
     const base = 440 * 2 ** ((midi - 69) / 12)
-    const spread = 0.5 + vy * 1.5
-    const compression = 1 + energy * 0.75
-    const gain = 0.018 + energy * 0.026 + collision * 0.05
+    const spread = (0.5 + vy * 1.5) * mode.spread
+    const compression = 1 + energy * (0.55 + mode.drive * 0.28)
+    const gain = (0.014 + energy * 0.024 + collision * 0.048) * mode.drive
 
     synth.oscA.frequency.setTargetAtTime(base * compression, now, 0.035)
     synth.oscB.frequency.setTargetAtTime(base * spread * (collision > 0.42 ? 1.5 : 0.5), now, 0.045)
-    synth.oscB.detune.setTargetAtTime((vy - 0.5) * 26 + collision * 18, now, 0.04)
-    synth.filter.frequency.setTargetAtTime(260 + vy * vy * 3800 + collision * 1800, now, 0.03)
-    synth.filter.Q.setTargetAtTime(1.2 + collision * 9 + energy * 3, now, 0.04)
+    synth.oscB.detune.setTargetAtTime((vy - 0.5) * (20 + mode.spread * 12) + collision * 18, now, 0.04)
+    synth.filter.frequency.setTargetAtTime(240 + vy * vy * (2500 + mode.resonance * 900) + collision * 1800 + mode.midiOffset * 24, now, 0.03)
+    synth.filter.Q.setTargetAtTime(1.2 + collision * 8 * mode.resonance + energy * 3, now, 0.04)
     synth.master.gain.setTargetAtTime(gain, now, 0.055)
   }, [])
 
@@ -253,6 +515,12 @@ export default function EasterGame() {
       const ny = (my - GRID_Y) / GRID_H
       const energy = Math.min(1, Math.hypot(vx - 0.5, vy - 0.5) * 1.85)
       const waveOffset = (time * 0.0014) % (Math.PI * 2)
+      const modeIndex = synthModeRef.current
+      const mode = SYNTH_MODES[modeIndex]
+      const modePhase = mode.phase + modeIndex * 0.33
+      const railGhostRect = phaseRef.current === 'signal' && modeIndex === 1 ? canvas.getBoundingClientRect() : null
+      const railVelocity = mouseVelocity.current
+      const railSpeed = Math.hypot(railVelocity.x, railVelocity.y)
       const activeAxis: LabMetrics['axis'] =
         Math.abs(vx - 0.5) > Math.abs(vy - 0.5) * 1.35
           ? 'x'
@@ -261,13 +529,11 @@ export default function EasterGame() {
             : 'xy'
       const pointerCol = Math.min(COLS - 1, Math.max(0, Math.round(nx * (COLS - 1))))
       const pointerRow = Math.min(ROWS - 1, Math.max(0, Math.round(ny * (ROWS - 1))))
-      const upperAtPointer = 6 + Math.sin(pointerCol * (0.22 + vx * 0.2) + waveOffset) * (4 + energy * 5) + ny * 5
-      const lowerAtPointer = 18 + Math.cos(pointerCol * (0.2 + vy * 0.18) - waveOffset * 1.2) * (3 + energy * 4) - nx * 4
-      const spineAtPointer = 12 + Math.sin(pointerCol * 0.15 + waveOffset * 0.7 + vx * 2) * (2 + energy * 2)
+      const pointerRows = signalRows(pointerCol, vx, vy, nx, ny, energy, waveOffset, modeIndex, modePhase)
       const waveDistance = Math.min(
-        Math.abs(pointerRow - upperAtPointer),
-        Math.abs(pointerRow - lowerAtPointer),
-        Math.abs(pointerRow - spineAtPointer),
+        Math.abs(pointerRow - pointerRows.upper),
+        Math.abs(pointerRow - pointerRows.lower),
+        Math.abs(pointerRow - pointerRows.spine),
       )
       const collision = phaseRef.current === 'signal' ? Math.max(0, 1 - waveDistance / 4.5) : 0
 
@@ -292,10 +558,24 @@ export default function EasterGame() {
           const dx = (x - mx) / GRID_W
           const dy = (y - my) / GRID_H
           const distance = Math.hypot(dx * 1.95, dy * 2.65)
-          const viewportDriftX = Math.sin((gy - vy) * 12 + waveOffset) * (vx - 0.5) * 10
-          const viewportDriftY = Math.cos((gx - vx) * 12 - waveOffset) * (vy - 0.5) * 10
-          const pullX = Math.sin(dy * 16 + waveOffset) * Math.max(0, 1 - distance) * (5.5 + energy * 7) + viewportDriftX
-          const pullY = Math.cos(dx * 16 - waveOffset) * Math.max(0, 1 - distance) * (5.5 + energy * 7) + viewportDriftY
+          const proximity = Math.max(0, 1 - distance)
+          let pullX = Math.sin(dy * 15 + waveOffset + modePhase) * proximity * (5.5 + energy * 6.5) + Math.sin((gy - vy) * 11 + waveOffset + modePhase) * (vx - 0.5) * 9
+          let pullY = Math.cos(dx * 15 - waveOffset - modePhase) * proximity * (5.5 + energy * 6.5) + Math.cos((gx - vx) * 11 - waveOffset - modePhase) * (vy - 0.5) * 9
+
+          if (modeIndex === 1) {
+            const railPulse = Math.sin(c * 0.92 + waveOffset * 3.4 + pattern * 0.28) >= 0 ? 1 : -1
+            const rowLock = r % 4 === 0 ? 1 : 0.26
+            pullX = railPulse * (vx - 0.5) * (11 + energy * 10) * rowLock + proximity * Math.sin(r * 0.8 + waveOffset * 2) * 9
+            pullY = Math.sign(Math.sin(r * 0.68 - waveOffset * 2.7)) * (vy - 0.5) * (8 + energy * 8) + proximity * railPulse * 5
+          } else if (modeIndex === 2) {
+            const cx = gx - 0.5
+            const cy = gy - 0.5
+            const angle = Math.atan2(cy, cx)
+            const radius = Math.hypot(cx, cy)
+            const scan = Math.sin(radius * 30 - waveOffset * 4.2 + angle * 3 + vx * 4)
+            pullX = Math.cos(angle + waveOffset * 1.4) * scan * (4 + energy * 10) + proximity * Math.sin((c + r) * 0.55 + waveOffset * 3) * 12
+            pullY = Math.sin(angle - waveOffset * 1.2) * scan * (4 + energy * 10) + proximity * Math.cos((c - r) * 0.45 - waveOffset * 3) * 12
+          }
 
           let size = 2
           let color = DOT
@@ -312,21 +592,53 @@ export default function EasterGame() {
               size = 2
             }
           } else if (phaseRef.current === 'signal') {
-            const upperWave = Math.round(6 + Math.sin(c * (0.22 + vx * 0.2) + waveOffset) * (4 + energy * 5) + ny * 5)
-            const lowerWave = Math.round(18 + Math.cos(c * (0.2 + vy * 0.18) - waveOffset * 1.2) * (3 + energy * 4) - nx * 4)
-            const spine = Math.round(12 + Math.sin(c * 0.15 + waveOffset * 0.7 + vx * 2) * (2 + energy * 2))
+            const rows = signalRows(c, vx, vy, nx, ny, energy, waveOffset, modeIndex, modePhase)
+            const upperWave = Math.round(rows.upper)
+            const lowerWave = Math.round(rows.lower)
+            const spine = Math.round(rows.spine)
             const verticalGate = Math.abs(c - Math.round(vx * (COLS - 1))) < 1 && r % 2 === 0
             const horizontalGate = Math.abs(r - Math.round(vy * (ROWS - 1))) < 1 && c % 2 === 0
-            const isBlue =
+            const railGate = modeIndex === 1 && (r === 4 || r === 9 || r === 15 || r === 20 || (c % 8 < 4 && Math.abs(r - spine) < 2))
+            const glassGate = modeIndex === 2 && (
+              Math.abs((c - r * 1.9) - (vx * 22 - 4)) < 1.2 ||
+              Math.abs((c + r * 1.55) - (36 + vy * 18)) < 1.1 ||
+              positiveMod(c + r + Math.floor(waveOffset * 4), 13) === 0
+            )
+            const baseSignal =
               Math.abs(r - upperWave) < 1 ||
               Math.abs(r - lowerWave) < 1 ||
               (Math.abs(r - spine) < 1 && c > 8 && c < 47 && c % 3 !== 0) ||
               verticalGate ||
               horizontalGate
+            const isBlue = modeIndex === 1 ? railGate || Math.abs(r - upperWave) < 1 || Math.abs(r - lowerWave) < 1 : modeIndex === 2 ? glassGate || Math.abs(r - spine) < 1 : baseSignal
 
             if (isBlue) {
               color = BLUE
-              size = (pattern + (activeAxis === 'xy' ? 0 : 1)) % 2 === 0 ? 9 : 7
+              size = modeIndex === 1
+                ? (r % 4 === 0 ? 8 : 5)
+                : modeIndex === 2
+                  ? (positiveMod(c + r + pattern, 5) === 0 ? 4 : 8)
+                  : (pattern + (activeAxis === 'xy' ? 0 : 1)) % 2 === 0 ? 9 : 7
+              if (modeIndex === 1 && railGhostRect && railSpeed > 0.8 && (c * 13 + r * 17 + pattern) % 9 === 0) {
+                const ghosts = railGhostsRef.current
+                const directionX = railVelocity.x / railSpeed
+                const directionY = railVelocity.y / railSpeed
+                const side = ((c + r) % 2 === 0 ? 1 : -1) * Math.min(1.8, railSpeed * 0.02)
+                const throwSpeed = Math.min(30, 4.8 + railSpeed * 0.42)
+                const drawX = x + pullX
+                const drawY = y + pullY
+                const viewportX = railGhostRect.left + (drawX / CW) * railGhostRect.width
+                const viewportY = railGhostRect.top + (drawY / CH) * railGhostRect.height
+                ghosts.push({
+                  x: viewportX,
+                  y: viewportY,
+                  vx: directionX * throwSpeed - directionY * side,
+                  vy: directionY * throwSpeed + directionX * side,
+                  size: Math.max(3, size * (railGhostRect.width / CW) * 0.82),
+                  alpha: 0.42 + Math.min(0.34, railSpeed * 0.008),
+                })
+                if (ghosts.length > 560) ghosts.splice(0, ghosts.length - 560)
+              }
             } else if (distance < 0.08) {
               color = INK
               size = 4 + energy * 3
@@ -437,6 +749,7 @@ export default function EasterGame() {
       const canvas = canvasRef.current
       if (!root || !canvas) return
 
+      updateViewportMotion(clientX, clientY)
       const vx = Math.min(1, Math.max(0, clientX / window.innerWidth))
       const vy = Math.min(1, Math.max(0, clientY / window.innerHeight))
       viewportPointer.current = { x: vx, y: vy }
@@ -454,7 +767,7 @@ export default function EasterGame() {
     syncPointer(window.innerWidth / 2, window.innerHeight / 2)
     window.addEventListener('pointermove', onMove)
     return () => window.removeEventListener('pointermove', onMove)
-  }, [])
+  }, [updateViewportMotion])
 
   const toCanvas = (e: React.PointerEvent<HTMLCanvasElement>): Pt => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -536,6 +849,7 @@ export default function EasterGame() {
 
   const mono = '"Courier New", Courier, monospace'
   const sans = 'Arial, Helvetica, sans-serif'
+  const activeSynthMode = SYNTH_MODES[synthMode]
 
   return (
     <div
@@ -573,6 +887,18 @@ export default function EasterGame() {
         transform: 'translateY(-0.5px)',
         pointerEvents: 'none',
       }} />
+      <canvas
+        ref={railGhostCanvasRef}
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          pointerEvents: 'none',
+          zIndex: 1,
+        }}
+      />
       <header style={{
         position: 'absolute',
         top: 18,
@@ -582,6 +908,7 @@ export default function EasterGame() {
         gridTemplateColumns: '1fr auto 1fr',
         alignItems: 'center',
         fontSize: 16,
+        zIndex: 4,
       }}>
         <div />
 
@@ -597,7 +924,77 @@ export default function EasterGame() {
           </span>
         </nav>
 
-        <div />
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          {phase === 'signal' && (
+            <button
+              type="button"
+              onClick={cycleSynthMode}
+              aria-label={`Change synth type, current type ${activeSynthMode.name}`}
+              style={{
+                position: 'relative',
+                width: 138,
+                height: 34,
+                border: 0,
+                background: 'transparent',
+                color: BLUE,
+                cursor: 'pointer',
+                fontFamily: mono,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: 0,
+                lineHeight: 1,
+                padding: 0,
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  inset: '5px 0',
+                  border: '1px solid rgba(42, 95, 192, 0.28)',
+                  background: 'rgba(233, 229, 224, 0.68)',
+                }}
+              />
+              <span
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  top: 7,
+                  left: 4,
+                  width: 42,
+                  height: 20,
+                  background: BLUE,
+                  transform: `translateX(${synthMode * 44}px)`,
+                  transition: 'transform 180ms ease',
+                }}
+              />
+              <span
+                aria-hidden="true"
+                style={{
+                  position: 'relative',
+                  zIndex: 1,
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  alignItems: 'center',
+                  height: '100%',
+                }}
+              >
+                {SYNTH_MODES.map((mode, index) => (
+                  <span
+                    key={mode.shortName}
+                    style={{
+                      color: synthMode === index ? PAGE : index === 0 ? INK : BLUE,
+                      opacity: synthMode === index ? 1 : 0.72,
+                      transition: 'color 180ms ease, opacity 180ms ease',
+                    }}
+                  >
+                    {mode.shortName}
+                  </span>
+                ))}
+              </span>
+            </button>
+          )}
+        </div>
       </header>
 
       <main style={{
@@ -605,6 +1002,8 @@ export default function EasterGame() {
         display: 'grid',
         placeItems: 'center',
         padding: '92px 32px 70px',
+        position: 'relative',
+        zIndex: 2,
       }}>
         <section style={{ width: 'min(760px, 74vw)' }}>
           <div style={{
