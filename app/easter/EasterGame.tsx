@@ -44,6 +44,11 @@ const INK = '#0c0c0c'
 const MUTED = '#aaa6a0'
 const DOT = '#d0ccc8'
 const BLUE = '#2a5fc0'
+const EVIL_PAGE = '#050505'
+const EVIL_INK = '#f4f0ea'
+const EVIL_MUTED = '#706c68'
+const EVIL_DOT = '#292725'
+const EVIL_RED = '#d3322f'
 
 const CW = 760
 const CH = 360
@@ -77,6 +82,34 @@ const CASTLE_COLS = Math.max(...CASTLE_ASCII.map(line => line.length))
 const CASTLE_ASSEMBLE_MS = 2500
 const CASTLE_HOLD_MS = 650
 const CASTLE_FADE_MS = 620
+const EVIL_TRANSITION_MS = 2600
+const DEVIL_ASCII = [
+  '    ^^                             ^^    ',
+  '   /  \\                           /  \\   ',
+  '  /    \\                         /    \\  ',
+  ' /      \\      ###########      /      \\ ',
+  '/        \\   ###############   /        \\',
+  '\\         \\ ################# /         /',
+  ' \\         ###################         / ',
+  '  \\       #####################       /  ',
+  '   \\     #######################     /   ',
+  '        #########################        ',
+  '       ###########   ###########       ',
+  '      ##########  @@@  ##########      ',
+  '      #########  @@@@@  #########      ',
+  '      #########   @@@   #########      ',
+  '       #########       #########       ',
+  '        #######################        ',
+  '         ####   #######   ####         ',
+  '          ###  ## ### ##  ###          ',
+  '           ###  #######  ###           ',
+  '            ####       ####            ',
+  '             #############             ',
+  '              ###########              ',
+  '                #######                ',
+  '                  ###                  ',
+  '                   #                   ',
+]
 const SYNTH_MODES: SynthMode[] = [
   {
     name: 'wavefold',
@@ -118,6 +151,34 @@ const SYNTH_MODES: SynthMode[] = [
 
 function positiveMod(value: number, modulo: number) {
   return ((value % modulo) + modulo) % modulo
+}
+
+function smoothStep(value: number) {
+  const t = Math.min(1, Math.max(0, value))
+  return t * t * (3 - 2 * t)
+}
+
+function mixHex(from: string, to: string, amount: number) {
+  const t = Math.min(1, Math.max(0, amount))
+  const a = Number.parseInt(from.slice(1), 16)
+  const b = Number.parseInt(to.slice(1), 16)
+  const ar = (a >> 16) & 255
+  const ag = (a >> 8) & 255
+  const ab = a & 255
+  const br = (b >> 16) & 255
+  const bg = (b >> 8) & 255
+  const bb = b & 255
+  const r = Math.round(ar + (br - ar) * t)
+  const g = Math.round(ag + (bg - ag) * t)
+  const bl = Math.round(ab + (bb - ab) * t)
+  return `rgb(${r}, ${g}, ${bl})`
+}
+
+function devilGlyph(c: number, r: number) {
+  const row = DEVIL_ASCII[r]
+  if (!row) return ' '
+  const offset = Math.floor((COLS - row.length) / 2)
+  return row[c - offset] ?? ' '
 }
 
 function makeDistortionCurve(amount: number) {
@@ -227,6 +288,12 @@ export default function EasterGame() {
   const audioOnRef = useRef(false)
   const patternRef = useRef(0)
   const synthModeRef = useRef(0)
+  const modeSwitchDragging = useRef(false)
+  const evilModeRef = useRef(false)
+  const evilStartedAt = useRef(0)
+  const railSpinAngle = useRef<number | null>(null)
+  const railSpinTurns = useRef(0)
+  const lastRailSpinAt = useRef(0)
   const railGhostsRef = useRef<RailGhostDot[]>([])
 
   const [phase, setPhase] = useState<Phase>('draw')
@@ -234,6 +301,7 @@ export default function EasterGame() {
   const [drawVisible, setDrawVisible] = useState(true)
   const [pattern, setPattern] = useState(0)
   const [synthMode, setSynthMode] = useState(0)
+  const [evilMode, setEvilMode] = useState(false)
   const [metrics, setMetrics] = useState<LabMetrics>({ axis: 'xy', index: 24, energy: 0, collision: 0 })
   const [audioOn, setAudioOn] = useState(false)
   const [audioPrompt, setAudioPrompt] = useState(false)
@@ -334,7 +402,9 @@ export default function EasterGame() {
           continue
         }
 
-        ctx.fillStyle = `rgba(42, 95, 192, ${dot.alpha})`
+        ctx.fillStyle = evilModeRef.current
+          ? `rgba(244, 240, 234, ${dot.alpha * 0.9})`
+          : `rgba(42, 95, 192, ${dot.alpha})`
         ctx.fillRect(dot.x - dot.size / 2, dot.y - dot.size / 2, dot.size, dot.size)
       }
     }
@@ -427,8 +497,69 @@ export default function EasterGame() {
     markAudioReady(ctx)
   }
 
-  const cycleSynthMode = () => {
-    const next = (synthModeRef.current + 1) % SYNTH_MODES.length
+  const resetRailSpin = useCallback(() => {
+    railSpinAngle.current = null
+    railSpinTurns.current = 0
+    lastRailSpinAt.current = 0
+  }, [])
+
+  const triggerEvilMode = useCallback((startedAt: number) => {
+    if (evilModeRef.current) return
+    evilModeRef.current = true
+    evilStartedAt.current = startedAt
+    resetRailSpin()
+    setEvilMode(true)
+    setPattern(p => p + 13)
+  }, [resetRailSpin])
+
+  const trackRailSpin = useCallback((clientX: number, clientY: number, eventTime: number) => {
+    if (
+      evilModeRef.current ||
+      phaseRef.current !== 'signal' ||
+      synthModeRef.current !== 1 ||
+      modeSwitchDragging.current
+    ) {
+      resetRailSpin()
+      return
+    }
+
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const rect = canvas.getBoundingClientRect()
+    const cx = rect.left + rect.width / 2
+    const cy = rect.top + rect.height / 2
+    const dx = clientX - cx
+    const dy = clientY - cy
+    if (Math.hypot(dx, dy) < Math.min(rect.width, rect.height) * 0.22) {
+      railSpinAngle.current = null
+      return
+    }
+
+    const now = eventTime || 0
+    const angle = Math.atan2(dy, dx)
+    const previous = railSpinAngle.current
+    if (previous !== null) {
+      let delta = angle - previous
+      if (delta > Math.PI) delta -= Math.PI * 2
+      if (delta < -Math.PI) delta += Math.PI * 2
+
+      if (now - lastRailSpinAt.current > 1500) railSpinTurns.current = 0
+      if (delta > 0.015) {
+        railSpinTurns.current += delta / (Math.PI * 2)
+      } else if (delta < -0.09) {
+        railSpinTurns.current = Math.max(0, railSpinTurns.current + delta / (Math.PI * 2) * 1.6)
+      }
+
+      if (railSpinTurns.current >= 5) triggerEvilMode(now)
+    }
+
+    railSpinAngle.current = angle
+    lastRailSpinAt.current = now
+  }, [resetRailSpin, triggerEvilMode])
+
+  const selectSynthMode = (next: number) => {
+    if (next === synthModeRef.current) return
+    if (next !== 1) resetRailSpin()
     synthModeRef.current = next
     setSynthMode(next)
     const synth = synthRef.current
@@ -437,6 +568,12 @@ export default function EasterGame() {
       ensureSynth()
       setPattern(p => p + 1)
     }
+  }
+
+  const selectSynthModeFromPointer = (e: React.PointerEvent<HTMLElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const progress = Math.min(0.999, Math.max(0, (e.clientX - rect.left) / rect.width))
+    selectSynthMode(Math.floor(progress * SYNTH_MODES.length))
   }
 
   const updateSynth = useCallback((vx: number, vy: number, energy: number, collision: number) => {
@@ -451,6 +588,24 @@ export default function EasterGame() {
       const breakup = Math.min(1, center * 0.82 + collision * 0.72)
       const railStep = Math.round(vx * 7)
       const rowStep = Math.round((1 - vy) * 4)
+
+      if (evilModeRef.current) {
+        const snarl = Math.sin(now * (9 + collision * 18) + patternRef.current)
+        const midi = 23 + railStep * 2 - rowStep * 3 + Math.round(snarl * (2 + collision * 5))
+        const base = 440 * 2 ** ((midi - 69) / 12)
+        const split = 0.5 + Math.sin(now * 3.7 + vx * 5) * 0.035
+        const gain = (0.04 + energy * 0.055 + collision * 0.15 + center * 0.04) * (snarl > -0.42 ? 1 : 0.24)
+
+        synth.shaper.curve = makeDistortionCurve(140 + breakup * 230 + collision * 260)
+        synth.oscA.frequency.setTargetAtTime(base * (0.68 + collision * 0.18), now, 0.018)
+        synth.oscB.frequency.setTargetAtTime(base * split * (1.41 + breakup * 0.2), now, 0.022)
+        synth.oscB.detune.setTargetAtTime(-42 + railStep * 14 + snarl * 38, now, 0.018)
+        synth.filter.frequency.setTargetAtTime(130 + center * 360 + collision * 1200 + energy * 420, now, 0.018)
+        synth.filter.Q.setTargetAtTime(6 + breakup * 18 + collision * 14, now, 0.02)
+        synth.master.gain.setTargetAtTime(gain, now, 0.018)
+        return
+      }
+
       const crumble = Math.round(Math.sin(now * (28 + breakup * 56) + patternRef.current * 0.7) * breakup * 5)
       const midi = 31 + railStep * 3 + rowStep * 2 + crumble
       const base = 440 * 2 ** ((midi - 69) / 12)
@@ -518,6 +673,13 @@ export default function EasterGame() {
       const modeIndex = synthModeRef.current
       const mode = SYNTH_MODES[modeIndex]
       const modePhase = mode.phase + modeIndex * 0.33
+      const evilProgress = evilModeRef.current ? smoothStep((time - evilStartedAt.current) / EVIL_TRANSITION_MS) : 0
+      const inkColor = mixHex(INK, EVIL_INK, evilProgress)
+      const mutedColor = mixHex('#b9b5b0', EVIL_MUTED, evilProgress)
+      const dotColor = mixHex(DOT, EVIL_DOT, evilProgress)
+      const accentColor = mixHex(BLUE, EVIL_RED, evilProgress)
+      const devilColor = mixHex(BLUE, EVIL_INK, evilProgress)
+      const devilEyeColor = mixHex(BLUE, EVIL_RED, evilProgress)
       const railGhostRect = phaseRef.current === 'signal' && modeIndex === 1 ? canvas.getBoundingClientRect() : null
       const railVelocity = mouseVelocity.current
       const railSpeed = Math.hypot(railVelocity.x, railVelocity.y)
@@ -578,20 +740,22 @@ export default function EasterGame() {
           }
 
           let size = 2
-          let color = DOT
+          let color = dotColor
 
           if (phaseRef.current === 'castle') {
             const castleElapsed = time - unlockTime.current
             const scan = Math.min(COLS + 2, (castleElapsed / CASTLE_ASSEMBLE_MS) * (COLS + 4) - 2)
             const distanceToScan = Math.abs(c - scan)
             if (distanceToScan < 3) {
-              color = BLUE
+              color = accentColor
               size = 2.5 + (3 - distanceToScan)
             } else if ((c + r) % 11 === 0) {
-              color = '#b9b5b0'
+              color = mutedColor
               size = 2
             }
           } else if (phaseRef.current === 'signal') {
+            const glyph = evilProgress > 0 ? devilGlyph(c, r) : ' '
+            const devilCell = glyph !== ' '
             const rows = signalRows(c, vx, vy, nx, ny, energy, waveOffset, modeIndex, modePhase)
             const upperWave = Math.round(rows.upper)
             const lowerWave = Math.round(rows.lower)
@@ -613,7 +777,7 @@ export default function EasterGame() {
             const isBlue = modeIndex === 1 ? railGate || Math.abs(r - upperWave) < 1 || Math.abs(r - lowerWave) < 1 : modeIndex === 2 ? glassGate || Math.abs(r - spine) < 1 : baseSignal
 
             if (isBlue) {
-              color = BLUE
+              color = accentColor
               size = modeIndex === 1
                 ? (r % 4 === 0 ? 8 : 5)
                 : modeIndex === 2
@@ -640,14 +804,25 @@ export default function EasterGame() {
                 if (ghosts.length > 560) ghosts.splice(0, ghosts.length - 560)
               }
             } else if (distance < 0.08) {
-              color = INK
+              color = inkColor
               size = 4 + energy * 3
             } else if (Math.abs(c / COLS - nx) < 0.015 || Math.abs(r / ROWS - ny) < 0.025) {
-              color = '#b9b5b0'
+              color = mutedColor
               size = 3
             }
+
+            if (devilCell) {
+              const twitch = Math.sin(time * 0.011 + c * 0.6 + r * 0.35 + pattern * 0.4)
+              pullX += Math.sin(r * 0.9 + time * 0.006) * evilProgress * (1.4 + energy * 3.2)
+              pullY += twitch * evilProgress * (1.2 + collision * 2.8)
+              color = glyph === '@' ? devilEyeColor : devilColor
+              size = Math.max(size, 3.5 + evilProgress * (2.4 + Math.max(0, twitch) * 2.4 + collision * 2.8))
+            } else if (evilProgress > 0) {
+              color = mixHex(color, EVIL_DOT, evilProgress * 0.82)
+              size *= 1 - evilProgress * 0.22
+            }
           } else if (distance < 0.075) {
-            color = BLUE
+            color = accentColor
             size = 5
           }
 
@@ -659,8 +834,12 @@ export default function EasterGame() {
 
     const tick = (time: number) => {
       raf.current = requestAnimationFrame(tick)
+      const evilRaw = evilModeRef.current ? Math.min(1, Math.max(0, (time - evilStartedAt.current) / EVIL_TRANSITION_MS)) : 0
+      const evilProgress = smoothStep(evilRaw)
+      const pageColor = mixHex(PAGE, EVIL_PAGE, evilProgress)
+      const accentColor = mixHex(BLUE, EVIL_RED, evilProgress)
       ctx.clearRect(0, 0, CW, CH)
-      ctx.fillStyle = PAGE
+      ctx.fillStyle = pageColor
       ctx.fillRect(0, 0, CW, CH)
 
       drawGrid(time)
@@ -730,11 +909,28 @@ export default function EasterGame() {
         const elapsed = time - unlockTime.current
         const pulse = Math.max(0, 1 - elapsed / 900)
         if (pulse > 0) {
-          ctx.strokeStyle = `rgba(42, 95, 192, ${pulse * 0.32})`
+          ctx.strokeStyle = evilModeRef.current
+            ? `rgba(211, 50, 47, ${pulse * 0.34})`
+            : `rgba(42, 95, 192, ${pulse * 0.32})`
           ctx.lineWidth = 1 + pulse * 8
           ctx.beginPath()
           ctx.arc(CW / 2, CH / 2, 88 + (1 - pulse) * 80, 0, Math.PI * 2)
           ctx.stroke()
+        }
+
+        if (evilModeRef.current && evilRaw < 1) {
+          const sweep = smoothStep(evilRaw)
+          ctx.save()
+          ctx.globalAlpha = 1 - sweep
+          ctx.strokeStyle = accentColor
+          ctx.lineWidth = 2 + (1 - sweep) * 10
+          ctx.beginPath()
+          ctx.arc(CW / 2, CH / 2, 26 + sweep * 460, 0, Math.PI * 2)
+          ctx.stroke()
+          ctx.globalAlpha = (1 - sweep) * 0.2
+          ctx.fillStyle = EVIL_INK
+          ctx.fillRect(0, 0, CW, CH)
+          ctx.restore()
         }
       }
     }
@@ -744,11 +940,12 @@ export default function EasterGame() {
   }, [pattern, updateSynth])
 
   useEffect(() => {
-    const syncPointer = (clientX: number, clientY: number) => {
+    const syncPointer = (clientX: number, clientY: number, eventTime = 0) => {
       const root = rootRef.current
       const canvas = canvasRef.current
       if (!root || !canvas) return
 
+      trackRailSpin(clientX, clientY, eventTime)
       updateViewportMotion(clientX, clientY)
       const vx = Math.min(1, Math.max(0, clientX / window.innerWidth))
       const vy = Math.min(1, Math.max(0, clientY / window.innerHeight))
@@ -763,11 +960,11 @@ export default function EasterGame() {
       }
     }
 
-    const onMove = (e: PointerEvent) => syncPointer(e.clientX, e.clientY)
+    const onMove = (e: PointerEvent) => syncPointer(e.clientX, e.clientY, e.timeStamp)
     syncPointer(window.innerWidth / 2, window.innerHeight / 2)
     window.addEventListener('pointermove', onMove)
     return () => window.removeEventListener('pointermove', onMove)
-  }, [updateViewportMotion])
+  }, [trackRailSpin, updateViewportMotion])
 
   const toCanvas = (e: React.PointerEvent<HTMLCanvasElement>): Pt => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -795,9 +992,9 @@ export default function EasterGame() {
     }
   }
 
-  const unlock = () => {
+  const unlock = (startedAt: number) => {
     phaseRef.current = 'castle'
-    unlockTime.current = performance.now()
+    unlockTime.current = startedAt
     drawPts.current = []
     ensureSynth()
     setPhase('castle')
@@ -831,7 +1028,7 @@ export default function EasterGame() {
     drawPts.current.push(toCanvas(e))
 
     if (isSquareGesture(drawPts.current)) {
-      unlock()
+      unlock(e.timeStamp)
     } else {
       window.setTimeout(() => {
         drawPts.current = []
@@ -849,21 +1046,26 @@ export default function EasterGame() {
 
   const mono = '"Courier New", Courier, monospace'
   const sans = 'Arial, Helvetica, sans-serif'
-  const activeSynthMode = SYNTH_MODES[synthMode]
+  const pageColor = evilMode ? EVIL_PAGE : PAGE
+  const inkColor = evilMode ? EVIL_INK : INK
+  const mutedColor = evilMode ? EVIL_MUTED : MUTED
+  const accentColor = evilMode ? EVIL_RED : BLUE
+  const switchTrackColor = evilMode ? 'rgba(5, 5, 5, 0.68)' : 'rgba(233, 229, 224, 0.68)'
 
   return (
     <div
       ref={rootRef}
       onPointerMove={syncEventPointer}
       style={{
-      background: PAGE,
-      color: INK,
+      background: pageColor,
+      color: inkColor,
       width: '100vw',
       height: '100vh',
       position: 'relative',
       overflow: 'hidden',
       fontFamily: sans,
       userSelect: 'none',
+      transition: 'background 1.8s ease, color 1.8s ease',
       ['--lab-x' as string]: '50vw',
       ['--lab-y' as string]: '50vh',
     }}>
@@ -873,7 +1075,9 @@ export default function EasterGame() {
         top: 0,
         width: 1,
         height: '100%',
-        background: phase !== 'draw' ? 'rgba(42, 95, 192, 0.12)' : 'rgba(12, 12, 12, 0.035)',
+        background: evilMode
+          ? phase !== 'draw' ? 'rgba(211, 50, 47, 0.16)' : 'rgba(244, 240, 234, 0.035)'
+          : phase !== 'draw' ? 'rgba(42, 95, 192, 0.12)' : 'rgba(12, 12, 12, 0.035)',
         transform: 'translateX(-0.5px)',
         pointerEvents: 'none',
       }} />
@@ -883,7 +1087,9 @@ export default function EasterGame() {
         top: 'var(--lab-y)',
         width: '100%',
         height: 1,
-        background: phase !== 'draw' ? 'rgba(42, 95, 192, 0.10)' : 'rgba(12, 12, 12, 0.03)',
+        background: evilMode
+          ? phase !== 'draw' ? 'rgba(211, 50, 47, 0.14)' : 'rgba(244, 240, 234, 0.03)'
+          : phase !== 'draw' ? 'rgba(42, 95, 192, 0.10)' : 'rgba(12, 12, 12, 0.03)',
         transform: 'translateY(-0.5px)',
         pointerEvents: 'none',
       }} />
@@ -910,91 +1116,127 @@ export default function EasterGame() {
         fontSize: 16,
         zIndex: 4,
       }}>
-        <div />
+        <div style={{ position: 'absolute', top: 0, right: 0, display: 'grid', justifyItems: 'end' }}>
+          {phase === 'signal' && (
+            <>
+              <div
+                role="radiogroup"
+                aria-label="Synth type"
+                onPointerDown={(e) => {
+                  modeSwitchDragging.current = true
+                  e.currentTarget.setPointerCapture(e.pointerId)
+                  selectSynthModeFromPointer(e)
+                }}
+                onPointerMove={(e) => {
+                  if (modeSwitchDragging.current) selectSynthModeFromPointer(e)
+                }}
+                onPointerUp={() => {
+                  modeSwitchDragging.current = false
+                }}
+                onPointerCancel={() => {
+                  modeSwitchDragging.current = false
+                }}
+                onLostPointerCapture={() => {
+                  modeSwitchDragging.current = false
+                }}
+                style={{
+                  position: 'relative',
+                  width: 150,
+                  height: 34,
+                  color: accentColor,
+                  cursor: 'pointer',
+                  fontFamily: mono,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: 0,
+                  lineHeight: 1,
+                  touchAction: 'none',
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    inset: '5px 0',
+                    border: evilMode ? '1px solid rgba(211, 50, 47, 0.34)' : '1px solid rgba(42, 95, 192, 0.28)',
+                    background: switchTrackColor,
+                  }}
+                />
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    top: 7,
+                    left: 4,
+                    width: 'calc((100% - 8px) / 3)',
+                    height: 20,
+                    background: accentColor,
+                    transform: `translateX(${synthMode * 100}%)`,
+                    transition: 'transform 180ms ease',
+                  }}
+                />
+                <span
+                  style={{
+                    position: 'relative',
+                    zIndex: 1,
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    alignItems: 'center',
+                    height: '100%',
+                  }}
+                >
+                  {SYNTH_MODES.map((mode, index) => (
+                    <button
+                      key={mode.shortName}
+                      type="button"
+                      role="radio"
+                      aria-checked={synthMode === index}
+                      aria-label={mode.name}
+                      onClick={() => selectSynthMode(index)}
+                      style={{
+                        display: 'grid',
+                        placeItems: 'center',
+                        width: '100%',
+                        height: '100%',
+                        border: 0,
+                        background: 'transparent',
+                        color: synthMode === index ? pageColor : index === 0 ? inkColor : accentColor,
+                        cursor: 'pointer',
+                        font: 'inherit',
+                        fontSize: 10,
+                        fontWeight: 700,
+                        lineHeight: 1,
+                        margin: 0,
+                        padding: 0,
+                        opacity: synthMode === index ? 1 : 0.72,
+                        transition: 'color 180ms ease, opacity 180ms ease',
+                      }}
+                    >
+                      {mode.shortName}
+                    </button>
+                  ))}
+                </span>
+              </div>
+              <span style={{ marginTop: 2, fontSize: 11, lineHeight: 1.1, color: mutedColor, fontFamily: mono, letterSpacing: 0 }}>
+                synth select
+              </span>
+            </>
+          )}
+        </div>
 
-        <nav style={{ display: 'flex', alignItems: 'center', gap: 34, fontSize: 15 }}>
-          <span style={{ color: phase === 'signal' && metrics.axis !== 'y' ? BLUE : INK, opacity: phase === 'draw' ? 0.42 : 1 }}>
+        <nav style={{ gridColumn: 2, justifySelf: 'center', display: 'flex', alignItems: 'center', gap: 34, fontSize: 15 }}>
+          <span style={{ color: phase === 'signal' && metrics.axis !== 'y' ? accentColor : inkColor, opacity: phase === 'draw' ? 0.42 : 1 }}>
             <span style={{ fontFamily: mono, fontSize: 17, marginRight: 8 }}>{metrics.energy > 66 ? '✹' : '✦'}</span>Signal
           </span>
-          <span style={{ color: phase === 'draw' ? BLUE : phase === 'castle' ? BLUE : metrics.axis === 'xy' ? INK : MUTED }}>
+          <span style={{ color: phase === 'draw' ? accentColor : phase === 'castle' ? accentColor : metrics.axis === 'xy' ? inkColor : mutedColor }}>
             <span style={{ fontFamily: mono, fontSize: 17, marginRight: 8 }}>{phase === 'draw' ? '◯' : phase === 'castle' ? '□' : '●'}</span>Draw
           </span>
-          <span style={{ color: phase === 'signal' && metrics.axis !== 'x' ? BLUE : INK, opacity: phase === 'draw' ? 0.42 : 1 }}>
+          <span style={{ color: phase === 'signal' && metrics.axis !== 'x' ? accentColor : inkColor, opacity: phase === 'draw' ? 0.42 : 1 }}>
             <span style={{ fontFamily: mono, fontSize: 17, marginRight: 8 }}>{metrics.axis === 'y' ? '↕' : '⌁'}</span>Lab
           </span>
         </nav>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          {phase === 'signal' && (
-            <button
-              type="button"
-              onClick={cycleSynthMode}
-              aria-label={`Change synth type, current type ${activeSynthMode.name}`}
-              style={{
-                position: 'relative',
-                width: 138,
-                height: 34,
-                border: 0,
-                background: 'transparent',
-                color: BLUE,
-                cursor: 'pointer',
-                fontFamily: mono,
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: 0,
-                lineHeight: 1,
-                padding: 0,
-              }}
-            >
-              <span
-                aria-hidden="true"
-                style={{
-                  position: 'absolute',
-                  inset: '5px 0',
-                  border: '1px solid rgba(42, 95, 192, 0.28)',
-                  background: 'rgba(233, 229, 224, 0.68)',
-                }}
-              />
-              <span
-                aria-hidden="true"
-                style={{
-                  position: 'absolute',
-                  top: 7,
-                  left: 4,
-                  width: 42,
-                  height: 20,
-                  background: BLUE,
-                  transform: `translateX(${synthMode * 44}px)`,
-                  transition: 'transform 180ms ease',
-                }}
-              />
-              <span
-                aria-hidden="true"
-                style={{
-                  position: 'relative',
-                  zIndex: 1,
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, 1fr)',
-                  alignItems: 'center',
-                  height: '100%',
-                }}
-              >
-                {SYNTH_MODES.map((mode, index) => (
-                  <span
-                    key={mode.shortName}
-                    style={{
-                      color: synthMode === index ? PAGE : index === 0 ? INK : BLUE,
-                      opacity: synthMode === index ? 1 : 0.72,
-                      transition: 'color 180ms ease, opacity 180ms ease',
-                    }}
-                  >
-                    {mode.shortName}
-                  </span>
-                ))}
-              </span>
-            </button>
-          )}
-        </div>
+        <div style={{ gridColumn: 3 }} />
       </header>
 
       <main style={{
@@ -1012,7 +1254,7 @@ export default function EasterGame() {
             alignItems: 'end',
             marginBottom: 20,
           }}>
-            <p style={{ margin: 0, fontSize: 13, fontFamily: mono, color: MUTED }}>hidden room</p>
+            <p style={{ margin: 0, fontSize: 13, fontFamily: mono, color: mutedColor }}>hidden room</p>
             <h1 style={{
               margin: 0,
               fontSize: 22,
@@ -1023,7 +1265,7 @@ export default function EasterGame() {
             }}>
               {phase === 'draw' ? 'draw the box' : phase === 'castle' ? 'unlocking gate' : 'krate signal lab'}
             </h1>
-            <p style={{ margin: 0, fontSize: 12, fontFamily: mono, color: MUTED, textAlign: 'right' }}>
+            <p style={{ margin: 0, fontSize: 12, fontFamily: mono, color: mutedColor, textAlign: 'right' }}>
               {phase === 'draw' ? 'unlock' : phase === 'castle' ? 'stand by' : 'move / click'}
             </p>
           </div>
@@ -1054,10 +1296,10 @@ export default function EasterGame() {
           }}>
             <div>
               <p style={{ margin: 0, fontSize: 18, lineHeight: 1.05, fontWeight: 500, letterSpacing: 0 }}>
-                {phase === 'draw' ? 'Easter frequency' : phase === 'castle' ? 'Gate sequence' : '4-bit blue room'}
+                {phase === 'draw' ? 'Easter frequency' : phase === 'castle' ? 'Gate sequence' : evilMode ? '4-bit red room' : '4-bit blue room'}
               </p>
-              <p style={{ margin: '4px 0 0', fontSize: 11, lineHeight: 1.1, color: MUTED, fontFamily: mono, letterSpacing: 0 }}>
-                {phase === 'draw' ? 'square gesture + reactive matrix' : phase === 'castle' ? 'terminal reveal + synth warmup' : audioOn ? 'mouse field + collision synth' : audioUnsupported ? 'visual signal only' : 'sound permission required'}
+              <p style={{ margin: '4px 0 0', fontSize: 11, lineHeight: 1.1, color: mutedColor, fontFamily: mono, letterSpacing: 0 }}>
+                {phase === 'draw' ? 'square gesture + reactive matrix' : phase === 'castle' ? 'terminal reveal + synth warmup' : evilMode ? 'inverted field + sinister synth' : audioOn ? 'mouse field + collision synth' : audioUnsupported ? 'visual signal only' : 'sound permission required'}
               </p>
             </div>
 
@@ -1067,13 +1309,13 @@ export default function EasterGame() {
               lineHeight: 1,
               fontFamily: mono,
               fontWeight: 700,
-              color: BLUE,
+              color: accentColor,
               opacity: phase === 'draw' && drawVisible ? 1 : phase === 'draw' ? 0 : 1,
-              textShadow: phase === 'draw' ? '0 0 5px rgba(42, 95, 192, 0.22)' : 'none',
+              textShadow: phase === 'draw' ? `0 0 5px ${evilMode ? 'rgba(211, 50, 47, 0.22)' : 'rgba(42, 95, 192, 0.22)'}` : 'none',
               transition: 'opacity 0.45s ease',
               textAlign: 'right',
             }}>
-              {phase === 'draw' ? 'draw a square.' : phase === 'castle' ? 'opening.' : audioOn ? 'synth live.' : audioUnsupported ? 'visual only.' : 'enable sound.'}
+              {phase === 'draw' ? 'draw a square.' : phase === 'castle' ? 'opening.' : evilMode ? 'evil live.' : audioOn ? 'synth live.' : audioUnsupported ? 'visual only.' : 'enable sound.'}
             </p>
           </div>
         </section>
@@ -1088,21 +1330,21 @@ export default function EasterGame() {
           alignItems: 'center',
           gap: 10,
           padding: '8px 10px',
-          border: '1px solid rgba(12, 12, 12, 0.12)',
-          background: 'rgba(233, 229, 224, 0.86)',
+          border: evilMode ? '1px solid rgba(244, 240, 234, 0.16)' : '1px solid rgba(12, 12, 12, 0.12)',
+          background: evilMode ? 'rgba(5, 5, 5, 0.86)' : 'rgba(233, 229, 224, 0.86)',
           backdropFilter: 'blur(8px)',
           fontFamily: mono,
           fontSize: 11,
-          color: INK,
+          color: inkColor,
         }}>
-          <span style={{ color: MUTED }}>sound locked</span>
+          <span style={{ color: mutedColor }}>sound locked</span>
           <button
             type="button"
             onClick={ensureSynth}
             style={{
-              border: '1px solid rgba(42, 95, 192, 0.36)',
-              background: 'rgba(42, 95, 192, 0.08)',
-              color: BLUE,
+              border: evilMode ? '1px solid rgba(211, 50, 47, 0.42)' : '1px solid rgba(42, 95, 192, 0.36)',
+              background: evilMode ? 'rgba(211, 50, 47, 0.1)' : 'rgba(42, 95, 192, 0.08)',
+              color: accentColor,
               cursor: 'pointer',
               fontFamily: mono,
               fontSize: 11,
@@ -1125,9 +1367,9 @@ export default function EasterGame() {
         gap: 18,
         fontSize: 13,
       }}>
-        <span style={{ color: metrics.axis === 'x' ? BLUE : INK }}>index {metrics.index.toString().padStart(2, '0')}</span>
-        <span style={{ color: metrics.energy > 52 ? BLUE : INK }}>blueprint {metrics.energy}%</span>
-        <span style={{ color: metrics.collision > 45 ? BLUE : INK }}>contact {metrics.collision}%</span>
+        <span style={{ color: metrics.axis === 'x' ? accentColor : inkColor }}>index {metrics.index.toString().padStart(2, '0')}</span>
+        <span style={{ color: metrics.energy > 52 ? accentColor : inkColor }}>blueprint {metrics.energy}%</span>
+        <span style={{ color: metrics.collision > 45 ? accentColor : inkColor }}>contact {metrics.collision}%</span>
       </footer>
 
     </div>
