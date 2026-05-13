@@ -386,26 +386,38 @@ export default function EasterGame() {
         const dot = ghosts[i]
         dot.x += dot.vx
         dot.y += dot.vy
-        dot.vx *= 0.993
-        dot.vy *= 0.993
-        dot.size *= 0.996
-        dot.alpha *= 0.972
+        const evilTrail = evilModeRef.current
+        dot.vx *= evilTrail ? 0.996 : 0.993
+        dot.vy *= evilTrail ? 0.996 : 0.993
+        dot.size *= evilTrail ? 0.999 : 0.996
+        dot.alpha *= evilTrail ? 0.985 : 0.972
 
         if (
           dot.alpha < 0.012 ||
-          dot.x < -360 ||
-          dot.x > width + 360 ||
-          dot.y < -360 ||
-          dot.y > height + 360
+          dot.x < (evilTrail ? -520 : -360) ||
+          dot.x > width + (evilTrail ? 520 : 360) ||
+          dot.y < (evilTrail ? -520 : -360) ||
+          dot.y > height + (evilTrail ? 520 : 360)
         ) {
           ghosts.splice(i, 1)
           continue
         }
 
-        ctx.fillStyle = evilModeRef.current
-          ? `rgba(211, 50, 47, ${dot.alpha})`
-          : `rgba(42, 95, 192, ${dot.alpha})`
-        ctx.fillRect(dot.x - dot.size / 2, dot.y - dot.size / 2, dot.size, dot.size)
+        if (evilTrail) {
+          ctx.save()
+          ctx.shadowColor = `rgba(211, 16, 20, ${Math.min(0.72, dot.alpha)})`
+          ctx.shadowBlur = 18 + dot.size * 1.8
+          ctx.fillStyle = `rgba(90, 0, 0, ${dot.alpha * 0.36})`
+          ctx.fillRect(dot.x - dot.size * 1.16, dot.y - dot.size * 1.16, dot.size * 2.32, dot.size * 2.32)
+          ctx.fillStyle = `rgba(211, 50, 47, ${Math.min(0.95, dot.alpha * 1.22)})`
+          ctx.fillRect(dot.x - dot.size / 2, dot.y - dot.size / 2, dot.size, dot.size)
+          ctx.fillStyle = `rgba(244, 240, 234, ${dot.alpha * 0.18})`
+          ctx.fillRect(dot.x - dot.size * 0.22, dot.y - dot.size * 0.22, dot.size * 0.44, dot.size * 0.44)
+          ctx.restore()
+        } else {
+          ctx.fillStyle = `rgba(42, 95, 192, ${dot.alpha})`
+          ctx.fillRect(dot.x - dot.size / 2, dot.y - dot.size / 2, dot.size, dot.size)
+        }
       }
     }
 
@@ -846,25 +858,40 @@ export default function EasterGame() {
                 : modeIndex === 2
                   ? (positiveMod(c + r + pattern, 5) === 0 ? 4 : 8)
                   : (pattern + (activeAxis === 'xy' ? 0 : 1)) % 2 === 0 ? 9 : 7
-              if (modeIndex === 1 && railGhostRect && railSpeed > 0.8 && (c * 13 + r * 17 + pattern) % 9 === 0) {
+              const evilTrail = evilModeRef.current
+              const ghostModulo = evilTrail ? 5 : 9
+              if (modeIndex === 1 && railGhostRect && railSpeed > (evilTrail ? 0.58 : 0.8) && (c * 13 + r * 17 + pattern) % ghostModulo === 0) {
                 const ghosts = railGhostsRef.current
                 const directionX = railVelocity.x / railSpeed
                 const directionY = railVelocity.y / railSpeed
-                const side = ((c + r) % 2 === 0 ? 1 : -1) * Math.min(1.8, railSpeed * 0.02)
-                const throwSpeed = Math.min(30, 4.8 + railSpeed * 0.42)
+                const sideSign = (c + r) % 2 === 0 ? 1 : -1
+                const side = sideSign * Math.min(evilTrail ? 5.4 : 1.8, railSpeed * (evilTrail ? 0.062 : 0.02))
+                const throwSpeed = Math.min(evilTrail ? 42 : 30, (evilTrail ? 7.5 : 4.8) + railSpeed * (evilTrail ? 0.56 : 0.42))
                 const drawX = x + pullX
                 const drawY = y + pullY
                 const viewportX = railGhostRect.left + (drawX / CW) * railGhostRect.width
                 const viewportY = railGhostRect.top + (drawY / CH) * railGhostRect.height
+                const viewportSize = Math.max(3, size * (railGhostRect.width / CW) * (evilTrail ? 1.18 : 0.82))
                 ghosts.push({
                   x: viewportX,
                   y: viewportY,
                   vx: directionX * throwSpeed - directionY * side,
                   vy: directionY * throwSpeed + directionX * side,
-                  size: Math.max(3, size * (railGhostRect.width / CW) * 0.82),
-                  alpha: 0.42 + Math.min(0.34, railSpeed * 0.008),
+                  size: viewportSize,
+                  alpha: (evilTrail ? 0.58 : 0.42) + Math.min(evilTrail ? 0.38 : 0.34, railSpeed * (evilTrail ? 0.011 : 0.008)),
                 })
-                if (ghosts.length > 560) ghosts.splice(0, ghosts.length - 560)
+                if (evilTrail && (c + pattern) % 3 === 0) {
+                  ghosts.push({
+                    x: viewportX - directionX * viewportSize * 1.5,
+                    y: viewportY - directionY * viewportSize * 1.5,
+                    vx: directionX * throwSpeed * 0.68 + directionY * side * 0.72,
+                    vy: directionY * throwSpeed * 0.68 - directionX * side * 0.72,
+                    size: viewportSize * 0.68,
+                    alpha: 0.36 + Math.min(0.26, railSpeed * 0.007),
+                  })
+                }
+                const maxGhosts = evilTrail ? 980 : 560
+                if (ghosts.length > maxGhosts) ghosts.splice(0, ghosts.length - maxGhosts)
               }
             } else if (distance < 0.08) {
               color = inkColor
