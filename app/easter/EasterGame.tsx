@@ -404,16 +404,8 @@ export default function EasterGame() {
         }
 
         if (evilTrail) {
-          ctx.save()
-          ctx.shadowColor = `rgba(211, 16, 20, ${Math.min(0.72, dot.alpha)})`
-          ctx.shadowBlur = 18 + dot.size * 1.8
-          ctx.fillStyle = `rgba(90, 0, 0, ${dot.alpha * 0.36})`
-          ctx.fillRect(dot.x - dot.size * 1.16, dot.y - dot.size * 1.16, dot.size * 2.32, dot.size * 2.32)
           ctx.fillStyle = `rgba(211, 50, 47, ${Math.min(0.95, dot.alpha * 1.22)})`
           ctx.fillRect(dot.x - dot.size / 2, dot.y - dot.size / 2, dot.size, dot.size)
-          ctx.fillStyle = `rgba(244, 240, 234, ${dot.alpha * 0.18})`
-          ctx.fillRect(dot.x - dot.size * 0.22, dot.y - dot.size * 0.22, dot.size * 0.44, dot.size * 0.44)
-          ctx.restore()
         } else {
           ctx.fillStyle = `rgba(42, 95, 192, ${dot.alpha})`
           ctx.fillRect(dot.x - dot.size / 2, dot.y - dot.size / 2, dot.size, dot.size)
