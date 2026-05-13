@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import LampCorner from "./components/LampCorner";
 import BackSwipeGuard from "./components/BackSwipeGuard";
+import SystemAdvisory from "./components/SystemAdvisory";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -40,6 +41,7 @@ export default function RootLayout({
         {children}
         <LampCorner />
         <BackSwipeGuard />
+        <SystemAdvisory />
       </body>
     </html>
   );
