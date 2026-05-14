@@ -77,7 +77,6 @@ type MatrixDot = {
   vx: number;
   vy: number;
   size: number;
-  phase: number;
   rgb: [number, number, number];
 };
 
@@ -257,8 +256,6 @@ function ParticleButton({
   );
 }
 
-type MatrixGhost = { pts: Float32Array; alpha: number };
-
 const hexToRgb = (hex: string): [number, number, number] => {
   const normalized = hex.replace("#", "");
   return [
@@ -287,9 +284,7 @@ function DotMatrixProjectSignal({
     if (!ctx) return;
 
     let dots: MatrixDot[] = [];
-    let ghosts: MatrixGhost[] = [];
     let raf = 0;
-    let tick = 0;
     const signalRgb = isMobile && activeSignal === "#808080" ? hexToRgb("#c8c8c8") : hexToRgb(activeSignal);
 
     const buildDots = () => {
@@ -347,7 +342,6 @@ function DotMatrixProjectSignal({
             vx: 0,
             vy: 0,
             size: isMobile ? 5.2 : 6,
-            phase: Math.random() * Math.PI * 2,
             rgb: signalRgb,
           });
         }
@@ -365,7 +359,6 @@ function DotMatrixProjectSignal({
       });
 
       dots = next;
-      ghosts = [];
     };
 
     const onPointerMove = (event: PointerEvent) => {
@@ -388,19 +381,10 @@ function DotMatrixProjectSignal({
 
     const animate = () => {
       raf = requestAnimationFrame(animate);
-      tick += 1;
       const rect = canvas.getBoundingClientRect();
       const cssW = Math.max(1, rect.width);
       const cssH = Math.max(1, rect.height);
       ctx.clearRect(0, 0, cssW, cssH);
-
-      ghosts.forEach((ghost) => {
-        for (let i = 0; i < dots.length && i * 2 + 1 < ghost.pts.length; i++) {
-          drawDot(ghost.pts[i * 2], ghost.pts[i * 2 + 1], dots[i].size, dots[i].rgb, ghost.alpha);
-        }
-        ghost.alpha *= 0.86;
-      });
-      ghosts = ghosts.filter((ghost) => ghost.alpha > 0.025);
 
       const pointer = pointerRef.current;
       const driftX = (pointer.x - 0.5) * (isMobile ? 10 : 28);
@@ -408,12 +392,8 @@ function DotMatrixProjectSignal({
       const mouseX = pointer.x * cssW;
       const mouseY = pointer.y * cssH;
 
-      const fadeStart = cssH * 0.72;
-      const fadeRange = cssH - fadeStart;
-
       dots.forEach((dot) => {
-        const wave = Math.sin(tick * 0.018 + dot.phase) * (isMobile ? 0.45 : 0.7);
-        let targetX = dot.tx + driftX + wave;
+        let targetX = dot.tx + driftX;
         let targetY = dot.ty + driftY;
 
         if (pointer.active) {
@@ -433,28 +413,11 @@ function DotMatrixProjectSignal({
         dot.vx *= 0.78;
         dot.vy *= 0.78;
 
-        const breakT = dot.y > fadeStart ? Math.min(1, (dot.y - fadeStart) / fadeRange) : 0;
-        if (breakT > 0) {
-          dot.vx += (Math.random() - 0.5) * breakT * 1.8;
-          dot.vy += breakT * 0.6;
-        }
-
         dot.x += dot.vx;
         dot.y += dot.vy;
 
-        const alpha = (isMobile ? 0.96 : 0.88) * (breakT > 0 ? (1 - breakT) * (1 - breakT) : 1);
-        if (alpha > 0.01) drawDot(dot.x, dot.y, dot.size, dot.rgb, alpha);
+        drawDot(dot.x, dot.y, dot.size, dot.rgb, isMobile ? 0.96 : 0.88);
       });
-
-      if (tick % 5 === 0 && dots.length > 0) {
-        const pts = new Float32Array(dots.length * 2);
-        dots.forEach((dot, i) => {
-          pts[i * 2] = dot.x;
-          pts[i * 2 + 1] = dot.y;
-        });
-        if (ghosts.length > 8) ghosts.shift();
-        ghosts.push({ pts, alpha: 0.16 });
-      }
     };
 
     buildDots();
