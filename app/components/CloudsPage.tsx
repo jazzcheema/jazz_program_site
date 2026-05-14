@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import GridMouseTrail from "./GridMouseTrail";
 import * as THREE from "three";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -1252,6 +1253,7 @@ export default function CloudsPage() {
         }
       `}</style>
       <div className="clouds-room-grid" aria-hidden="true" />
+      <GridMouseTrail />
 
       <canvas
         ref={canvasRef}

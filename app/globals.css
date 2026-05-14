@@ -232,6 +232,11 @@ a.clouds-particle-btn {
   transform: translate(-50%, -50%);
   gap: clamp(0.8rem, 1.6vw, 1.3rem);
   justify-items: center;
+  padding: clamp(1rem, 2vw, 1.6rem);
+  background: rgba(233, 229, 224, 0.42);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(22, 22, 22, 0.06);
 }
 
 .sand-field-label {
@@ -353,8 +358,8 @@ a.clouds-particle-btn {
   background: rgba(233, 229, 224, 0.62);
   cursor: grab;
   touch-action: none;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .sand-joystick-cross {
@@ -399,8 +404,8 @@ a.clouds-particle-btn {
   transform: translateX(-50%);
   gap: 0.42rem;
   justify-items: center;
-  border: 1px solid #161616;
-  background: #161616;
+  border: 1px solid rgba(22, 22, 22, 0.7);
+  background: rgba(22, 22, 22, 0.78);
   color: #ffffff;
   padding: 1rem 1.2rem;
   text-align: center;

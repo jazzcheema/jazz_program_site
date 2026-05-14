@@ -55,28 +55,43 @@ The target is not arcade, racing, military HUD, or dense game UI. The interactiv
 ### Core Rules
 
 - **One clear focus per page**: avoid adding explanatory panels or decorative systems unless they serve the main interaction.
-- **Pale field first**: default scene surface is `#e9e5e0`; dark UI belongs mainly to the hidden Krate room or inverse hover states.
+- **Pale field first**: default scene surface is `#e2deda` (body, home, CV); dark UI belongs mainly to the hidden Krate room or inverse hover states.
 - **Lamp as site mark**: do not add large homepage identity text, portfolio-axis branding, or top-right personal labels. The lamp owns that corner.
 - **Portfolio links matter most on Clouds**: preserve the bottom-centered particle project title, description, stack/type metadata, and `VISIT` link.
 - **Sand stays abstract**: no genie, camera object, webcam/skyfeed, character scene, or top nav. It is a block/gate puzzle that reveals contact.
-- **Buttons flip with purpose**: hover/focus should invert color and swap command text when useful, for example `MAKE_CONTACT` to `EMAIL`.
+- **Buttons flip with purpose**: hover/focus should invert color and swap command text when useful, for example `MAKE_CONTACT` → `EMAIL` and `GATE CONFIRMED` → `UNLOCKED`.
+- **True inverse on flip**: dark cards flip to pure `#ffffff`; light cards flip to `#161616`. Avoid off-white as a hover state.
 - **Block language is shared**: pixel dots, particle letters, square gates, signal grids, and small block trails are the common interaction vocabulary.
 - **Use viewport corners deliberately**: controls can live at the edges when useful; avoid forcing every page into a vertical center aisle.
 - **No decorative atmosphere**: avoid starfields, vortexes, generic glows, and mood effects unless the specific interaction requires them.
 - **Scene pages are viewport-locked**: home, Clouds, Sand, and hidden lab should not scroll. CV can remain document-like.
+- **Frosted glass for floating panels**: sand stage and joystick use `backdrop-filter: blur(14px)` with semi-transparent backgrounds. Contact cards use `blur(18px)`. Keeps the field visible behind UI.
+- **Grid responds to mouse on desktop**: all scene pages (home, clouds, sand) drift the background grid with a slow lerp (4%, ±24px) and ghost visited cells with a fading white canvas trail. Mobile skips both effects.
 
 ### Palette
 
 | Name | Value | Role |
 |---|---|---|
-| FIELD | `#e9e5e0` | Primary pale room surface |
+| FIELD | `#e2deda` | Primary pale room surface (body, home, CV) |
+| FIELD-ALT | `#e9e5e0` | Sand room surface and castle block field |
 | INK | `#161616` | Primary text and active inverse controls |
 | RULE | `rgba(22,22,22,0.12)` | Dividers, grid lines, inactive frames |
 | GHOST | `#8b8780` | Secondary labels and quiet metadata |
 | MUTED | `#3d3a36` | Readable body copy |
-| HEAT | `#c87820` | Sand/castle blocks, peak/high state |
+| HEAT | `#c87820` | Sand/castle blocks, advisory cards, peak/high state |
 | OK | `#249958` | Gate, ready, confirmed state |
 | TRACE | `#2a5fc0` | Active block, selection, movement trail |
+
+### Advisory Cards
+
+Both the desktop `SystemAdvisory` and the mobile gate screen use the same card design: `#c87820` background, octagonal `clip-path`, `!` icon box, `SYS-ADV` header line, rule dividers, and a dark `#0c0c0c` clipped button with `#c87820` text that flips on hover. The mobile version uses `CLASS: NOTICE-M` and mobile-specific copy. Both are shown once per device via `localStorage`.
+
+### Sand Page Details
+
+- The gate contact card appears 420ms after the gate opens — prevents the closing touch from immediately triggering hover state on the card.
+- Contact card uses frosted dark glass (`rgba(22,22,22,0.78)` + `blur(18px)`) so the pale field bleeds through slightly.
+- Sand game grid is 190px tiles; home and clouds are 192px. `GridMouseTrail` takes a `cellSize` prop to stay aligned.
+- On mobile the joystick and contact card share the same bottom-center position; the delay above prevents overlap glitch.
 
 ### Page Notes
 

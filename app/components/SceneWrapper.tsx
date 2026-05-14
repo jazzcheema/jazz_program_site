@@ -5,6 +5,7 @@ import CarpetScene from "./CarpetScene";
 import CloudsPage from "./CloudsPage";
 import SandPage from "./SandPage";
 import CVPage from "./CVPage";
+import GridMouseTrail from "./GridMouseTrail";
 
 export default function SceneWrapper() {
   const [reached, setReached] = useState(false);
@@ -196,6 +197,8 @@ export default function SceneWrapper() {
       className="home-room w-dvw h-dvh overflow-hidden relative"
       style={{ width: "100dvw", height: "100dvh", background: "#e2deda" }}
     >
+      <GridMouseTrail />
+
       <div className="absolute inset-0">
         <CarpetScene
           onReachClouds={handleReachClouds}

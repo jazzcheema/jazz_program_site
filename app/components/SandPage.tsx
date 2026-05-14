@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import GridMouseTrail from "./GridMouseTrail";
 
 type Cell = {
   x: number;
@@ -235,6 +236,7 @@ export default function SandPage() {
       style={{ opacity: show ? 1 : 0 }}
     >
       <div className="sand-kingdom-grid" aria-hidden="true" />
+      <GridMouseTrail cellSize={190} />
 
       <main className="sand-field-stage" aria-label="Sand kingdom gate field">
         <div className="sand-field-label">
