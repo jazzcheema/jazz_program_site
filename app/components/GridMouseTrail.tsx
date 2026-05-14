@@ -93,7 +93,7 @@ export default function GridMouseTrail({ cellSize = 192 }: { cellSize?: number }
       window.removeEventListener("resize", onResize);
       cancelAnimationFrame(frame);
     };
-  }, []);
+  }, [cellSize]);
 
   return (
     <canvas
