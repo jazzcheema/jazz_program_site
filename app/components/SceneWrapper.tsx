@@ -128,9 +128,9 @@ export default function SceneWrapper() {
             This experience was built for a wide viewport: 3D scenes, cinematic camera moves, and interactive controls are optimised for desktop.
             <br /><br />
             → OPTIMAL: Desktop or laptop<br />
-            → BROWSER: Chrome / Safari / Firefox / Arc — latest<br />
+            → Ensure your browser is fully up to date<br />
             → Mobile renders a reduced version<br />
-            → Additional rooms and 3D scenes are desktop-only
+            → Some 3D scenes and additional rooms are desktop-only
           </div>
 
           {/* Rule */}

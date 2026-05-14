@@ -395,10 +395,40 @@ a.clouds-particle-btn {
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   transition:
-    background-color 160ms ease,
+    background 160ms ease,
     border-color 160ms ease,
     color 160ms ease,
     transform 160ms ease;
+}
+
+.sand-contact-label {
+  position: relative;
+  display: block;
+}
+
+.sand-contact-label-default,
+.sand-contact-label-reveal {
+  display: block;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.sand-contact-label-reveal {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: translateY(0.28rem);
+}
+
+.sand-contact-card:hover .sand-contact-label-default,
+.sand-contact-card:focus-visible .sand-contact-label-default {
+  opacity: 0;
+  transform: translateY(-0.28rem);
+}
+
+.sand-contact-card:hover .sand-contact-label-reveal,
+.sand-contact-card:focus-visible .sand-contact-label-reveal {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .sand-contact-title {
@@ -429,8 +459,8 @@ a.clouds-particle-btn {
 
 .sand-contact-card:hover,
 .sand-contact-card:focus-visible {
-  border-color: rgba(22, 22, 22, 0.16);
-  background: rgba(233, 229, 224, 0.82);
+  border-color: #ffffff;
+  background: #ffffff;
   color: #161616;
   outline: none;
   transform: translateX(-50%) translateY(-1px);
@@ -471,6 +501,7 @@ a.clouds-particle-btn {
   letter-spacing: 0.2em;
   text-transform: uppercase;
   white-space: nowrap;
+  text-align: center;
   clip-path: polygon(6px 0%, calc(100% - 6px) 0%, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0% calc(100% - 6px), 0% 6px);
   transition: background 160ms ease, color 160ms ease;
 }
@@ -486,7 +517,7 @@ a.clouds-particle-btn {
   inset: 0;
   display: flex;
   align-items: center;
-  padding: 0 1.1rem;
+  justify-content: center;
   opacity: 0;
   transform: translateY(0.28rem);
   white-space: nowrap;
@@ -561,6 +592,7 @@ a.clouds-particle-btn {
     line-height: 1.42;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
   .clouds-matrix-meta {

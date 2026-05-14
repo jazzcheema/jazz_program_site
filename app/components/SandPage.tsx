@@ -271,7 +271,10 @@ export default function SandPage() {
           href="mailto:thecyberfoolz@gmail.com"
           aria-label="Email thecyberfoolz@gmail.com"
         >
-          <span>gate confirmed</span>
+          <span className="sand-contact-label">
+            <span className="sand-contact-label-default">gate confirmed</span>
+            <span className="sand-contact-label-reveal">unlocked</span>
+          </span>
           <strong className="sand-contact-title" aria-hidden="true">
             <span className="sand-contact-title-default">MAKE_CONTACT</span>
             <span className="sand-contact-title-reveal">EMAIL</span>
