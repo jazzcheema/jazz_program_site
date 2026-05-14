@@ -456,21 +456,23 @@ a.clouds-particle-btn {
 }
 
 .mobile-gate-btn {
+  display: block;
   position: relative;
   overflow: hidden;
-  align-self: flex-start;
-  min-width: 10.5rem;
-  background: transparent;
-  border: 1px solid #2a2a2a;
-  border-radius: 8px;
-  color: #808080;
+  width: 100%;
+  padding: 11px 0;
+  background: #0c0c0c;
+  border: none;
+  color: #c87820;
   cursor: pointer;
   font-family: var(--font-geist-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.14em;
-  padding: 0.7rem 1.1rem;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
   white-space: nowrap;
-  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+  clip-path: polygon(6px 0%, calc(100% - 6px) 0%, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0% calc(100% - 6px), 0% 6px);
+  transition: background 160ms ease, color 160ms ease;
 }
 
 .mobile-gate-btn-default,
@@ -492,8 +494,7 @@ a.clouds-particle-btn {
 
 .mobile-gate-btn:hover,
 .mobile-gate-btn:focus-visible {
-  background-color: #c8c8c8;
-  border-color: #c8c8c8;
+  background: #c8c8c8;
   color: #0c0c0c;
   outline: none;
 }

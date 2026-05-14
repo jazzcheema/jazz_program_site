@@ -60,13 +60,10 @@ export default function SceneWrapper() {
         style={{
           position: "fixed",
           inset: 0,
-          background: "#09090e",
+          background: "#e2deda",
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: "max(1.5rem, env(safe-area-inset-top)) max(1.5rem, env(safe-area-inset-left))",
-          fontFamily: "var(--font-geist-mono)",
           opacity: gateVisible ? 1 : 0,
           transition: "opacity 500ms ease",
           zIndex: 100,
@@ -74,63 +71,71 @@ export default function SceneWrapper() {
       >
         <div
           style={{
-            width: "min(26rem, calc(100vw - 3rem))",
+            width: "min(300px, calc(100vw - 3rem))",
+            background: "#c87820",
+            clipPath:
+              "polygon(18px 0%, calc(100% - 18px) 0%, 100% 18px, 100% calc(100% - 18px), calc(100% - 18px) 100%, 18px 100%, 0% calc(100% - 18px), 0% 18px)",
+            padding: "36px 32px 28px",
+            fontFamily: "var(--font-geist-mono)",
+            color: "#0c0c0c",
           }}
         >
-          <div
-            style={{
-              color: "#c87820",
-              fontSize: "0.52rem",
-              letterSpacing: "0.18em",
-              marginBottom: "1.1rem",
-            }}
-          >
-            → SYS_ADVISORY // ENV_CHECK
+          {/* Icon row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <div
+              style={{
+                width: 28,
+                height: 28,
+                border: "2px solid #0c0c0c",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 14,
+                fontWeight: 900,
+                flexShrink: 0,
+                clipPath:
+                  "polygon(6px 0%, calc(100% - 6px) 0%, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0% calc(100% - 6px), 0% 6px)",
+              }}
+            >
+              !
+            </div>
+            <div style={{ fontSize: 9, letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.65 }}>
+              SYS-ADV // CLASS: NOTICE-M
+            </div>
           </div>
 
-          <h1
+          {/* Title */}
+          <div
             style={{
-              color: "#ededed",
-              fontSize: "clamp(1.5rem, 7vw, 2rem)",
-              fontWeight: 400,
-              letterSpacing: "0.02em",
-              lineHeight: 1.06,
-              margin: "0 0 1.1rem",
+              fontSize: 15,
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              lineHeight: 1.25,
+              marginBottom: 4,
             }}
           >
-            DESKTOP_
+            TOUCH
             <br />
-            RECOMMENDED
-          </h1>
-
-          <p
-            style={{
-              color: "#6c6c6c",
-              fontSize: "0.68rem",
-              lineHeight: 1.65,
-              margin: "0 0 1.6rem",
-            }}
-          >
-            This experience was built for a wide viewport: 3D scenes, cinematic
-            camera moves, and interactive controls are optimised for desktop.
-          </p>
-
-          <div
-            style={{
-              color: "#383838",
-              fontSize: "0.52rem",
-              letterSpacing: "0.12em",
-              lineHeight: 1.8,
-              marginBottom: "2rem",
-              borderLeft: "1px solid #1e1e1e",
-              paddingLeft: "0.8rem",
-            }}
-          >
-            <div>→ OPTIMAL: Desktop or laptop</div>
-            <div>→ BROWSER: Chrome / Safari / Firefox / Arc — latest</div>
-            <div>→ Mobile renders a reduced version</div>
+            INTERFACE
           </div>
 
+          {/* Rule */}
+          <div style={{ height: 1, background: "rgba(12,12,12,0.25)", margin: "12px 0" }} />
+
+          {/* Body */}
+          <div style={{ fontSize: 10, lineHeight: 1.7, letterSpacing: "0.03em", opacity: 0.85, marginBottom: 20 }}>
+            This site is built for desktop. A reduced touch experience is loaded on mobile.
+            <br /><br />
+            → Use the on-screen joystick to navigate.<br />
+            → Landscape mode improves clarity.<br />
+            → Some 3D scenes are desktop-only.
+          </div>
+
+          {/* Rule */}
+          <div style={{ height: 1, background: "rgba(12,12,12,0.25)", marginBottom: 16 }} />
+
+          {/* Button */}
           <button
             type="button"
             className="mobile-gate-btn"
@@ -139,20 +144,9 @@ export default function SceneWrapper() {
               setShowMobileGate(false);
             }}
           >
-            <span className="mobile-gate-btn-default">→ ENTER_SITE</span>
-            <span className="mobile-gate-btn-reveal">→ CONFIRM_ENTRY</span>
+            <span className="mobile-gate-btn-default">CONFIRM &amp; CONTINUE →</span>
+            <span className="mobile-gate-btn-reveal">→ ENTERING SITE</span>
           </button>
-
-          <div
-            style={{
-              marginTop: "1.6rem",
-              color: "#242424",
-              fontSize: "0.42rem",
-              letterSpacing: "0.1em",
-            }}
-          >
-            VER.01.09.26 // JAZZ.CHEEMA SYSTEMS
-          </div>
         </div>
       </div>
     );
