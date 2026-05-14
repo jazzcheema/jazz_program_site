@@ -238,9 +238,9 @@ export default function SandPage() {
       <div className="sand-kingdom-grid" aria-hidden="true" />
       <GridMouseTrail cellSize={190} />
 
-      <main className="sand-field-stage" aria-label="Sand kingdom gate field">
+      <main className="sand-field-stage" aria-label="Glass Sand kingdom gate field">
         <div className="sand-field-label">
-          <span>sand kingdom</span>
+          <span>glass sand kingdom</span>
           <strong>{gateOpen ? "gate open" : "move block to gate"}</strong>
         </div>
 
