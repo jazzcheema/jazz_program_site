@@ -100,7 +100,7 @@ export default function SceneWrapper() {
               !
             </div>
             <div style={{ fontSize: 9, letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.65 }}>
-              SYS-ADV // CLASS: NOTICE-M
+              SYS-ADV // ENV_CHECK
             </div>
           </div>
 
@@ -115,9 +115,9 @@ export default function SceneWrapper() {
               marginBottom: 4,
             }}
           >
-            TOUCH
+            DESKTOP
             <br />
-            INTERFACE
+            RECOMMENDED
           </div>
 
           {/* Rule */}
@@ -125,11 +125,12 @@ export default function SceneWrapper() {
 
           {/* Body */}
           <div style={{ fontSize: 10, lineHeight: 1.7, letterSpacing: "0.03em", opacity: 0.85, marginBottom: 20 }}>
-            This site is built for desktop. A reduced touch experience is loaded on mobile.
+            This experience was built for a wide viewport: 3D scenes, cinematic camera moves, and interactive controls are optimised for desktop.
             <br /><br />
-            → Use the on-screen joystick to navigate.<br />
-            → Landscape mode improves clarity.<br />
-            → Some 3D scenes are desktop-only.
+            → OPTIMAL: Desktop or laptop<br />
+            → BROWSER: Chrome / Safari / Firefox / Arc — latest<br />
+            → Mobile renders a reduced version<br />
+            → Additional rooms and 3D scenes are desktop-only
           </div>
 
           {/* Rule */}
@@ -144,8 +145,8 @@ export default function SceneWrapper() {
               setShowMobileGate(false);
             }}
           >
-            <span className="mobile-gate-btn-default">CONFIRM &amp; CONTINUE →</span>
-            <span className="mobile-gate-btn-reveal">→ ENTERING SITE</span>
+            <span className="mobile-gate-btn-default">→ ENTER_SITE</span>
+            <span className="mobile-gate-btn-reveal">→ CONFIRM_ENTRY</span>
           </button>
         </div>
       </div>
