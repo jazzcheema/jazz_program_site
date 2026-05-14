@@ -236,9 +236,15 @@ a.clouds-particle-btn {
 
 .sand-field-label span,
 .sand-field-readout,
-.sand-joystick-panel span,
-.sand-contact-card span {
+.sand-joystick-panel span {
   color: #8b8780;
+  font-family: var(--font-geist-mono);
+  font-size: clamp(0.48rem, 0.68vw, 0.62rem);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.sand-contact-card span {
   font-family: var(--font-geist-mono);
   font-size: clamp(0.48rem, 0.68vw, 0.62rem);
   letter-spacing: 0.16em;
@@ -388,7 +394,7 @@ a.clouds-particle-btn {
   justify-items: center;
   border: 1px solid #161616;
   background: #161616;
-  color: #e9e5e0;
+  color: #ffffff;
   padding: 1rem 1.2rem;
   text-align: center;
   text-decoration: none;
@@ -434,7 +440,7 @@ a.clouds-particle-btn {
 .sand-contact-title {
   position: relative;
   display: block;
-  color: #e9e5e0;
+  color: #ffffff;
   font-family: var(--font-geist-sans);
   font-size: clamp(1.05rem, 1.6vw, 1.42rem);
   font-weight: 400;
