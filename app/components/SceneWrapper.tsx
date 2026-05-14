@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import CarpetScene from "./CarpetScene";
 import CloudsPage from "./CloudsPage";
 import SandPage from "./SandPage";
@@ -13,6 +13,7 @@ export default function SceneWrapper() {
   const [flashing, setFlashing] = useState(false);
   const [showMobileGate, setShowMobileGate] = useState(false);
   const [gateVisible, setGateVisible] = useState(false);
+  const homeRoomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const isMobile = window.innerWidth < 768 && "ontouchstart" in window;
@@ -29,6 +30,39 @@ export default function SceneWrapper() {
       };
     }
   }, []);
+
+  useEffect(() => {
+    if (reached || reachedSand || reachedBooks) return;
+    if (typeof window === "undefined") return;
+    if (window.innerWidth < 768) return;
+
+    let targetX = 0, targetY = 0;
+    let currentX = 0, currentY = 0;
+    let frame = 0;
+
+    const onMouseMove = (e: MouseEvent) => {
+      targetX = (e.clientX / window.innerWidth - 0.5) * 2;
+      targetY = (e.clientY / window.innerHeight - 0.5) * 2;
+    };
+
+    const tick = () => {
+      frame = requestAnimationFrame(tick);
+      currentX += (targetX - currentX) * 0.04;
+      currentY += (targetY - currentY) * 0.04;
+      const el = homeRoomRef.current;
+      if (el) {
+        el.style.setProperty("--grid-x", String((currentX * 24).toFixed(2)));
+        el.style.setProperty("--grid-y", String((currentY * 24).toFixed(2)));
+      }
+    };
+
+    window.addEventListener("mousemove", onMouseMove, { passive: true });
+    frame = requestAnimationFrame(tick);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      cancelAnimationFrame(frame);
+    };
+  }, [reached, reachedSand, reachedBooks]);
 
   const handleReachClouds = () => {
     setFlashing(true);
@@ -158,6 +192,7 @@ export default function SceneWrapper() {
 
   return (
     <div
+      ref={homeRoomRef}
       className="home-room w-dvw h-dvh overflow-hidden relative"
       style={{ width: "100dvw", height: "100dvh", background: "#e2deda" }}
     >

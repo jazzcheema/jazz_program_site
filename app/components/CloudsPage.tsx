@@ -673,6 +673,28 @@ export default function CloudsPage() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined" || window.innerWidth < 768) return;
+    let targetX = 0, targetY = 0, currentX = 0, currentY = 0, frame = 0;
+    const onMouseMove = (e: MouseEvent) => {
+      targetX = (e.clientX / window.innerWidth - 0.5) * 2;
+      targetY = (e.clientY / window.innerHeight - 0.5) * 2;
+    };
+    const tick = () => {
+      frame = requestAnimationFrame(tick);
+      currentX += (targetX - currentX) * 0.04;
+      currentY += (targetY - currentY) * 0.04;
+      rootRef.current?.style.setProperty("--grid-x", (currentX * 24).toFixed(2));
+      rootRef.current?.style.setProperty("--grid-y", (currentY * 24).toFixed(2));
+    };
+    window.addEventListener("mousemove", onMouseMove, { passive: true });
+    frame = requestAnimationFrame(tick);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 

@@ -91,6 +91,7 @@ export default function SandPage() {
   const joystickPointerIdRef = useRef<number | null>(null);
   const moveInputRef = useRef<Cell>({ x: 0, y: 0 });
   const lastMoveRef = useRef(0);
+  const roomRef = useRef<HTMLDivElement>(null);
 
   const moveBlock = useCallback((dx: number, dy: number) => {
     if (gateOpen) return;
@@ -135,6 +136,28 @@ export default function SandPage() {
   useEffect(() => {
     const t = setTimeout(() => setShow(true), 60);
     return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || window.innerWidth < 768) return;
+    let targetX = 0, targetY = 0, currentX = 0, currentY = 0, frame = 0;
+    const onMouseMove = (e: MouseEvent) => {
+      targetX = (e.clientX / window.innerWidth - 0.5) * 2;
+      targetY = (e.clientY / window.innerHeight - 0.5) * 2;
+    };
+    const tick = () => {
+      frame = requestAnimationFrame(tick);
+      currentX += (targetX - currentX) * 0.04;
+      currentY += (targetY - currentY) * 0.04;
+      roomRef.current?.style.setProperty("--grid-x", (currentX * 24).toFixed(2));
+      roomRef.current?.style.setProperty("--grid-y", (currentY * 24).toFixed(2));
+    };
+    window.addEventListener("mousemove", onMouseMove, { passive: true });
+    frame = requestAnimationFrame(tick);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      cancelAnimationFrame(frame);
+    };
   }, []);
 
   useEffect(() => {
@@ -207,6 +230,7 @@ export default function SandPage() {
 
   return (
     <div
+      ref={roomRef}
       className="sand-kingdom-room"
       style={{ opacity: show ? 1 : 0 }}
     >

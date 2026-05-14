@@ -79,6 +79,13 @@ canvas {
   opacity: 0.72;
 }
 
+.home-room::before,
+.clouds-room-grid,
+.sand-kingdom-grid {
+  background-position: calc(var(--grid-x, 0) * 1px) calc(var(--grid-y, 0) * 1px);
+  will-change: background-position;
+}
+
 .clouds-room-grid {
   z-index: 0;
 }
