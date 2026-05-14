@@ -477,8 +477,8 @@ a.clouds-particle-btn {
 
 .sand-contact-card:hover,
 .sand-contact-card:focus-visible {
-  border-color: #ffffff;
-  background: #ffffff;
+  border-color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.78);
   color: #161616;
   outline: none;
   transform: translateX(-50%) translateY(-1px);
