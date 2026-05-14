@@ -87,6 +87,7 @@ export default function SandPage() {
   const [trailCells, setTrailCells] = useState<string[]>([]);
   const [joystickPosition, setJoystickPosition] = useState({ x: 0, y: 0 });
   const [gateOpen, setGateOpen] = useState(false);
+  const [contactReady, setContactReady] = useState(false);
   const joystickPointerIdRef = useRef<number | null>(null);
   const moveInputRef = useRef<Cell>({ x: 0, y: 0 });
   const lastMoveRef = useRef(0);
@@ -135,6 +136,12 @@ export default function SandPage() {
     const t = setTimeout(() => setShow(true), 60);
     return () => clearTimeout(t);
   }, []);
+
+  useEffect(() => {
+    if (!gateOpen) return;
+    const t = setTimeout(() => setContactReady(true), 420);
+    return () => clearTimeout(t);
+  }, [gateOpen]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -258,7 +265,7 @@ export default function SandPage() {
         </section>
       )}
 
-      {gateOpen && (
+      {contactReady && (
         <a
           className="sand-contact-card"
           href="mailto:thecyberfoolz@gmail.com"
