@@ -11,10 +11,13 @@ export default function SystemAdvisory() {
   useEffect(() => {
     const isMobile = 'ontouchstart' in window || window.innerWidth < 1024
     if (isMobile) return
-    if (!localStorage.getItem(STORAGE_KEY)) {
-      setVisible(true)
-    }
-    setMounted(true)
+    const t = setTimeout(() => {
+      if (!localStorage.getItem(STORAGE_KEY)) {
+        setVisible(true)
+      }
+      setMounted(true)
+    }, 0)
+    return () => clearTimeout(t)
   }, [])
 
   const dismiss = () => {

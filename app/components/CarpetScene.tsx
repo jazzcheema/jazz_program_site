@@ -52,10 +52,10 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
     renderer.toneMapping = THREE.ACESFilmicToneMapping
     renderer.toneMappingExposure = isPortraitMobile() ? 1.35 : 1.0
 
-    renderer.setClearColor(0x0c0c0c, 0)
+    renderer.setClearColor(0xe9e5e0, 0)
 
     const scene = new THREE.Scene()
-    scene.fog = new THREE.Fog('#0c0c0c', 14, 32)
+    scene.fog = new THREE.Fog('#e9e5e0', 16, 34)
 
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100)
     camera.position.set(0, 0, CAMERA_Z)
@@ -99,7 +99,7 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
     const key = new THREE.DirectionalLight('#ffffff', 0)
     key.position.set(2, 4, 3)
     scene.add(key)
-    const rim = new THREE.PointLight('#0055ff', 0, 15)
+    const rim = new THREE.PointLight('#2a5fc0', 0, 15)
     rim.position.set(-3, 2, -2)
     scene.add(rim)
     const cloudLight = new THREE.PointLight('#8899ff', 0, 8)

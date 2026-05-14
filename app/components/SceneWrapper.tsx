@@ -6,8 +6,6 @@ import InfoPanel from "./InfoPanel";
 import CloudsPage from "./CloudsPage";
 import SandPage from "./SandPage";
 import CVPage from "./CVPage";
-import VortexBackground from "./VortexBackground";
-import WindTextChars from "./WindTextChars";
 import type { ObjectData } from "../data/objects";
 
 const CARPET_DATA: ObjectData = {
@@ -55,7 +53,6 @@ export default function SceneWrapper() {
   const [reachedSand, setReachedSand] = useState(false);
   const [reachedBooks, setReachedBooks] = useState(false);
   const [flashing, setFlashing] = useState(false);
-  const [identityActive, setIdentityActive] = useState(false);
   const [showMobileGate, setShowMobileGate] = useState(false);
   const [gateVisible, setGateVisible] = useState(false);
 
@@ -63,15 +60,16 @@ export default function SceneWrapper() {
     const isMobile = window.innerWidth < 768 && "ontouchstart" in window;
     const seen = localStorage.getItem("mobile-gate-seen");
     if (isMobile && !seen) {
-      setShowMobileGate(true);
-      const t = setTimeout(() => setGateVisible(true), 60);
-      return () => clearTimeout(t);
+      let visibleTimer: ReturnType<typeof setTimeout> | null = null;
+      const showTimer = setTimeout(() => {
+        setShowMobileGate(true);
+        visibleTimer = setTimeout(() => setGateVisible(true), 60);
+      }, 0);
+      return () => {
+        clearTimeout(showTimer);
+        if (visibleTimer) clearTimeout(visibleTimer);
+      };
     }
-  }, []);
-
-  useEffect(() => {
-    const t = setTimeout(() => setIdentityActive(true), 180);
-    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {
@@ -216,21 +214,9 @@ export default function SceneWrapper() {
 
   return (
     <div
-      className="w-dvw h-dvh overflow-hidden relative"
-      style={{ width: "100dvw", height: "100dvh", background: "#09090e" }}
+      className="home-room w-dvw h-dvh overflow-hidden relative"
+      style={{ width: "100dvw", height: "100dvh", background: "#e9e5e0" }}
     >
-      <div className="absolute inset-0 pointer-events-none">
-        <VortexBackground
-          className="w-full h-full"
-          hues={[28, 195, 262]}
-          saturation={72}
-          lightness={62}
-          particleMultiplier={2.6}
-          alphaMultiplier={2.2}
-          backgroundFill="rgba(9, 9, 13, 0.32)"
-        />
-      </div>
-
       <div className="absolute inset-0">
         <CarpetScene
           onCarpetClick={() => setPanelOpen((prev) => !prev)}
@@ -246,53 +232,11 @@ export default function SceneWrapper() {
         onClose={() => setPanelOpen(false)}
       />
 
-      <div
-        className="home-identity"
-        data-hidden={panelOpen}
-        aria-hidden={panelOpen}
-        aria-label="Jazz Cheema, Software Engineer"
-      >
-        <h1>
-          <WindTextChars
-            active={identityActive}
-            text="Jazz Cheema"
-            baseDelay={80}
-            stagger={58}
-            mode="chars"
-          />
-        </h1>
-        <p>
-          <WindTextChars
-            active={identityActive}
-            text="Software Engineer"
-            baseDelay={520}
-            stagger={36}
-            mode="chars"
-          />
-        </p>
-      </div>
-
       {/* White flash on reach */}
       <div
         className="fixed inset-0 pointer-events-none transition-opacity duration-300"
         style={{ background: "#ffffff", opacity: flashing ? 1 : 0, zIndex: 50 }}
       />
-
-      {/* Hint */}
-      {!panelOpen && (
-        <div className="fixed bottom-5 sm:bottom-6 left-1/2 -translate-x-1/2 pointer-events-none w-[90vw] sm:w-auto text-center">
-          <div
-            style={{
-              color: "#484848",
-              fontFamily: "var(--font-geist-mono)",
-              fontSize: "clamp(0.58rem, 0.68vw, 0.68rem)",
-              letterSpacing: "0.1em",
-            }}
-          >
-            → CLICK CARPET FOR MISSION DATA → DRAG TO CLOUDS, SANDCASTLE, OR BOOKS
-          </div>
-        </div>
-      )}
     </div>
   );
 }

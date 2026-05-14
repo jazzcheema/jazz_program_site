@@ -8,7 +8,6 @@ import {
   containDistanceForFrame,
   worldFrameAtDistance,
 } from "../lib/responsiveScene";
-import Sparkles from "./Sparkles";
 import EasterGame from "../easter/EasterGame";
 
 const CAM = {
@@ -28,13 +27,10 @@ type ProjectData = {
   id: string;
   model: string;
   label: string;
-  className: string;
   href: string;
   stack: string;
   type: string;
   description: string;
-  status: string;
-  finePrint: string;
   scaleFactor?: number;
 };
 
@@ -43,44 +39,32 @@ const PROJECTS: ProjectData[] = [
     id: "teva",
     model: "/models/genie3.glb",
     label: "TEVACHEEMA.COM",
-    className: "FILM / INTERACTIVE / WEB",
     href: "https://tevacheema.com",
     stack: "NEXT.JS + THREE.JS + REACT",
     type: "FILM PORTFOLIO / INTERACTIVE",
     description:
       "Immersive web experience for filmmaker Teva Cheema, built around interactive 3D storytelling.",
-    status: "LIVE / PUBLIC",
-    finePrint:
-      "© JAZZ.CHEEMA_SYSTEMS / TEVACHEEMA.COM / REG: TC-WEB-002 / STACK: NEXT.JS+THREE.JS / INTERACTIVE_FILM_PORTFOLIO",
   },
   {
     id: "krate",
     model: "/models/krate.glb",
     scaleFactor: 0.82,
     label: "KRATE",
-    className: "SOCIAL / MUSIC / MOBILE",
     href: "https://apps.apple.com/us/app/krate-rate-music/id1540002251",
     stack: "REACT NATIVE + EXPO ROUTER + FIREBASE",
     type: "IOS / ANDROID SOCIAL MUSIC APP",
     description:
-      "Rebuilt a 15k+ user social music app from deprecated React Native and Expo versions to Expo Router, Firebase methodologies, and React Native New Architecture. Improved feature velocity, load times, accessibility, and reduced technical debt.",
-    status: "APP STORE / PUBLIC",
-    finePrint:
-      "© JAZZ.CHEEMA_SYSTEMS / KRATE_MOBILE / REG: KR-IOS-ANDROID-001 / EXPO_ROUTER / FIREBASE / NEW_ARCHITECTURE",
+      "Rebuilt a 15k+ user social music app from deprecated React Native and Expo versions to Expo Router, Firebase methodologies, and React Native New Architecture.",
   },
   {
     id: "episode",
     model: "/models/mobile_tv.glb",
     label: "EPISODE",
-    className: "PROPERTY / DEVELOPMENT / INTERACTIVE",
     href: "https://episode-eta.vercel.app/",
     stack: "NEXT.JS + THREE.JS + REACT",
     type: "PROPERTY DEVELOPMENT WEBSITE",
     description:
       "Interactive property development website for Episode Companies, featuring a 3D television interface and knob-turning navigation.",
-    status: "LIVE / PUBLIC",
-    finePrint:
-      "© JAZZ.CHEEMA_SYSTEMS / EPISODE_COMPANIES / REG: EP-WEB-001 / THREEJS_INTERFACE / KNOB_CONTROL_NAVIGATION",
   },
 ];
 
@@ -371,7 +355,7 @@ function DotMatrixProjectSignal({
       const textW = Math.max(1, maxX - minX);
       const textH = Math.max(1, maxY - minY);
       const offsetX = (cssW - textW) * 0.5 - minX;
-      const offsetY = (cssH - textH) * 0.5 - minY;
+      const offsetY = cssH - textH - (isMobile ? 4 : 6) - minY;
       next.forEach((dot) => {
         dot.tx += offsetX;
         dot.ty += offsetY;
@@ -477,159 +461,6 @@ function DotMatrixProjectSignal({
   return <canvas ref={canvasRef} className="clouds-matrix-canvas" aria-label={`${displayLabel} project signal`} />;
 }
 
-type MatrixFieldDot = {
-  x: number;
-  y: number;
-  tx: number;
-  ty: number;
-  vx: number;
-  vy: number;
-  phase: number;
-  size: number;
-};
-
-function DotMatrixPanelField({ isMobile }: { isMobile: boolean }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const pointerRef = useRef({ x: 0.5, y: 0.5, active: false });
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let dots: MatrixFieldDot[] = [];
-    let raf = 0;
-    let tick = 0;
-
-    const buildDots = () => {
-      const rect = canvas.getBoundingClientRect();
-      const cssW = Math.max(1, Math.floor(rect.width));
-      const cssH = Math.max(1, Math.floor(rect.height));
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = cssW * dpr;
-      canvas.height = cssH * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-      const step = isMobile ? 3 : 4;
-      const inset = isMobile ? 5 : 7;
-      const cols = Math.max(1, Math.floor((cssW - inset * 2) / step) + 1);
-      const rows = Math.max(1, Math.floor((cssH - inset * 2) / step) + 1);
-      const startX = (cssW - (cols - 1) * step) * 0.5;
-      const startY = (cssH - (rows - 1) * step) * 0.5;
-      const next: MatrixFieldDot[] = [];
-
-      for (let row = 0; row < rows; row += 1) {
-        for (let col = 0; col < cols; col += 1) {
-          const x = startX + col * step;
-          const y = startY + row * step;
-          next.push({
-            x,
-            y,
-            tx: x,
-            ty: y,
-            vx: 0,
-            vy: 0,
-            phase: Math.random() * Math.PI * 2,
-            size: isMobile ? 2.8 : 3.4,
-          });
-        }
-      }
-
-      dots = next;
-    };
-
-    const onPointerMove = (event: PointerEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      const inside =
-        event.clientX >= rect.left &&
-        event.clientX <= rect.right &&
-        event.clientY >= rect.top &&
-        event.clientY <= rect.bottom;
-
-      pointerRef.current = {
-        x: Math.min(1, Math.max(0, (event.clientX - rect.left) / Math.max(rect.width, 1))),
-        y: Math.min(1, Math.max(0, (event.clientY - rect.top) / Math.max(rect.height, 1))),
-        active: inside,
-      };
-    };
-
-    const drawDot = (x: number, y: number, size: number, alpha: number, lightAlpha: number) => {
-      ctx.fillStyle = `rgba(3,3,3,${alpha})`;
-      ctx.fillRect(x - size * 0.5, y - size * 0.5, size, size);
-      ctx.fillStyle = `rgba(200,200,200,${lightAlpha})`;
-      ctx.fillRect(x - 0.5, y - 0.5, 1, 1);
-    };
-
-    const animate = () => {
-      raf = requestAnimationFrame(animate);
-      tick += 1;
-
-      const rect = canvas.getBoundingClientRect();
-      const cssW = Math.max(1, rect.width);
-      const cssH = Math.max(1, rect.height);
-      ctx.clearRect(0, 0, cssW, cssH);
-      ctx.fillStyle = "rgba(0,0,0,0.24)";
-      ctx.fillRect(0, 0, cssW, cssH);
-
-      const pointer = pointerRef.current;
-      const mouseX = pointer.x * cssW;
-      const mouseY = pointer.y * cssH;
-      const driftX = pointer.active ? (pointer.x - 0.5) * (isMobile ? 8 : 16) : 0;
-      const driftY = pointer.active ? (pointer.y - 0.5) * (isMobile ? 5 : 10) : 0;
-
-      dots.forEach((dot) => {
-        const wave = Math.sin(tick * 0.03 + dot.phase) * (pointer.active ? 1.4 : 0.18);
-        let targetX = dot.tx + driftX + wave;
-        let targetY = dot.ty + driftY - wave * 0.35;
-        let proximity = 0;
-
-        if (pointer.active) {
-          const dx = targetX - mouseX;
-          const dy = targetY - mouseY;
-          const dist = Math.hypot(dx, dy);
-          const radius = isMobile ? 78 : 112;
-          if (dist > 0.01 && dist < radius) {
-            proximity = 1 - dist / radius;
-            const force = proximity ** 2 * (isMobile ? 28 : 46);
-            targetX += (dx / dist) * force;
-            targetY += (dy / dist) * force;
-          }
-        }
-
-        dot.vx += (targetX - dot.x) * 0.09;
-        dot.vy += (targetY - dot.y) * 0.09;
-        dot.vx *= 0.76;
-        dot.vy *= 0.76;
-        dot.x += dot.vx;
-        dot.y += dot.vy;
-
-        drawDot(
-          dot.x,
-          dot.y,
-          dot.size + proximity * 1.35,
-          pointer.active ? 0.66 + proximity * 0.18 : 0.58,
-          pointer.active ? 0.13 + proximity * 0.16 : 0.1,
-        );
-      });
-    };
-
-    buildDots();
-    const observer = new ResizeObserver(buildDots);
-    observer.observe(canvas);
-    window.addEventListener("pointermove", onPointerMove);
-    animate();
-
-    return () => {
-      cancelAnimationFrame(raf);
-      observer.disconnect();
-      window.removeEventListener("pointermove", onPointerMove);
-    };
-  }, [isMobile]);
-
-  return <canvas ref={canvasRef} className="clouds-matrix-field" aria-hidden="true" />;
-}
-
 function ProjectCard({
   visible,
   project,
@@ -674,10 +505,11 @@ function ProjectCard({
       }
     : {
         position: "fixed",
-        top: carouselOpen ? "max(102px, 15dvh)" : "max(110px, 16dvh)",
-        right: "clamp(28px, 7vw, 128px)",
+        left: "50%",
+        bottom: "max(30px, 5dvh)",
         zIndex: 30,
-        width: "min(620px, calc(100vw - 56px))",
+        width: "min(560px, calc(100vw - 56px))",
+        transform: "translateX(-50%)",
         pointerEvents: "none",
         fontFamily: "var(--font-geist-mono), monospace",
       };
@@ -700,7 +532,6 @@ function ProjectCard({
       </div>
 
       <div className="clouds-matrix-info">
-        <DotMatrixPanelField isMobile={isMobile} />
         <p className="clouds-matrix-caption">{project.description}</p>
         <div className="clouds-matrix-meta" aria-label="Project details">
           <span className="clouds-matrix-meta-row">
@@ -974,7 +805,7 @@ export default function CloudsPage() {
 
     const responsiveModelSize = () => {
       const mobile = window.innerWidth < 768;
-      return mobile ? 3.85 : 2.5;
+      return mobile ? 3.55 : 1.95;
     };
 
     const applyMaterialOpacity = (object: THREE.Object3D, opacity: number) => {
@@ -1323,11 +1154,11 @@ export default function CloudsPage() {
   return (
     <div
       ref={rootRef}
-      className="w-dvw h-dvh relative transition-opacity duration-700 overflow-hidden"
+      className="clouds-portfolio-room w-dvw h-dvh relative transition-opacity duration-700 overflow-hidden"
       style={{
         width: "100dvw",
         height: "100dvh",
-        background: "#0c0c0c",
+        background: "#e9e5e0",
         opacity: show ? 1 : 0,
         cursor: hiddenRoomTransition ? "none" : undefined,
         ["--krate-cursor-x" as string]: "50vw",
@@ -1398,59 +1229,7 @@ export default function CloudsPage() {
           }
         }
       `}</style>
-      <div className="absolute inset-0">
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: `
-        radial-gradient(circle at 50% 42%,
-          rgba(245, 232, 185, 0.13) 0%,
-          rgba(180, 160, 95, 0.055) 18%,
-          rgba(95, 110, 160, 0.035) 36%,
-          rgba(12, 12, 12, 0) 62%
-        )
-      `,
-            mixBlendMode: "screen",
-            opacity: carouselOpen ? 1 : 0.78,
-          }}
-        />
-
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: `
-        radial-gradient(ellipse at 50% 100%,
-          rgba(255, 238, 180, 0.075) 0%,
-          rgba(120, 130, 190, 0.035) 28%,
-          rgba(12, 12, 12, 0) 68%
-        )
-      `,
-            mixBlendMode: "screen",
-          }}
-        />
-
-        <Sparkles
-          className="w-full h-full"
-          density={isMobileLayout ? 180 : 300}
-          mode="starfield"
-        />
-
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: `
-        radial-gradient(circle at center,
-          rgba(12, 12, 12, 0) 0%,
-          rgba(12, 12, 12, 0) 46%,
-          rgba(0, 0, 0, 0.36) 100%
-        )
-      `,
-          }}
-        />
-      </div>
+      <div className="clouds-room-grid" aria-hidden="true" />
 
       <canvas
         ref={canvasRef}
@@ -1618,23 +1397,6 @@ export default function CloudsPage() {
               }}
             />
           ))}
-        </div>
-      )}
-
-      {!(isMobileLayout && carouselOpen) && (
-        <div
-          className="absolute left-1/2 -translate-x-1/2 text-center text-[0.6rem] sm:text-xs tracking-widest pointer-events-none"
-          style={{
-            bottom: carouselOpen ? "max(18px, 4dvh)" : "max(22px, 7dvh)",
-            width: "min(38rem, calc(100vw - 32px))",
-            color: "#303030",
-            fontFamily: "var(--font-geist-mono)",
-            zIndex: 9,
-          }}
-        >
-          {carouselOpen
-            ? "→ DRAG LEFT / RIGHT TO ROTATE PORTFOLIO AXIS → CLICK MODEL TO FOCUS"
-            : "→ CLICK GENIE TO OPEN PORTFOLIO AXIS"}
         </div>
       )}
 
