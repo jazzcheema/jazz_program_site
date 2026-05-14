@@ -356,7 +356,7 @@ function DotMatrixProjectSignal({
       const textW = Math.max(1, maxX - minX);
       const textH = Math.max(1, maxY - minY);
       const offsetX = (cssW - textW) * 0.5 - minX;
-      const offsetY = cssH - textH - (isMobile ? 4 : 6) - minY;
+      const offsetY = cssH - textH - (isMobile ? 18 : 28) - minY;
       next.forEach((dot) => {
         dot.tx += offsetX;
         dot.ty += offsetY;
@@ -408,6 +408,9 @@ function DotMatrixProjectSignal({
       const mouseX = pointer.x * cssW;
       const mouseY = pointer.y * cssH;
 
+      const fadeStart = cssH * 0.72;
+      const fadeRange = cssH - fadeStart;
+
       dots.forEach((dot) => {
         const wave = Math.sin(tick * 0.018 + dot.phase) * (isMobile ? 0.45 : 0.7);
         let targetX = dot.tx + driftX + wave;
@@ -429,9 +432,18 @@ function DotMatrixProjectSignal({
         dot.vy += (targetY - dot.y) * 0.08;
         dot.vx *= 0.78;
         dot.vy *= 0.78;
+
+        const breakT = dot.y > fadeStart ? Math.min(1, (dot.y - fadeStart) / fadeRange) : 0;
+        if (breakT > 0) {
+          dot.vx += (Math.random() - 0.5) * breakT * 1.8;
+          dot.vy += breakT * 0.6;
+        }
+
         dot.x += dot.vx;
         dot.y += dot.vy;
-        drawDot(dot.x, dot.y, dot.size, dot.rgb, isMobile ? 0.96 : 0.88);
+
+        const alpha = (isMobile ? 0.96 : 0.88) * (breakT > 0 ? (1 - breakT) * (1 - breakT) : 1);
+        if (alpha > 0.01) drawDot(dot.x, dot.y, dot.size, dot.rgb, alpha);
       });
 
       if (tick % 5 === 0 && dots.length > 0) {
