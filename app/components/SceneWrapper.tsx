@@ -164,7 +164,7 @@ export default function SceneWrapper() {
   return (
     <div
       className="home-room w-dvw h-dvh overflow-hidden relative"
-      style={{ width: "100dvw", height: "100dvh", background: "#e9e5e0" }}
+      style={{ width: "100dvw", height: "100dvh", background: "#e2deda" }}
     >
       <div className="absolute inset-0">
         <CarpetScene
