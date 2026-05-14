@@ -386,9 +386,9 @@ a.clouds-particle-btn {
   transform: translateX(-50%);
   gap: 0.42rem;
   justify-items: center;
-  border: 1px solid rgba(22, 22, 22, 0.16);
-  background: rgba(233, 229, 224, 0.76);
-  color: #161616;
+  border: 1px solid #161616;
+  background: #161616;
+  color: #e9e5e0;
   padding: 1rem 1.2rem;
   text-align: center;
   text-decoration: none;
@@ -404,7 +404,7 @@ a.clouds-particle-btn {
 .sand-contact-title {
   position: relative;
   display: block;
-  color: #161616;
+  color: #e9e5e0;
   font-family: var(--font-geist-sans);
   font-size: clamp(1.05rem, 1.6vw, 1.42rem);
   font-weight: 400;
@@ -429,8 +429,9 @@ a.clouds-particle-btn {
 
 .sand-contact-card:hover,
 .sand-contact-card:focus-visible {
-  background: #161616;
-  color: #e9e5e0;
+  border-color: rgba(22, 22, 22, 0.16);
+  background: rgba(233, 229, 224, 0.82);
+  color: #161616;
   outline: none;
   transform: translateX(-50%) translateY(-1px);
 }
@@ -439,7 +440,7 @@ a.clouds-particle-btn {
 .sand-contact-card:focus-visible span,
 .sand-contact-card:hover .sand-contact-title,
 .sand-contact-card:focus-visible .sand-contact-title {
-  color: #e9e5e0;
+  color: #161616;
 }
 
 .sand-contact-card:hover .sand-contact-title-default,

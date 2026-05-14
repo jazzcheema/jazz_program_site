@@ -10,22 +10,9 @@ const CSS_SIZE = 'clamp(64px, 17vw, 92px)'
 
 export default function LampCorner() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [hiddenForPanel, setHiddenForPanel] = useState(false)
   const [hiddenForCV, setHiddenForCV] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
-
-  useEffect(() => {
-    const isMobileViewport = () =>
-      window.innerWidth <= 767 || window.innerWidth / window.innerHeight <= 3 / 4
-
-    const handler = (e: Event) => {
-      const open = (e as CustomEvent<boolean>).detail
-      setHiddenForPanel(open && isMobileViewport())
-    }
-    window.addEventListener('carpet-panel-open', handler)
-    return () => window.removeEventListener('carpet-panel-open', handler)
-  }, [])
 
   useEffect(() => {
     const handler = (e: Event) => setHiddenForCV((e as CustomEvent<boolean>).detail)
@@ -119,8 +106,8 @@ export default function LampCorner() {
         width: CSS_SIZE,
         height: CSS_SIZE,
         zIndex: 1100,
-        opacity: (hiddenForPanel || hiddenForCV) ? 0 : 1,
-        pointerEvents: (hiddenForPanel || hiddenForCV) ? 'none' : 'auto',
+        opacity: hiddenForCV ? 0 : 1,
+        pointerEvents: hiddenForCV ? 'none' : 'auto',
         transition: 'opacity 180ms ease, transform 160ms ease',
         transformOrigin: 'center',
         cursor: 'pointer',

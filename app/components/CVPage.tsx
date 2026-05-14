@@ -47,7 +47,7 @@ const AWARDS = [
 ]
 
 const CREDITS = [
-  { name: 'Jazz Cheema', role: 'Program & Software', detail: 'Three.js · Next.js 16 · React 19 · TypeScript · Tailwind CSS 4 · WebGL' },
+  { name: 'Site', role: 'Program & Software', detail: 'Three.js · Next.js 16 · React 19 · TypeScript · Tailwind CSS 4 · WebGL' },
   { name: 'Kevin Netteberg', role: '3D Models', detail: 'Genie · Lamp · Carpet · Krate · Mobile TV' },
 ]
 
@@ -1397,10 +1397,10 @@ export default function CVPage() {
       >
         <div>
           <div style={{ fontSize: '0.58rem', letterSpacing: '0.22em', color: '#9a9590', marginBottom: '0.9rem', textTransform: 'uppercase' }}>
-            Portfolio
+            CV
           </div>
           <h1 style={{ fontSize: 'clamp(3.2rem, 9.5vw, 8rem)', fontWeight: 400, letterSpacing: '-0.025em', lineHeight: 0.88, color: '#18181a', margin: 0 }}>
-            Jazz<br />Cheema
+            Selected<br />Work
           </h1>
         </div>
         <p style={{ fontSize: 'clamp(0.62rem, 1.1vw, 0.82rem)', letterSpacing: '0.1em', color: '#8a8580', paddingBottom: '0.5rem', margin: 0 }}>
@@ -1656,7 +1656,7 @@ export default function CVPage() {
             gap: '0.5rem',
           }}
         >
-          <span style={{ fontSize: '0.56rem', letterSpacing: '0.1em', color: '#aaa59f' }}>© 2026 Jazz Cheema · Ver.01.09.26</span>
+          <span style={{ fontSize: '0.56rem', letterSpacing: '0.1em', color: '#aaa59f' }}>© 2026 · Ver.01.09.26</span>
           <span style={{ fontSize: '0.56rem', letterSpacing: '0.1em', color: '#bbb6b0' }}>Built with Three.js · Next.js · React</span>
         </div>
 

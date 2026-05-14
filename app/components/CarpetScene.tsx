@@ -7,7 +7,6 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { REFERENCE_ASPECT } from '../lib/responsiveScene'
 
 interface CarpetSceneProps {
-  onCarpetClick?: () => void
   onReachClouds: () => void
   onReachSandcastle: () => void
   onReachBooks: () => void
@@ -24,19 +23,17 @@ const SANDCASTLE_PULL_DIST = 2.15
 const BOOKS_REACH_DIST = 0.8
 const MOBILE_ASPECT = 0.74
 
-export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandcastle, onReachBooks }: CarpetSceneProps) {
+export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachBooks }: CarpetSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const onReachRef = useRef(onReachClouds)
   const onReachSandcastleRef = useRef(onReachSandcastle)
   const onReachBooksRef = useRef(onReachBooks)
-  const onClickRef = useRef(onCarpetClick)
 
   useEffect(() => {
     onReachRef.current = onReachClouds
     onReachSandcastleRef.current = onReachSandcastle
     onReachBooksRef.current = onReachBooks
-    onClickRef.current = onCarpetClick
-  }, [onCarpetClick, onReachClouds, onReachSandcastle, onReachBooks])
+  }, [onReachClouds, onReachSandcastle, onReachBooks])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -204,8 +201,6 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
     let currX = 0, currY = 0
     let targetX = 0, targetY = 0
 
-    const raycaster = new THREE.Raycaster()
-
     const onPointerDown = (e: PointerEvent) => {
       isDragging = true
       downX = e.clientX
@@ -227,16 +222,7 @@ export default function CarpetScene({ onCarpetClick, onReachClouds, onReachSandc
     const onPointerUp = (e: PointerEvent) => {
       isDragging = false
       const moved = Math.hypot(e.clientX - downX, e.clientY - downY)
-      if (moved < 6) {
-        const ndc = new THREE.Vector2(
-          (e.clientX / window.innerWidth) * 2 - 1,
-          -(e.clientY / window.innerHeight) * 2 + 1,
-        )
-        raycaster.setFromCamera(ndc, camera)
-        if (carpet && raycaster.intersectObject(carpet, true).length > 0) {
-          onClickRef.current?.()
-        }
-      }
+      if (moved < 6) return
     }
 
     canvas.addEventListener('pointerdown', onPointerDown)
