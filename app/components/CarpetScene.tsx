@@ -72,19 +72,27 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     }
 
     const responsiveCloudPos = () => {
+      const { width, height } = visibleWorldSize()
+      if (isPortraitMobile()) return new THREE.Vector3(width * 0.30, height * 0.36, 0)
       return DESKTOP_CLOUD_POS.clone().multiplyScalar(stageScale())
     }
 
     const responsiveSandcastlePos = () => {
+      const { width, height } = visibleWorldSize()
+      if (isPortraitMobile()) return new THREE.Vector3(-width * 0.30, -height * 0.40, 0)
       return DESKTOP_SANDCASTLE_POS.clone().multiplyScalar(stageScale())
     }
 
     const responsiveModelSize = (desktopSize: number, mobileWidthFactor: number) => {
-      void mobileWidthFactor
+      if (isPortraitMobile()) return visibleWorldSize().width * mobileWidthFactor
       return desktopSize * stageScale()
     }
 
-    const responsiveBooksPos = () => DESKTOP_BOOKS_POS.clone().multiplyScalar(stageScale())
+    const responsiveBooksPos = () => {
+      const { width, height } = visibleWorldSize()
+      if (isPortraitMobile()) return new THREE.Vector3(width * 0.30, -height * 0.40, 0)
+      return DESKTOP_BOOKS_POS.clone().multiplyScalar(stageScale())
+    }
 
     let cloudPos = responsiveCloudPos()
     let sandcastlePos = responsiveSandcastlePos()
@@ -151,7 +159,7 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
       carpet.position.sub(box.getCenter(new THREE.Vector3()))
       const size = box.getSize(new THREE.Vector3())
       carpetMaxDim = Math.max(size.x, size.y, size.z)
-      carpetBaseScale = responsiveModelSize(2.2, 0.62) / carpetMaxDim
+      carpetBaseScale = responsiveModelSize(2.2, 0.56) / carpetMaxDim
       carpet.scale.setScalar(carpetBaseScale)
       carpet.rotation.y = Math.PI / 3
       scene.add(carpet)
@@ -163,7 +171,7 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
       clouds.position.sub(box.getCenter(new THREE.Vector3()))
       const size = box.getSize(new THREE.Vector3())
       cloudsMaxDim = Math.max(size.x, size.y, size.z)
-      clouds.scale.setScalar(responsiveModelSize(1.6, 0.44) / cloudsMaxDim)
+      clouds.scale.setScalar(responsiveModelSize(1.6, 0.26) / cloudsMaxDim)
       clouds.position.copy(cloudPos)
       scene.add(clouds)
     })
@@ -174,7 +182,7 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
       sandcastle.position.sub(box.getCenter(new THREE.Vector3()))
       const size = box.getSize(new THREE.Vector3())
       sandcastleMaxDim = Math.max(size.x, size.y, size.z)
-      sandcastle.scale.setScalar(responsiveModelSize(1.35, 0.34) / sandcastleMaxDim)
+      sandcastle.scale.setScalar(responsiveModelSize(1.35, 0.22) / sandcastleMaxDim)
       sandcastle.position.copy(sandcastlePos)
       sandcastle.rotation.y = -Math.PI / 7
       scene.add(sandcastle)
@@ -186,7 +194,7 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
       books.position.sub(box.getCenter(new THREE.Vector3()))
       const size = box.getSize(new THREE.Vector3())
       booksMaxDim = Math.max(size.x, size.y, size.z)
-      books.scale.setScalar(responsiveModelSize(0.72, 0.22) / booksMaxDim)
+      books.scale.setScalar(responsiveModelSize(0.72, 0.16) / booksMaxDim)
       books.position.copy(booksPos)
       books.rotation.y = Math.PI / 5
       scene.add(books)
@@ -242,12 +250,12 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
       sandcastleLight.position.copy(sandcastlePos).add(new THREE.Vector3(0, 0.8, 2))
       booksLight.position.copy(booksPos).add(new THREE.Vector3(0, 0.8, 2))
       if (carpet) {
-        carpetBaseScale = responsiveModelSize(2.2, 0.62) / carpetMaxDim
+        carpetBaseScale = responsiveModelSize(2.2, 0.56) / carpetMaxDim
         carpet.scale.setScalar(carpetBaseScale)
       }
-      if (clouds) clouds.scale.setScalar(responsiveModelSize(1.6, 0.44) / cloudsMaxDim)
-      if (sandcastle) sandcastle.scale.setScalar(responsiveModelSize(1.35, 0.34) / sandcastleMaxDim)
-      if (books) books.scale.setScalar(responsiveModelSize(0.72, 0.22) / booksMaxDim)
+      if (clouds) clouds.scale.setScalar(responsiveModelSize(1.6, 0.26) / cloudsMaxDim)
+      if (sandcastle) sandcastle.scale.setScalar(responsiveModelSize(1.35, 0.22) / sandcastleMaxDim)
+      if (books) books.scale.setScalar(responsiveModelSize(0.72, 0.16) / booksMaxDim)
     }
     window.addEventListener('resize', onResize)
 
@@ -313,29 +321,37 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
 
         // Shrink as it moves from center, then tuck smaller into the sandcastle target.
         const currentStageScale = stageScale()
+        const mobile = isPortraitMobile()
+        const { width: visW } = visibleWorldSize()
+        // On portrait mobile, reach zones scale with visible world width; desktop uses stageScale
+        const reachScale = mobile ? visW * 0.20 : currentStageScale
         const dist = Math.hypot(currX, currY)
-        const worldShrink = Math.max(0.42, 1 - (dist / Math.max(currentStageScale, 0.001)) * 0.09)
+        const worldShrink = mobile
+          ? Math.max(0.42, 1 - dist * 0.09)
+          : Math.max(0.42, 1 - (dist / Math.max(currentStageScale, 0.001)) * 0.09)
         const sandcastleDist = cPos.distanceTo(sandcastlePos)
-        const sandcastlePull = 1 - THREE.MathUtils.clamp(sandcastleDist / (SANDCASTLE_PULL_DIST * currentStageScale), 0, 1)
+        const sandcastlePull = mobile
+          ? 0
+          : 1 - THREE.MathUtils.clamp(sandcastleDist / (SANDCASTLE_PULL_DIST * currentStageScale), 0, 1)
         const sandcastleShrink = THREE.MathUtils.lerp(worldShrink, 0.2, sandcastlePull * sandcastlePull)
         carpet.scale.setScalar(carpetBaseScale * sandcastleShrink)
 
         // Proximity check
-        if (cPos.distanceTo(cloudPos) < REACH_DIST * currentStageScale) {
+        if (cPos.distanceTo(cloudPos) < REACH_DIST * reachScale) {
           reached = true
           onReachRef.current()
-        } else if (sandcastleDist < SANDCASTLE_REACH_DIST * currentStageScale && !sandcastleActivated) {
+        } else if (sandcastleDist < SANDCASTLE_REACH_DIST * reachScale && !sandcastleActivated) {
           sandcastleActivated = true
           onReachSandcastleRef.current()
-        } else if (sandcastleDist > SANDCASTLE_REACH_DIST * currentStageScale * 1.7) {
+        } else if (sandcastleDist > SANDCASTLE_REACH_DIST * reachScale * 1.7) {
           sandcastleActivated = false
         }
 
         const booksDist = cPos.distanceTo(booksPos)
-        if (booksDist < BOOKS_REACH_DIST * currentStageScale && !booksActivated) {
+        if (booksDist < BOOKS_REACH_DIST * reachScale && !booksActivated) {
           booksActivated = true
           onReachBooksRef.current()
-        } else if (booksDist > BOOKS_REACH_DIST * currentStageScale * 1.7) {
+        } else if (booksDist > BOOKS_REACH_DIST * reachScale * 1.7) {
           booksActivated = false
         }
       }
