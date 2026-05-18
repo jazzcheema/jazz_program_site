@@ -1370,7 +1370,7 @@ export default function EasterGame() {
             <span style={{ fontFamily: mono, fontSize: 17, marginRight: 8 }}>{phase === 'draw' ? '◯' : phase === 'castle' ? '□' : '●'}</span>Draw
           </span>
           <span style={{ color: phase === 'signal' && metrics.axis !== 'x' ? accentColor : inkColor, opacity: phase === 'draw' ? 0.42 : 1 }}>
-            <span style={{ fontFamily: mono, fontSize: 17, marginRight: 8 }}>{metrics.axis === 'y' ? '↕' : '⌁'}</span>Lab
+            <span style={{ fontFamily: mono, fontSize: 17, marginRight: 8 }}>{metrics.axis === 'y' ? '↕' : '⌁'}</span>Drift
           </span>
         </nav>
 
