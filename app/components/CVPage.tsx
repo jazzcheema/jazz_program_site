@@ -47,7 +47,7 @@ const AWARDS = [
 ]
 
 const CREDITS = [
-  { name: 'Site', role: 'Program & Software', detail: 'Three.js · Next.js 16 · React 19 · TypeScript · Tailwind CSS 4 · WebGL' },
+  { name: 'Jazz Cheema', role: 'Program & Software', detail: 'Three.js · Next.js 16 · React 19 · TypeScript · Tailwind CSS 4 · WebGL' },
   { name: 'Kevin Netteberg', role: '3D Models', detail: 'Genie · Lamp · Carpet · Krate · Mobile TV' },
 ]
 
@@ -1656,7 +1656,7 @@ export default function CVPage() {
             gap: '0.5rem',
           }}
         >
-          <span style={{ fontSize: '0.56rem', letterSpacing: '0.1em', color: '#aaa59f' }}>© 2026 · Ver.01.09.26</span>
+          <span style={{ fontSize: '0.56rem', letterSpacing: '0.1em', color: '#aaa59f' }}>Jazz Cheema © 2026 · Ver.01.09.26</span>
           <span style={{ fontSize: '0.56rem', letterSpacing: '0.1em', color: '#bbb6b0' }}>Built with Three.js · Next.js · React</span>
         </div>
 
