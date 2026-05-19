@@ -403,3 +403,66 @@ a.clouds-particle-btn {
     left: 33.333%;
   }
 }
+
+/* ── Video overlay ────────────────────────────────────────── */
+@keyframes video-overlay-enter {
+  from {
+    opacity: 0;
+    transform: scale(1.012);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.video-overlay-return-btn {
+  position: relative;
+  overflow: hidden;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #161616;
+  background: #c9ff00;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0.54rem 2rem;
+  white-space: nowrap;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.video-overlay-return-btn:hover,
+.video-overlay-return-btn:focus-visible {
+  background: #161616;
+  color: #c9ff00;
+}
+
+.video-overlay-return-default,
+.video-overlay-return-reveal {
+  display: block;
+  transition: opacity 130ms ease, transform 130ms ease;
+}
+
+.video-overlay-return-reveal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(0.3rem);
+}
+
+.video-overlay-return-btn:hover .video-overlay-return-default,
+.video-overlay-return-btn:focus-visible .video-overlay-return-default {
+  opacity: 0;
+  transform: translateY(-0.3rem);
+}
+
+.video-overlay-return-btn:hover .video-overlay-return-reveal,
+.video-overlay-return-btn:focus-visible .video-overlay-return-reveal {
+  opacity: 1;
+  transform: translateY(0);
+}

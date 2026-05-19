@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import GridMouseTrail from "./GridMouseTrail";
 import * as THREE from "three";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
@@ -24,6 +25,8 @@ const DESIGN_FRAME = worldFrameAtDistance(45, CAM.endDist);
 const LIGHT_TARGETS = { ambient: 0.45, key: 1.6, rim: 2.2 };
 const LIGHT_DURATION = 260;
 
+type VimeoClip = { id: string; h: string };
+
 type ProjectData = {
   id: string;
   model: string;
@@ -33,6 +36,7 @@ type ProjectData = {
   type: string;
   description: string;
   scaleFactor?: number;
+  videos?: VimeoClip[];
 };
 
 const PROJECTS: ProjectData[] = [
@@ -45,6 +49,12 @@ const PROJECTS: ProjectData[] = [
     type: "FILM PORTFOLIO / INTERACTIVE",
     description:
       "Immersive web experience for filmmaker Teva Cheema, built around interactive 3D storytelling.",
+    videos: [
+      { id: "1193655382", h: "958d435e42" },
+      { id: "1193657329", h: "16dc336029" },
+      { id: "1193658739", h: "0c99ae6fbe" },
+      { id: "1193657330", h: "6564ba3c87" },
+    ],
   },
   {
     id: "krate",
@@ -437,6 +447,167 @@ function DotMatrixProjectSignal({
   return <canvas ref={canvasRef} className="clouds-matrix-canvas" aria-label={`${displayLabel} project signal`} />;
 }
 
+function VideoOverlay({
+  project,
+  onClose,
+}: {
+  project: ProjectData;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  const videos = project.videos ?? [];
+  const shortLabel = project.label.replace(".COM", "").replace(".VERCEL.APP", "");
+  const mono = "var(--font-geist-mono), monospace";
+  const BG_SOLID  = "rgba(237,234,230,0.82)";
+  const BG_GLASS  = "rgba(237,234,230,0.9)";
+  const BLUR_OUTER = "blur(36px) saturate(0.92)";
+  const BLUR_BAR   = "blur(14px)";
+
+  const VidCell = ({ clip, title }: { clip: VimeoClip; title: string }) => (
+    <div style={{ position: "relative", aspectRatio: "16/9", background: "#0d0d0d" }}>
+      <iframe
+        src={`https://player.vimeo.com/video/${clip.id}?h=${clip.h}&background=1&autoplay=1&loop=1&muted=1&dnt=1`}
+        allow="autoplay; fullscreen"
+        loading="lazy"
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
+        title={title}
+      />
+    </div>
+  );
+
+  return createPortal(
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 2000,
+        background: BG_GLASS,
+        backdropFilter: BLUR_OUTER,
+        WebkitBackdropFilter: BLUR_OUTER,
+        overflowY: "auto",
+        fontFamily: mono,
+        animation: "video-overlay-enter 360ms cubic-bezier(0.16,1,0.3,1) both",
+      }}
+    >
+      {/* ── Top bar ── */}
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          height: 50,
+          padding: "0 clamp(1.2rem,3vw,2.5rem)",
+          background: BG_SOLID,
+          backdropFilter: BLUR_BAR,
+          WebkitBackdropFilter: BLUR_BAR,
+          borderBottom: "1px solid rgba(22,22,22,0.1)",
+        }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          style={{ fontFamily: mono, fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.14em", color: "#161616", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+        >
+          {shortLabel}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          style={{ fontFamily: mono, fontSize: "0.62rem", fontWeight: 600, letterSpacing: "0.1em", color: "rgba(22,22,22,0.38)", background: "none", border: "none", cursor: "pointer", padding: "0.3rem 0.5rem" }}
+        >
+          [ESC]
+        </button>
+      </div>
+
+      {/* ── Description ── */}
+      <div style={{ padding: "clamp(3rem,7vw,5.5rem) clamp(1.5rem,8vw,6rem) clamp(2rem,5vw,3.5rem)", textAlign: "center" }}>
+        <p
+          style={{
+            maxWidth: "50rem",
+            margin: "0 auto clamp(1.8rem,3vw,2.5rem)",
+            fontSize: "clamp(1.05rem,2.1vw,1.42rem)",
+            lineHeight: 1.52,
+            fontWeight: 500,
+            color: "#161616",
+            letterSpacing: "-0.01em",
+          }}
+        >
+          {project.description}
+        </p>
+        <div style={{ display: "flex", justifyContent: "center", gap: "clamp(1.8rem,5vw,4rem)", flexWrap: "wrap", fontSize: "0.56rem", letterSpacing: "0.1em", color: "rgba(22,22,22,0.45)" }}>
+          <span><span style={{ color: "rgba(22,22,22,0.26)", marginRight: "0.5rem" }}>STACK</span>{project.stack}</span>
+          <span><span style={{ color: "rgba(22,22,22,0.26)", marginRight: "0.5rem" }}>TYPE</span>{project.type}</span>
+        </div>
+      </div>
+
+      {/* ── Video 1 — full width ── */}
+      {videos[0] && <VidCell clip={videos[0]} title={`${shortLabel} 1`} />}
+
+      {/* ── Videos 2 + 3 — side by side ── */}
+      {(videos[1] || videos[2]) && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px", marginTop: "3px" }}>
+          {videos[1] && <VidCell clip={videos[1]} title={`${shortLabel} 2`} />}
+          {videos[2] && <VidCell clip={videos[2]} title={`${shortLabel} 3`} />}
+        </div>
+      )}
+
+      {/* ── Video 4 — full width ── */}
+      {videos[3] && (
+        <div style={{ marginTop: "3px" }}>
+          <VidCell clip={videos[3]} title={`${shortLabel} 4`} />
+        </div>
+      )}
+
+      {/* ── Bottom bar ── */}
+      <div
+        style={{
+          position: "sticky",
+          bottom: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          height: 60,
+          padding: "0 clamp(1.2rem,3vw,2.5rem)",
+          background: BG_SOLID,
+          backdropFilter: BLUR_BAR,
+          WebkitBackdropFilter: BLUR_BAR,
+          borderTop: "1px solid rgba(22,22,22,0.1)",
+          marginTop: "3px",
+        }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="video-overlay-return-btn"
+        >
+          <span className="video-overlay-return-default">← CLOUDS</span>
+          <span className="video-overlay-return-reveal">← RETURN</span>
+        </button>
+        <a
+          href={project.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ fontFamily: mono, fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.14em", color: "#161616", textDecoration: "none", padding: "0.54rem 2rem", border: "1px solid rgba(22,22,22,0.22)", borderRadius: "6px" }}
+        >
+          VISIT ↗
+        </a>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function ProjectCard({
   visible,
   project,
@@ -445,6 +616,7 @@ function ProjectCard({
   showEasterCue,
   onPrev,
   onNext,
+  onWatch,
 }: {
   visible: boolean;
   project: ProjectData;
@@ -453,6 +625,7 @@ function ProjectCard({
   showEasterCue: boolean;
   onPrev: () => void;
   onNext: () => void;
+  onWatch?: () => void;
 }) {
   if (!visible) return null;
 
@@ -530,6 +703,16 @@ function ProjectCard({
               stopEvent={stop}
             />
           )}
+          {project.videos && onWatch && (
+            <ParticleButton
+              label="LOOK"
+              rgb={[36, 153, 88]}
+              isMobile={isMobile}
+              scatterDir="up"
+              onClick={onWatch}
+              stopEvent={stop}
+            />
+          )}
           <ParticleButton
             label="VISIT"
             rgb={[200, 120, 32]}
@@ -585,6 +768,7 @@ export default function CloudsPage() {
   const [isMobileLayout, setIsMobileLayout] = useState(false);
   const [krateEasterCue, setKrateEasterCue] = useState(false);
   const [hiddenRoomTransition, setHiddenRoomTransition] = useState(false);
+  const [showVideoOverlay, setShowVideoOverlay] = useState(false);
   const carouselOpenRef = useRef(false);
   const activeProjectRef = useRef(0);
   const krateEasterCueRef = useRef(false);
@@ -596,6 +780,7 @@ export default function CloudsPage() {
     activeProjectRef.current = normalized;
     setActiveProject(normalized);
     setShowProject(true);
+    setShowVideoOverlay(false);
     krateEasterCueRef.current = false;
     setKrateEasterCue(false);
   }, []);
@@ -1407,7 +1592,15 @@ export default function CloudsPage() {
         showEasterCue={!isMobileLayout && krateEasterCue && !hiddenRoomTransition}
         onPrev={selectPrev}
         onNext={selectNext}
+        onWatch={PROJECTS[activeProject].videos ? () => setShowVideoOverlay(true) : undefined}
       />
+
+      {showVideoOverlay && (
+        <VideoOverlay
+          project={PROJECTS[activeProject]}
+          onClose={() => setShowVideoOverlay(false)}
+        />
+      )}
 
       {showEaster && (
         <div
