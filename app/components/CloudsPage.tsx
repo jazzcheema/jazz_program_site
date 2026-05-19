@@ -456,7 +456,7 @@ function DotMatrixProjectSignal({
 function VidCell({ clip, title }: { clip: VimeoClip; title: string }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const wasHidden = useRef(false);
-  const src = `https://player.vimeo.com/video/${clip.id}?h=${clip.h}&background=1&autoplay=1&loop=1&muted=1&dnt=1&quality=2160p`;
+  const src = `https://player.vimeo.com/video/${clip.id}?h=${clip.h}&background=1&autoplay=1&loop=1&muted=1&dnt=1`;
 
   useEffect(() => {
     const iframe = iframeRef.current;
