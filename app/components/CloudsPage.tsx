@@ -455,18 +455,16 @@ function DotMatrixProjectSignal({
 
 function VidCell({ clip, title }: { clip: VimeoClip; title: string }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const wasHidden = useRef(false);
   const src = `https://player.vimeo.com/video/${clip.id}?h=${clip.h}&background=1&autoplay=1&loop=1&muted=1&dnt=1`;
 
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
     const observer = new IntersectionObserver(([entry]) => {
-      if (!entry.isIntersecting) {
-        wasHidden.current = true;
-      } else if (wasHidden.current) {
-        wasHidden.current = false;
+      if (entry.isIntersecting) {
         iframe.src = src;
+      } else {
+        iframe.removeAttribute("src");
       }
     }, { threshold: 0.1 });
     observer.observe(iframe);
@@ -477,9 +475,8 @@ function VidCell({ clip, title }: { clip: VimeoClip; title: string }) {
     <div style={{ position: "relative", aspectRatio: "16/9", background: "#0d0d0d" }}>
       <iframe
         ref={iframeRef}
-        src={src}
+        src={undefined}
         allow="autoplay; fullscreen"
-        loading="eager"
         style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
         title={title}
       />
