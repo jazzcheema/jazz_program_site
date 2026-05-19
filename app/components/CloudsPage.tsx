@@ -679,6 +679,7 @@ function ProjectCard({
   carouselOpen,
   isMobile,
   showEasterCue,
+  krateDrop,
   onPrev,
   onNext,
   onWatch,
@@ -688,6 +689,7 @@ function ProjectCard({
   carouselOpen: boolean;
   isMobile: boolean;
   showEasterCue: boolean;
+  krateDrop: boolean;
   onPrev: () => void;
   onNext: () => void;
   onWatch?: () => void;
@@ -706,6 +708,14 @@ function ProjectCard({
 
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();
 
+  const dropStyle: React.CSSProperties = {
+    transform: krateDrop
+      ? isMobile ? "translateY(160%)" : "translateX(-50%) translateY(160%)"
+      : isMobile ? "translateY(0)" : "translateX(-50%)",
+    opacity: krateDrop ? 0 : 1,
+    transition: "transform 2200ms cubic-bezier(0.4,0,0.8,1), opacity 1800ms ease-in",
+  };
+
   const outerStyle: React.CSSProperties = isMobile
     ? {
         position: "fixed",
@@ -716,6 +726,7 @@ function ProjectCard({
         width: "auto",
         pointerEvents: "auto",
         fontFamily: "var(--font-geist-mono), monospace",
+        ...dropStyle,
       }
     : {
         position: "fixed",
@@ -723,9 +734,9 @@ function ProjectCard({
         bottom: "max(30px, 5dvh)",
         zIndex: 30,
         width: "min(560px, calc(100vw - 56px))",
-        transform: "translateX(-50%)",
         pointerEvents: "none",
         fontFamily: "var(--font-geist-mono), monospace",
+        ...dropStyle,
       };
 
   return (
@@ -832,13 +843,16 @@ export default function CloudsPage() {
   const [activeProject, setActiveProject] = useState(0);
   const [isMobileLayout, setIsMobileLayout] = useState(false);
   const [krateEasterCue, setKrateEasterCue] = useState(false);
-  const [hiddenRoomTransition, setHiddenRoomTransition] = useState(false);
+  const [hiddenRoomTransition] = useState(false);
   const [showVideoOverlay, setShowVideoOverlay] = useState(false);
   const carouselOpenRef = useRef(false);
   const activeProjectRef = useRef(0);
   const krateEasterCueRef = useRef(false);
   const hiddenRoomTransitionRef = useRef(false);
+  const krateDeadRef = useRef(false);
+  const krateDropRef = useRef(false);
   const hiddenRoomTimer = useRef<number | null>(null);
+  const [krateDrop, setKrateDrop] = useState(false);
 
   const selectProject = useCallback((nextIndex: number) => {
     const normalized = (nextIndex + PROJECTS.length) % PROJECTS.length;
@@ -870,15 +884,20 @@ export default function CloudsPage() {
     hiddenRoomTransitionRef.current = true;
     krateEasterCueRef.current = false;
     setKrateEasterCue(false);
-    setHiddenRoomTransition(true);
-    if (hiddenRoomTimer.current) window.clearTimeout(hiddenRoomTimer.current);
-    hiddenRoomTimer.current = window.setTimeout(() => {
-      setShowEaster(true);
-      setHiddenRoomTransition(false);
-      hiddenRoomTransitionRef.current = false;
-      hiddenRoomTimer.current = null;
-    }, 2300);
+    setShowEaster(true);
   }, []);
+
+  const triggerKrateDead = useCallback(() => {
+    if (krateDeadRef.current || hiddenRoomTransitionRef.current) return;
+    krateDeadRef.current = true;
+    krateEasterCueRef.current = false;
+    setKrateEasterCue(false);
+    window.setTimeout(() => {
+      krateDropRef.current = true;
+      setKrateDrop(true);
+    }, 1800);
+    window.setTimeout(() => triggerHiddenRoomTransition(), 4200);
+  }, [triggerHiddenRoomTransition]);
 
   useEffect(() => {
     const check = () => setIsMobileLayout(window.innerWidth < 768);
@@ -1076,6 +1095,19 @@ export default function CloudsPage() {
     const loader = new GLTFLoader();
     loader.setDRACOLoader(dracoLoader);
 
+    let deadKrateGroup: THREE.Group | null = null;
+    let deadKrateMaxDim = 1;
+    loader.load("/models/krate_dead.glb", (gltf) => {
+      const group = gltf.scene;
+      const box = new THREE.Box3().setFromObject(group);
+      group.position.sub(box.getCenter(new THREE.Vector3()));
+      const size = box.getSize(new THREE.Vector3());
+      deadKrateMaxDim = Math.max(size.x, size.y, size.z);
+      group.visible = false;
+      scene.add(group);
+      deadKrateGroup = group;
+    });
+
     PROJECTS.forEach((project, index) => {
       loader.load(project.model, (gltf) => {
         const group = gltf.scene;
@@ -1215,7 +1247,7 @@ export default function CloudsPage() {
 
       // Easter egg: click krate again while it's already the active project — desktop only
       if (clickedProject.index === 1 && activeProjectRef.current === 1 && e.pointerType !== "touch" && window.innerWidth >= 768) {
-        triggerHiddenRoomTransition();
+        triggerKrateDead();
         return;
       }
 
@@ -1256,6 +1288,7 @@ export default function CloudsPage() {
 
     let tick = 0,
       camT = 0,
+      dropProgress = 0,
       animId: number;
 
     const onResize = () => {
@@ -1320,7 +1353,10 @@ export default function CloudsPage() {
         const mobileCardLift =
           carouselOpenRef.current && window.innerWidth < 768 ? 0.78 : 0;
 
-        const targetY = Math.sin(t * 0.7 + index * 0.8) * 0.1 + mobileCardLift;
+        const droopY = (krateDropRef.current && index !== 1)
+          ? dropProgress * dropProgress * -5.0
+          : 0;
+        const targetY = Math.sin(t * 0.7 + index * 0.8) * 0.1 + mobileCardLift + droopY;
         const targetScale =
           (responsiveModelSize() / maxDim) * (PROJECTS[index].scaleFactor ?? 1) * (0.76 + focus * 0.28);
 
@@ -1353,10 +1389,13 @@ export default function CloudsPage() {
             wrappedOffset * -0.18,
           0.08,
         );
+        const droopTilt = (krateDropRef.current && index !== 1)
+          ? dropProgress * 0.4 * (index === 0 ? 1 : -1)
+          : 0;
         group.rotation.z = THREE.MathUtils.lerp(
           group.rotation.z,
-          Math.sin(t * 0.31 + index) * 0.02,
-          0.08,
+          Math.sin(t * 0.31 + index) * 0.02 + droopTilt,
+          0.04,
         );
         if (projectObject.eyeRig) {
           const s = projectObject.eyeRig.sensitivity;
@@ -1378,7 +1417,42 @@ export default function CloudsPage() {
           });
         }
         applyMaterialOpacity(group, 0.34 + focus * 0.66);
+
+        // Gray out non-krate objects when dead sequence starts
+        if (krateDeadRef.current && index !== 1) {
+          const gray = new THREE.Color(0.54, 0.53, 0.50);
+          group.traverse((child) => {
+            if (!(child instanceof THREE.Mesh)) return;
+            const mats = Array.isArray(child.material) ? child.material : [child.material];
+            mats.forEach((mat) => {
+              if (mat instanceof THREE.MeshStandardMaterial) mat.color.lerp(gray, 0.015);
+            });
+          });
+        }
       });
+
+      // Drop progress + camera dolly
+      if (krateDropRef.current) {
+        dropProgress = Math.min(1, dropProgress + 0.008);
+        camera.position.z = THREE.MathUtils.lerp(camera.position.z, 3.0, 0.018);
+        camera.position.y = THREE.MathUtils.lerp(camera.position.y, 0.1, 0.012);
+        camera.lookAt(0, 0, 0);
+      }
+
+      // Swap krate → dead krate
+      if (krateDeadRef.current) {
+        const liveKrate = projectObjects[1];
+        if (liveKrate) {
+          liveKrate.group.visible = false;
+          if (deadKrateGroup) {
+            deadKrateGroup.visible = true;
+            deadKrateGroup.position.copy(liveKrate.group.position);
+            deadKrateGroup.rotation.copy(liveKrate.group.rotation);
+            const ds = (responsiveModelSize() / deadKrateMaxDim) * (PROJECTS[1].scaleFactor ?? 1) * 1.04;
+            deadKrateGroup.scale.lerp(new THREE.Vector3(ds, ds, ds), 0.09);
+          }
+        }
+      }
 
       renderer.render(scene, camera);
     };
@@ -1397,7 +1471,7 @@ export default function CloudsPage() {
       dracoLoader.dispose();
       renderer.dispose();
     };
-  }, [openCarousel, selectProject, triggerHiddenRoomTransition]);
+  }, [openCarousel, selectProject, triggerHiddenRoomTransition, triggerKrateDead]);
 
   return (
     <div
@@ -1408,12 +1482,15 @@ export default function CloudsPage() {
         height: "100dvh",
         background: "#e9e5e0",
         opacity: show ? 1 : 0,
-        cursor: hiddenRoomTransition ? "none" : undefined,
         ["--krate-cursor-x" as string]: "50vw",
         ["--krate-cursor-y" as string]: "50vh",
       }}
     >
       <style>{`
+        @keyframes easterFadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
         @keyframes krateCursorCore {
           0%, 100% {
             transform: translate(-50%, -50%) rotate(0deg) scale(0.94);
@@ -1425,56 +1502,9 @@ export default function CloudsPage() {
           }
         }
         @keyframes krateCursorWind {
-          0% {
-            transform: translate(4px, -50%) scaleX(0.72);
-            opacity: 0.16;
-          }
-          50% {
-            transform: translate(-18px, -50%) scaleX(1.16);
-            opacity: 0.62;
-          }
-          100% {
-            transform: translate(-34px, -50%) scaleX(0.64);
-            opacity: 0;
-          }
-        }
-        @keyframes hiddenRoomWash {
-          0% {
-            opacity: 0;
-            background: rgba(0, 0, 0, 0);
-          }
-          34% {
-            opacity: 0.24;
-            background: rgba(0, 0, 0, 0.22);
-          }
-          100% {
-            opacity: 1;
-            background: rgba(0, 0, 0, 0.78);
-          }
-        }
-        @keyframes hiddenRoomPortal {
-          0% {
-            left: var(--krate-cursor-x);
-            top: var(--krate-cursor-y);
-            opacity: 0.95;
-            transform: translate(-50%, -50%) rotate(0deg) scale(0.62);
-          }
-          26% {
-            left: 50%;
-            top: 50%;
-            opacity: 1;
-            transform: translate(-50%, -50%) rotate(0deg) scale(1.12);
-          }
-          82% {
-            left: 50%;
-            top: 50%;
-            opacity: 1;
-            transform: translate(-50%, -50%) rotate(1800deg) scale(1.42);
-          }
-          100% {
-            opacity: 0;
-            transform: translate(-50%, -50%) rotate(1800deg) scale(1.78);
-          }
+          0% { transform: translate(4px, -50%) scaleX(0.72); opacity: 0.16; }
+          50% { transform: translate(-18px, -50%) scaleX(1.16); opacity: 0.62; }
+          100% { transform: translate(-34px, -50%) scaleX(0.64); opacity: 0; }
         }
       `}</style>
       <div className="clouds-room-grid" aria-hidden="true" />
@@ -1486,82 +1516,9 @@ export default function CloudsPage() {
         style={{
           width: "100%",
           height: "100%",
-          cursor: (krateEasterCue || hiddenRoomTransition) && !isMobileLayout
-            ? "none"
-            : carouselOpen ? "grab" : "pointer",
+          cursor: krateEasterCue && !isMobileLayout ? "none" : carouselOpen ? "grab" : "pointer",
         }}
       />
-
-      {hiddenRoomTransition && (
-        <div
-          aria-hidden="true"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 900,
-            pointerEvents: "none",
-            overflow: "hidden",
-            animation: "hiddenRoomWash 2300ms cubic-bezier(0.16, 1, 0.3, 1) both",
-          }}
-        >
-          <div
-            style={{
-              position: "fixed",
-              left: "var(--krate-cursor-x)",
-              top: "var(--krate-cursor-y)",
-              width: 96,
-              height: 96,
-              animation: "hiddenRoomPortal 2300ms cubic-bezier(0.12, 0.86, 0.18, 1) both",
-              mixBlendMode: "screen",
-            }}
-          >
-            <span
-              style={{
-                position: "absolute",
-                left: 45,
-                top: 0,
-                width: 6,
-                height: 96,
-                background: "rgba(211, 50, 47, 0.96)",
-                boxShadow: "0 0 18px rgba(211, 50, 47, 0.62)",
-              }}
-            />
-            <span
-              style={{
-                position: "absolute",
-                left: 0,
-                top: 45,
-                width: 96,
-                height: 6,
-                background: "rgba(211, 50, 47, 0.96)",
-                boxShadow: "0 0 18px rgba(211, 50, 47, 0.62)",
-              }}
-            />
-            <span
-              style={{
-                position: "absolute",
-                left: 21,
-                top: 21,
-                width: 54,
-                height: 54,
-                border: "5px solid rgba(233, 229, 224, 0.9)",
-                boxShadow: "0 0 24px rgba(211, 50, 47, 0.62), inset 0 0 16px rgba(211, 50, 47, 0.42)",
-              }}
-            />
-            <span
-              style={{
-                position: "absolute",
-                left: 40,
-                top: 40,
-                width: 16,
-                height: 16,
-                background: "#0c0c0c",
-                boxShadow: "0 0 14px rgba(211, 50, 47, 0.8)",
-              }}
-            />
-          </div>
-        </div>
-      )}
 
       {krateEasterCue && !hiddenRoomTransition && !isMobileLayout && (
         <div
@@ -1588,60 +1545,23 @@ export default function CloudsPage() {
               animation: "krateCursorCore 980ms ease-in-out infinite",
             }}
           >
-            <span
-              style={{
-                position: "absolute",
-                left: 22,
-                top: 2,
-                width: 6,
-                height: 46,
-                background: "rgba(211, 50, 47, 0.92)",
-              }}
-            />
-            <span
-              style={{
-                position: "absolute",
-                left: 2,
-                top: 22,
-                width: 46,
-                height: 6,
-                background: "rgba(211, 50, 47, 0.92)",
-              }}
-            />
-            <span
-              style={{
-                position: "absolute",
-                left: 13,
-                top: 13,
-                width: 24,
-                height: 24,
-                border: "3px solid rgba(244, 240, 234, 0.86)",
-                boxShadow: "0 0 12px rgba(211, 50, 47, 0.42)",
-              }}
-            />
-            <span
-              style={{
-                position: "absolute",
-                left: 21,
-                top: 21,
-                width: 8,
-                height: 8,
-                background: "#0c0c0c",
-              }}
-            />
+            <span style={{ position: "absolute", left: 22, top: 2, width: 6, height: 46, background: "rgba(211, 50, 47, 0.92)" }} />
+            <span style={{ position: "absolute", left: 2, top: 22, width: 46, height: 6, background: "rgba(211, 50, 47, 0.92)" }} />
+            <span style={{ position: "absolute", left: 13, top: 13, width: 24, height: 24, border: "3px solid rgba(244, 240, 234, 0.86)", boxShadow: "0 0 12px rgba(211, 50, 47, 0.42)" }} />
+            <span style={{ position: "absolute", left: 21, top: 21, width: 8, height: 8, background: "#0c0c0c" }} />
           </span>
-          {[0, 1, 2].map((index) => (
+          {[0, 1, 2].map((i) => (
             <span
-              key={index}
+              key={i}
               style={{
                 position: "absolute",
-                left: 10 - index * 5,
-                top: 26 + index * 6,
-                width: 38 - index * 7,
+                left: 10 - i * 5,
+                top: 26 + i * 6,
+                width: 38 - i * 7,
                 height: 3,
-                background: index === 1 ? "rgba(244, 240, 234, 0.58)" : "rgba(211, 50, 47, 0.74)",
-                animation: `krateCursorWind ${620 + index * 130}ms ease-out infinite`,
-                animationDelay: `${index * 90}ms`,
+                background: i === 1 ? "rgba(244, 240, 234, 0.58)" : "rgba(211, 50, 47, 0.74)",
+                animation: `krateCursorWind ${620 + i * 130}ms ease-out infinite`,
+                animationDelay: `${i * 90}ms`,
                 transformOrigin: "right center",
               }}
             />
@@ -1655,6 +1575,7 @@ export default function CloudsPage() {
         carouselOpen={carouselOpen}
         isMobile={isMobileLayout}
         showEasterCue={!isMobileLayout && krateEasterCue && !hiddenRoomTransition}
+        krateDrop={krateDrop}
         onPrev={selectPrev}
         onNext={selectNext}
         onWatch={PROJECTS[activeProject].videos ? () => setShowVideoOverlay(true) : undefined}
@@ -1670,7 +1591,7 @@ export default function CloudsPage() {
 
       {showEaster && (
         <div
-          style={{ position: 'fixed', inset: 0, zIndex: 1000 }}
+          style={{ position: 'fixed', inset: 0, zIndex: 1000, animation: 'easterFadeIn 1400ms ease-out both' }}
           onKeyDown={e => { if (e.key === 'Escape') setShowEaster(false) }}
         >
           <EasterGame />
