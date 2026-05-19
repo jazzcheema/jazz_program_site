@@ -76,6 +76,12 @@ const PROJECTS: ProjectData[] = [
     type: "PROPERTY DEVELOPMENT WEBSITE",
     description:
       "Interactive property development website for Episode Companies, featuring a 3D television interface and knob-turning navigation.",
+    videos: [
+      { id: "1193699829", h: "979ff6f49f" },
+      { id: "1193699831", h: "a6f8bc052f" },
+      { id: "1193699828", h: "4f46bf5e39" },
+      { id: "1193699830", h: "0f69541395" },
+    ],
   },
 ];
 
@@ -450,7 +456,7 @@ function DotMatrixProjectSignal({
 function VidCell({ clip, title }: { clip: VimeoClip; title: string }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const wasHidden = useRef(false);
-  const src = `https://player.vimeo.com/video/${clip.id}?h=${clip.h}&background=1&autoplay=1&loop=1&muted=1&dnt=1`;
+  const src = `https://player.vimeo.com/video/${clip.id}?h=${clip.h}&background=1&autoplay=1&loop=1&muted=1&dnt=1&quality=2160p`;
 
   useEffect(() => {
     const iframe = iframeRef.current;
