@@ -416,6 +416,17 @@ a.clouds-particle-btn {
   }
 }
 
+@keyframes video-content-rise {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .video-overlay-return-btn {
   position: relative;
   overflow: hidden;

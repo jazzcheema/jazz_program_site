@@ -462,13 +462,30 @@ function VideoOverlay({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
+  const [scrolled, setScrolled] = useState(false);
+  const [atBottom, setAtBottom] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      setScrolled(el.scrollTop > 8);
+      setAtBottom(el.scrollTop + el.clientHeight >= el.scrollHeight - 80);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
   const videos = project.videos ?? [];
   const shortLabel = project.label.replace(".COM", "").replace(".VERCEL.APP", "");
   const mono = "var(--font-geist-mono), monospace";
-  const BG_SOLID  = "rgba(237,234,230,0.82)";
-  const BG_GLASS  = "rgba(237,234,230,0.9)";
+  const BG_PILL  = "rgba(237,234,230,0.78)";
+  const BG_GLASS = "rgba(237,234,230,0.88)";
   const BLUR_OUTER = "blur(36px) saturate(0.92)";
-  const BLUR_BAR   = "blur(14px)";
+  const BLUR_PILL  = "blur(18px)";
+  const rise = (ms: number) =>
+    `video-content-rise 540ms cubic-bezier(0.16,1,0.3,1) ${ms}ms both`;
 
   const VidCell = ({ clip, title }: { clip: VimeoClip; title: string }) => (
     <div style={{ position: "relative", aspectRatio: "16/9", background: "#0d0d0d" }}>
@@ -484,6 +501,7 @@ function VideoOverlay({
 
   return createPortal(
     <div
+      ref={scrollRef}
       style={{
         position: "fixed",
         inset: 0,
@@ -496,67 +514,97 @@ function VideoOverlay({
         animation: "video-overlay-enter 360ms cubic-bezier(0.16,1,0.3,1) both",
       }}
     >
-      {/* ── Top bar ── */}
+      {/* ── Top bar: glued at top, floats when scrolled ── */}
       <div
         style={{
           position: "sticky",
           top: 0,
           zIndex: 10,
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          height: 50,
-          padding: "0 clamp(1.2rem,3vw,2.5rem)",
-          background: BG_SOLID,
-          backdropFilter: BLUR_BAR,
-          WebkitBackdropFilter: BLUR_BAR,
-          borderBottom: "1px solid rgba(22,22,22,0.1)",
+          justifyContent: "center",
+          padding: scrolled ? "10px 0" : "0",
+          transition: "padding 620ms cubic-bezier(0.16,1,0.3,1)",
+          animation: rise(40),
         }}
       >
-        <button
-          type="button"
-          onClick={onClose}
-          style={{ fontFamily: mono, fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.14em", color: "#161616", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            width: "100%",
+            maxWidth: scrolled ? "min(17rem, calc(100vw - 32px))" : "100%",
+            padding: scrolled ? "0.9rem 1.8rem" : "0.78rem 2rem",
+            background: BG_PILL,
+            backdropFilter: BLUR_PILL,
+            WebkitBackdropFilter: BLUR_PILL,
+            borderRadius: scrolled ? 20 : 0,
+            border: scrolled ? "1px solid rgba(22,22,22,0.08)" : "none",
+            borderBottom: scrolled ? "none" : "1px solid rgba(22,22,22,0.1)",
+            boxShadow: scrolled ? "0 2px 20px rgba(0,0,0,0.08)" : "none",
+            transition: [
+              "max-width 620ms cubic-bezier(0.16,1,0.3,1)",
+              "border-radius 620ms cubic-bezier(0.16,1,0.3,1)",
+              "padding 620ms cubic-bezier(0.16,1,0.3,1)",
+              "box-shadow 480ms ease",
+            ].join(", "),
+          }}
         >
-          {shortLabel}
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          style={{ fontFamily: mono, fontSize: "0.62rem", fontWeight: 600, letterSpacing: "0.1em", color: "rgba(22,22,22,0.38)", background: "none", border: "none", cursor: "pointer", padding: "0.3rem 0.5rem" }}
-        >
-          [ESC]
-        </button>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ fontFamily: mono, fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.14em", color: "#161616", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+          >
+            {shortLabel}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            style={{ fontFamily: mono, fontSize: "0.62rem", fontWeight: 600, letterSpacing: "0.1em", color: "rgba(22,22,22,0.38)", background: "none", border: "none", cursor: "pointer", padding: "0.3rem 0.5rem" }}
+          >
+            [ESC]
+          </button>
+        </div>
       </div>
 
       {/* ── Description ── */}
-      <div style={{ padding: "clamp(3rem,7vw,5.5rem) clamp(1.5rem,8vw,6rem) clamp(2rem,5vw,3.5rem)", textAlign: "center" }}>
+      <div
+        style={{
+          padding: "clamp(2.5rem,6vw,4.5rem) clamp(1.5rem,8vw,6rem) clamp(2rem,4vw,3rem)",
+          textAlign: "center",
+          animation: rise(140),
+        }}
+      >
         <p
           style={{
-            maxWidth: "50rem",
-            margin: "0 auto clamp(1.8rem,3vw,2.5rem)",
-            fontSize: "clamp(1.05rem,2.1vw,1.42rem)",
-            lineHeight: 1.52,
-            fontWeight: 500,
-            color: "#161616",
-            letterSpacing: "-0.01em",
+            maxWidth: "38rem",
+            margin: "0 auto clamp(1.2rem,2vw,1.8rem)",
+            fontSize: "clamp(0.72rem,1.1vw,0.88rem)",
+            lineHeight: 1.65,
+            fontWeight: 400,
+            color: "rgba(22,22,22,0.72)",
+            letterSpacing: "0.01em",
           }}
         >
           {project.description}
         </p>
-        <div style={{ display: "flex", justifyContent: "center", gap: "clamp(1.8rem,5vw,4rem)", flexWrap: "wrap", fontSize: "0.56rem", letterSpacing: "0.1em", color: "rgba(22,22,22,0.45)" }}>
-          <span><span style={{ color: "rgba(22,22,22,0.26)", marginRight: "0.5rem" }}>STACK</span>{project.stack}</span>
-          <span><span style={{ color: "rgba(22,22,22,0.26)", marginRight: "0.5rem" }}>TYPE</span>{project.type}</span>
+        <div style={{ display: "flex", justifyContent: "center", gap: "clamp(1.5rem,4vw,3.5rem)", flexWrap: "wrap", fontSize: "0.54rem", letterSpacing: "0.1em", color: "rgba(22,22,22,0.38)" }}>
+          <span><span style={{ color: "rgba(22,22,22,0.22)", marginRight: "0.5rem" }}>STACK</span>{project.stack}</span>
+          <span><span style={{ color: "rgba(22,22,22,0.22)", marginRight: "0.5rem" }}>TYPE</span>{project.type}</span>
         </div>
       </div>
 
       {/* ── Video 1 — full width ── */}
-      {videos[0] && <VidCell clip={videos[0]} title={`${shortLabel} 1`} />}
+      {videos[0] && (
+        <div style={{ animation: rise(240) }}>
+          <VidCell clip={videos[0]} title={`${shortLabel} 1`} />
+        </div>
+      )}
 
       {/* ── Videos 2 + 3 — side by side ── */}
       {(videos[1] || videos[2]) && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px", marginTop: "3px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px", marginTop: "3px", animation: rise(320) }}>
           {videos[1] && <VidCell clip={videos[1]} title={`${shortLabel} 2`} />}
           {videos[2] && <VidCell clip={videos[2]} title={`${shortLabel} 3`} />}
         </div>
@@ -564,44 +612,60 @@ function VideoOverlay({
 
       {/* ── Video 4 — full width ── */}
       {videos[3] && (
-        <div style={{ marginTop: "3px" }}>
+        <div style={{ marginTop: "3px", animation: rise(400) }}>
           <VidCell clip={videos[3]} title={`${shortLabel} 4`} />
         </div>
       )}
 
-      {/* ── Bottom bar ── */}
+      {/* ── Bottom bar: condensed pill while scrolling, attaches at bottom ── */}
       <div
         style={{
           position: "sticky",
           bottom: 0,
+          zIndex: 10,
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          height: 60,
-          padding: "0 clamp(1.2rem,3vw,2.5rem)",
-          background: BG_SOLID,
-          backdropFilter: BLUR_BAR,
-          WebkitBackdropFilter: BLUR_BAR,
-          borderTop: "1px solid rgba(22,22,22,0.1)",
-          marginTop: "3px",
+          justifyContent: "center",
+          padding: atBottom ? "0" : "8px 0 10px",
+          transition: "padding 620ms cubic-bezier(0.16,1,0.3,1)",
+          animation: rise(480),
         }}
       >
-        <button
-          type="button"
-          onClick={onClose}
-          className="video-overlay-return-btn"
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            width: "100%",
+            maxWidth: atBottom ? "100%" : "min(23rem, calc(100vw - 32px))",
+            padding: atBottom ? "0.78rem clamp(1.2rem,3vw,2.5rem)" : "0.9rem 1.8rem",
+            background: BG_PILL,
+            backdropFilter: BLUR_PILL,
+            WebkitBackdropFilter: BLUR_PILL,
+            borderRadius: atBottom ? 0 : 20,
+            border: atBottom ? "none" : "1px solid rgba(22,22,22,0.08)",
+            borderTop: atBottom ? "1px solid rgba(22,22,22,0.1)" : "none",
+            boxShadow: atBottom ? "none" : "0 -2px 16px rgba(0,0,0,0.07)",
+            transition: [
+              "max-width 620ms cubic-bezier(0.16,1,0.3,1)",
+              "border-radius 620ms cubic-bezier(0.16,1,0.3,1)",
+              "padding 620ms cubic-bezier(0.16,1,0.3,1)",
+              "box-shadow 480ms ease",
+            ].join(", "),
+          }}
         >
-          <span className="video-overlay-return-default">← CLOUDS</span>
-          <span className="video-overlay-return-reveal">← RETURN</span>
-        </button>
-        <a
-          href={project.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ fontFamily: mono, fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.14em", color: "#161616", textDecoration: "none", padding: "0.54rem 2rem", border: "1px solid rgba(22,22,22,0.22)", borderRadius: "6px" }}
-        >
-          VISIT ↗
-        </a>
+          <button type="button" onClick={onClose} className="video-overlay-return-btn">
+            <span className="video-overlay-return-default">← CLOUDS</span>
+            <span className="video-overlay-return-reveal">← RETURN</span>
+          </button>
+          <a
+            href={project.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontFamily: mono, fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.14em", color: "#161616", textDecoration: "none", padding: "0.54rem 2rem", border: "1px solid rgba(22,22,22,0.22)", borderRadius: 6 }}
+          >
+            VISIT ↗
+          </a>
+        </div>
       </div>
     </div>,
     document.body,
