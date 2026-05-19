@@ -852,6 +852,7 @@ export default function CloudsPage() {
   const krateDeadRef = useRef(false);
   const krateDropRef = useRef(false);
   const hiddenRoomTimer = useRef<number | null>(null);
+  const [krateDead, setKrateDead] = useState(false);
   const [krateDrop, setKrateDrop] = useState(false);
 
   const selectProject = useCallback((nextIndex: number) => {
@@ -890,6 +891,7 @@ export default function CloudsPage() {
   const triggerKrateDead = useCallback(() => {
     if (krateDeadRef.current || hiddenRoomTransitionRef.current) return;
     krateDeadRef.current = true;
+    setKrateDead(true);
     krateEasterCueRef.current = false;
     setKrateEasterCue(false);
     window.setTimeout(() => {
@@ -1516,11 +1518,11 @@ export default function CloudsPage() {
         style={{
           width: "100%",
           height: "100%",
-          cursor: krateEasterCue && !isMobileLayout ? "none" : carouselOpen ? "grab" : "pointer",
+          cursor: krateDead || (krateEasterCue && !isMobileLayout) ? "none" : carouselOpen ? "grab" : "pointer",
         }}
       />
 
-      {krateEasterCue && !hiddenRoomTransition && !isMobileLayout && (
+      {(krateEasterCue || krateDead) && !isMobileLayout && (
         <div
           aria-hidden="true"
           style={{
