@@ -1508,6 +1508,14 @@ export default function CloudsPage() {
           50% { transform: translate(-18px, -50%) scaleX(1.16); opacity: 0.62; }
           100% { transform: translate(-34px, -50%) scaleX(0.64); opacity: 0; }
         }
+        @keyframes krateCursorPing {
+          0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 0.9; }
+          100% { transform: translate(-50%, -50%) scale(3.2); opacity: 0; }
+        }
+        @keyframes krateCursorGreenBlink {
+          0%, 25% { opacity: 1; }
+          100%    { opacity: 0; }
+        }
       `}</style>
       <div className="clouds-room-grid" aria-hidden="true" />
       <GridMouseTrail />
@@ -1551,7 +1559,23 @@ export default function CloudsPage() {
             <span style={{ position: "absolute", left: 2, top: 22, width: 46, height: 6, background: "rgba(211, 50, 47, 0.92)" }} />
             <span style={{ position: "absolute", left: 13, top: 13, width: 24, height: 24, border: "3px solid rgba(244, 240, 234, 0.86)", boxShadow: "0 0 12px rgba(211, 50, 47, 0.42)" }} />
             <span style={{ position: "absolute", left: 21, top: 21, width: 8, height: 8, background: "#0c0c0c" }} />
+            {krateDead && <>
+              <span style={{ position: "absolute", left: 22, top: 2, width: 6, height: 46, background: "rgba(36, 200, 100, 0.95)", animation: "krateCursorGreenBlink 900ms ease-out both" }} />
+              <span style={{ position: "absolute", left: 2, top: 22, width: 46, height: 6, background: "rgba(36, 200, 100, 0.95)", animation: "krateCursorGreenBlink 900ms ease-out both" }} />
+            </>}
           </span>
+          {krateDead && (
+            <span style={{
+              position: "absolute",
+              left: "50%",
+              top: "50%",
+              width: 54,
+              height: 54,
+              border: "2.5px solid rgba(36, 200, 100, 0.88)",
+              borderRadius: "50%",
+              animation: "krateCursorPing 900ms ease-out both",
+            }} />
+          )}
           {[0, 1, 2].map((i) => (
             <span
               key={i}
