@@ -22,6 +22,9 @@ const SANDCASTLE_REACH_DIST = 0.72
 const SANDCASTLE_PULL_DIST = 2.15
 const BOOKS_REACH_DIST = 0.8
 const MOBILE_ASPECT = 0.74
+const MOBILE_CLOUD_POS = { x: 0.34, y: 0.39 }
+const MOBILE_BOTTOM_POS = { x: 0.37, y: -0.42 }
+const MOBILE_BOOKS_POS = { x: 0.355, y: MOBILE_BOTTOM_POS.y }
 
 export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachBooks }: CarpetSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -73,13 +76,13 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
 
     const responsiveCloudPos = () => {
       const { width, height } = visibleWorldSize()
-      if (isPortraitMobile()) return new THREE.Vector3(width * 0.30, height * 0.36, 0)
+      if (isPortraitMobile()) return new THREE.Vector3(width * MOBILE_CLOUD_POS.x, height * MOBILE_CLOUD_POS.y, 0)
       return DESKTOP_CLOUD_POS.clone().multiplyScalar(stageScale())
     }
 
     const responsiveSandcastlePos = () => {
       const { width, height } = visibleWorldSize()
-      if (isPortraitMobile()) return new THREE.Vector3(-width * 0.30, -height * 0.40, 0)
+      if (isPortraitMobile()) return new THREE.Vector3(-width * MOBILE_BOTTOM_POS.x, height * MOBILE_BOTTOM_POS.y, 0)
       return DESKTOP_SANDCASTLE_POS.clone().multiplyScalar(stageScale())
     }
 
@@ -90,7 +93,7 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
 
     const responsiveBooksPos = () => {
       const { width, height } = visibleWorldSize()
-      if (isPortraitMobile()) return new THREE.Vector3(width * 0.30, -height * 0.40, 0)
+      if (isPortraitMobile()) return new THREE.Vector3(width * MOBILE_BOOKS_POS.x, height * MOBILE_BOOKS_POS.y, 0)
       return DESKTOP_BOOKS_POS.clone().multiplyScalar(stageScale())
     }
 
