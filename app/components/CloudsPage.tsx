@@ -447,12 +447,48 @@ function DotMatrixProjectSignal({
   return <canvas ref={canvasRef} className="clouds-matrix-canvas" aria-label={`${displayLabel} project signal`} />;
 }
 
+function VidCell({ clip, title }: { clip: VimeoClip; title: string }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const wasHidden = useRef(false);
+  const src = `https://player.vimeo.com/video/${clip.id}?h=${clip.h}&background=1&autoplay=1&loop=1&muted=1&dnt=1`;
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) {
+        wasHidden.current = true;
+      } else if (wasHidden.current) {
+        wasHidden.current = false;
+        iframe.src = src;
+      }
+    }, { threshold: 0.1 });
+    observer.observe(iframe);
+    return () => observer.disconnect();
+  }, [src]);
+
+  return (
+    <div style={{ position: "relative", aspectRatio: "16/9", background: "#0d0d0d" }}>
+      <iframe
+        ref={iframeRef}
+        src={src}
+        allow="autoplay; fullscreen"
+        loading="eager"
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
+        title={title}
+      />
+    </div>
+  );
+}
+
 function VideoOverlay({
   project,
   onClose,
+  isMobile,
 }: {
   project: ProjectData;
   onClose: () => void;
+  isMobile: boolean;
 }) {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -485,17 +521,7 @@ function VideoOverlay({
   const rise = (ms: number) =>
     `video-content-rise 540ms cubic-bezier(0.16,1,0.3,1) ${ms}ms both`;
 
-  const VidCell = ({ clip, title }: { clip: VimeoClip; title: string }) => (
-    <div style={{ position: "relative", aspectRatio: "16/9", background: "#0d0d0d" }}>
-      <iframe
-        src={`https://player.vimeo.com/video/${clip.id}?h=${clip.h}&background=1&autoplay=1&loop=1&muted=1&dnt=1`}
-        allow="autoplay; fullscreen"
-        loading="lazy"
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
-        title={title}
-      />
-    </div>
-  );
+
 
   return createPortal(
     <div
@@ -508,6 +534,7 @@ function VideoOverlay({
         backdropFilter: "blur(52px) saturate(1.4)",
         WebkitBackdropFilter: "blur(52px) saturate(1.4)",
         overflowY: "auto",
+        overscrollBehavior: "none",
         fontFamily: mono,
         animation: "video-overlay-enter 360ms cubic-bezier(0.16,1,0.3,1) both",
       }}
@@ -520,7 +547,7 @@ function VideoOverlay({
           zIndex: 10,
           display: "flex",
           justifyContent: "center",
-          padding: scrolled ? "10px 0" : "0",
+          padding: scrolled ? (isMobile ? "6px 0" : "10px 0") : "0",
           transition: "padding 620ms cubic-bezier(0.16,1,0.3,1)",
           animation: rise(40),
         }}
@@ -531,12 +558,12 @@ function VideoOverlay({
             alignItems: "center",
             justifyContent: "space-between",
             width: "100%",
-            maxWidth: scrolled ? "min(17rem, calc(100vw - 32px))" : "100%",
-            padding: scrolled ? "0.9rem 1.8rem" : "0.78rem 2rem",
+            maxWidth: scrolled ? (isMobile ? "min(13rem, calc(100vw - 24px))" : "min(17rem, calc(100vw - 32px))") : "100%",
+            padding: scrolled ? (isMobile ? "0.5rem 1rem" : "0.9rem 1.8rem") : (isMobile ? "0.52rem 1rem" : "0.78rem 2rem"),
             background: BG_PILL,
             backdropFilter: BLUR_PILL,
             WebkitBackdropFilter: BLUR_PILL,
-            borderRadius: scrolled ? 20 : 0,
+            borderRadius: scrolled ? (isMobile ? 10 : 20) : 0,
             border: scrolled ? "1px solid rgba(22,22,22,0.08)" : "none",
             borderBottom: scrolled ? "none" : "1px solid rgba(22,22,22,0.1)",
             boxShadow: scrolled ? "0 2px 20px rgba(0,0,0,0.08)" : "none",
@@ -551,7 +578,7 @@ function VideoOverlay({
           <button
             type="button"
             onClick={onClose}
-            style={{ fontFamily: mono, fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.14em", color: "#161616", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+            style={{ fontFamily: mono, fontSize: isMobile ? "0.56rem" : "0.68rem", fontWeight: 700, letterSpacing: "0.14em", color: "#161616", background: "none", border: "none", cursor: "pointer", padding: 0 }}
           >
             {shortLabel}
           </button>
@@ -559,7 +586,7 @@ function VideoOverlay({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            style={{ fontFamily: mono, fontSize: "0.62rem", fontWeight: 600, letterSpacing: "0.1em", color: "rgba(22,22,22,0.38)", background: "none", border: "none", cursor: "pointer", padding: "0.3rem 0.5rem" }}
+            style={{ fontFamily: mono, fontSize: isMobile ? "0.52rem" : "0.62rem", fontWeight: 600, letterSpacing: "0.1em", color: "rgba(22,22,22,0.38)", background: "none", border: "none", cursor: "pointer", padding: "0.2rem 0.4rem" }}
           >
             [ESC]
           </button>
@@ -568,14 +595,14 @@ function VideoOverlay({
 
       {/* ── Video 1 — full width floating ── */}
       {videos[0] && (
-        <div style={{ padding: "clamp(3rem,6vw,5rem) clamp(1.5rem,6vw,6rem) 0", animation: rise(140) }}>
+        <div style={{ padding: isMobile ? "2rem 0.75rem 0" : "clamp(3rem,6vw,5rem) clamp(1.5rem,6vw,6rem) 0", animation: rise(140) }}>
           <VidCell clip={videos[0]} title={`${shortLabel} 1`} />
         </div>
       )}
 
-      {/* ── Videos 2 + 3 — side by side floating ── */}
+      {/* ── Videos 2 + 3 — side by side (desktop) / stacked full-width (mobile) ── */}
       {(videos[1] || videos[2]) && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "clamp(1rem,2vw,1.5rem)", padding: "clamp(2rem,4vw,3.5rem) clamp(1.5rem,6vw,6rem) 0", animation: rise(240) }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "1.5rem" : "clamp(1rem,2vw,1.5rem)", padding: isMobile ? "1.5rem 0.75rem 0" : "clamp(2rem,4vw,3.5rem) clamp(1.5rem,6vw,6rem) 0", animation: rise(240) }}>
           {videos[1] && <VidCell clip={videos[1]} title={`${shortLabel} 2`} />}
           {videos[2] && <VidCell clip={videos[2]} title={`${shortLabel} 3`} />}
         </div>
@@ -583,7 +610,7 @@ function VideoOverlay({
 
       {/* ── Video 4 — full width floating ── */}
       {videos[3] && (
-        <div style={{ padding: "clamp(2rem,4vw,3.5rem) clamp(1.5rem,6vw,6rem) clamp(5rem,10vw,8rem)", animation: rise(320) }}>
+        <div style={{ padding: isMobile ? "0.75rem 0.75rem clamp(4rem,12vw,6rem)" : "clamp(2rem,4vw,3.5rem) clamp(1.5rem,6vw,6rem) clamp(5rem,10vw,8rem)", animation: rise(320) }}>
           <VidCell clip={videos[3]} title={`${shortLabel} 4`} />
         </div>
       )}
@@ -596,7 +623,7 @@ function VideoOverlay({
           zIndex: 10,
           display: "flex",
           justifyContent: "center",
-          padding: atBottom ? "0" : "8px 0 10px",
+          padding: atBottom ? "0" : (isMobile ? "6px 0 8px" : "8px 0 10px"),
           transition: "padding 620ms cubic-bezier(0.16,1,0.3,1)",
           animation: rise(480),
         }}
@@ -607,12 +634,12 @@ function VideoOverlay({
             alignItems: "center",
             justifyContent: "space-between",
             width: "100%",
-            maxWidth: atBottom ? "100%" : "min(23rem, calc(100vw - 32px))",
-            padding: atBottom ? "0.78rem clamp(1.2rem,3vw,2.5rem)" : "0.9rem 1.8rem",
+            maxWidth: atBottom ? "100%" : (isMobile ? "min(16rem, calc(100vw - 24px))" : "min(23rem, calc(100vw - 32px))"),
+            padding: atBottom ? (isMobile ? "0.6rem 1rem" : "0.78rem clamp(1.2rem,3vw,2.5rem)") : (isMobile ? "0.5rem 1rem" : "0.9rem 1.8rem"),
             background: BG_PILL,
             backdropFilter: BLUR_PILL,
             WebkitBackdropFilter: BLUR_PILL,
-            borderRadius: atBottom ? 0 : 20,
+            borderRadius: atBottom ? 0 : (isMobile ? 10 : 20),
             border: atBottom ? "none" : "1px solid rgba(22,22,22,0.08)",
             borderTop: atBottom ? "1px solid rgba(22,22,22,0.1)" : "none",
             boxShadow: atBottom ? "none" : "0 -2px 16px rgba(0,0,0,0.07)",
@@ -624,7 +651,7 @@ function VideoOverlay({
             ].join(", "),
           }}
         >
-          <button type="button" onClick={onClose} className="video-overlay-return-btn">
+          <button type="button" onClick={onClose} className="video-overlay-return-btn" style={isMobile ? { fontSize: "0.58rem", padding: "0.42rem 1.2rem" } : undefined}>
             <span className="video-overlay-return-default">← CLOUDS</span>
             <span className="video-overlay-return-reveal">← RETURN</span>
           </button>
@@ -632,7 +659,7 @@ function VideoOverlay({
             href={project.href}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ fontFamily: mono, fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.14em", color: "#161616", textDecoration: "none", padding: "0.54rem 2rem", border: "1px solid rgba(22,22,22,0.22)", borderRadius: 6 }}
+            style={{ fontFamily: mono, fontSize: isMobile ? "0.58rem" : "0.7rem", fontWeight: 700, letterSpacing: "0.14em", color: "#161616", textDecoration: "none", padding: isMobile ? "0.42rem 1.2rem" : "0.54rem 2rem", border: "1px solid rgba(22,22,22,0.22)", borderRadius: 6 }}
           >
             VISIT ↗
           </a>
@@ -1634,6 +1661,7 @@ export default function CloudsPage() {
         <VideoOverlay
           project={PROJECTS[activeProject]}
           onClose={() => setShowVideoOverlay(false)}
+          isMobile={isMobileLayout}
         />
       )}
 
