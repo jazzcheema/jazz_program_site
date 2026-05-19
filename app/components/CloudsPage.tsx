@@ -481,8 +481,6 @@ function VideoOverlay({
   const shortLabel = project.label.replace(".COM", "").replace(".VERCEL.APP", "");
   const mono = "var(--font-geist-mono), monospace";
   const BG_PILL  = "rgba(237,234,230,0.78)";
-  const BG_GLASS = "rgba(237,234,230,0.88)";
-  const BLUR_OUTER = "blur(36px) saturate(0.92)";
   const BLUR_PILL  = "blur(18px)";
   const rise = (ms: number) =>
     `video-content-rise 540ms cubic-bezier(0.16,1,0.3,1) ${ms}ms both`;
@@ -506,9 +504,9 @@ function VideoOverlay({
         position: "fixed",
         inset: 0,
         zIndex: 2000,
-        background: BG_GLASS,
-        backdropFilter: BLUR_OUTER,
-        WebkitBackdropFilter: BLUR_OUTER,
+        background: "rgba(237,234,230,0.05)",
+        backdropFilter: "blur(52px) saturate(1.4)",
+        WebkitBackdropFilter: "blur(52px) saturate(1.4)",
         overflowY: "auto",
         fontFamily: mono,
         animation: "video-overlay-enter 360ms cubic-bezier(0.16,1,0.3,1) both",
@@ -568,51 +566,24 @@ function VideoOverlay({
         </div>
       </div>
 
-      {/* ── Description ── */}
-      <div
-        style={{
-          padding: "clamp(2.5rem,6vw,4.5rem) clamp(1.5rem,8vw,6rem) clamp(2rem,4vw,3rem)",
-          textAlign: "center",
-          animation: rise(140),
-        }}
-      >
-        <p
-          style={{
-            maxWidth: "38rem",
-            margin: "0 auto clamp(1.2rem,2vw,1.8rem)",
-            fontSize: "clamp(0.72rem,1.1vw,0.88rem)",
-            lineHeight: 1.65,
-            fontWeight: 400,
-            color: "rgba(22,22,22,0.72)",
-            letterSpacing: "0.01em",
-          }}
-        >
-          {project.description}
-        </p>
-        <div style={{ display: "flex", justifyContent: "center", gap: "clamp(1.5rem,4vw,3.5rem)", flexWrap: "wrap", fontSize: "0.54rem", letterSpacing: "0.1em", color: "rgba(22,22,22,0.38)" }}>
-          <span><span style={{ color: "rgba(22,22,22,0.22)", marginRight: "0.5rem" }}>STACK</span>{project.stack}</span>
-          <span><span style={{ color: "rgba(22,22,22,0.22)", marginRight: "0.5rem" }}>TYPE</span>{project.type}</span>
-        </div>
-      </div>
-
-      {/* ── Video 1 — full width ── */}
+      {/* ── Video 1 — full width floating ── */}
       {videos[0] && (
-        <div style={{ animation: rise(240) }}>
+        <div style={{ padding: "clamp(3rem,6vw,5rem) clamp(1.5rem,6vw,6rem) 0", animation: rise(140) }}>
           <VidCell clip={videos[0]} title={`${shortLabel} 1`} />
         </div>
       )}
 
-      {/* ── Videos 2 + 3 — side by side ── */}
+      {/* ── Videos 2 + 3 — side by side floating ── */}
       {(videos[1] || videos[2]) && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px", marginTop: "3px", animation: rise(320) }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "clamp(1rem,2vw,1.5rem)", padding: "clamp(2rem,4vw,3.5rem) clamp(1.5rem,6vw,6rem) 0", animation: rise(240) }}>
           {videos[1] && <VidCell clip={videos[1]} title={`${shortLabel} 2`} />}
           {videos[2] && <VidCell clip={videos[2]} title={`${shortLabel} 3`} />}
         </div>
       )}
 
-      {/* ── Video 4 — full width ── */}
+      {/* ── Video 4 — full width floating ── */}
       {videos[3] && (
-        <div style={{ marginTop: "3px", animation: rise(400) }}>
+        <div style={{ padding: "clamp(2rem,4vw,3.5rem) clamp(1.5rem,6vw,6rem) clamp(5rem,10vw,8rem)", animation: rise(320) }}>
           <VidCell clip={videos[3]} title={`${shortLabel} 4`} />
         </div>
       )}
