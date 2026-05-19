@@ -25,6 +25,7 @@ const MOBILE_ASPECT = 0.74
 const MOBILE_CLOUD_POS = { x: 0.34, y: 0.39 }
 const MOBILE_BOTTOM_POS = { x: 0.37, y: -0.42 }
 const MOBILE_BOOKS_POS = { x: 0.355, y: MOBILE_BOTTOM_POS.y }
+const MOBILE_CARPET_MIN_SCALE = 0.28
 
 export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachBooks }: CarpetSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -325,12 +326,17 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
         // Shrink as it moves from center, then tuck smaller into the sandcastle target.
         const currentStageScale = stageScale()
         const mobile = isPortraitMobile()
-        const { width: visW } = visibleWorldSize()
+        const { width: visW, height: visH } = visibleWorldSize()
         // On portrait mobile, reach zones scale with visible world width; desktop uses stageScale
         const reachScale = mobile ? visW * 0.20 : currentStageScale
-        const dist = Math.hypot(currX, currY)
+        const dist = cPos.length()
+        const mobileEdgeProgress = THREE.MathUtils.clamp(
+          dist / Math.hypot(visW * 0.5, visH * 0.5),
+          0,
+          1,
+        )
         const worldShrink = mobile
-          ? Math.max(0.42, 1 - dist * 0.09)
+          ? THREE.MathUtils.lerp(1, MOBILE_CARPET_MIN_SCALE, mobileEdgeProgress ** 1.18)
           : Math.max(0.42, 1 - (dist / Math.max(currentStageScale, 0.001)) * 0.09)
         const sandcastleDist = cPos.distanceTo(sandcastlePos)
         const sandcastlePull = mobile
