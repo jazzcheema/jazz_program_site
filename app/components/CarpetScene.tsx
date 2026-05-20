@@ -22,6 +22,9 @@ const MOBILE_CARPET_MIN_SCALE = 0.28
 const CLOUD_FRAC  = { x: 0.38, y: 0.39 }
 const SAND_FRAC   = { x: 0.44, y: 0.42 }
 const BOOKS_FRAC  = { x: 0.40, y: 0.40 }
+const MOBILE_CLOUD_FRAC = { x: 0.31, y: 0.44 }
+const MOBILE_SAND_FRAC = { x: 0.36, y: 0.44 }
+const MOBILE_BOOKS_FRAC = { x: 0.32, y: 0.43 }
 
 export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachBooks }: CarpetSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -73,12 +76,14 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
 
     const responsiveCloudPos = () => {
       const { width, height } = visibleWorldSize()
-      return new THREE.Vector3(width * CLOUD_FRAC.x, height * CLOUD_FRAC.y, 0)
+      const frac = isPortrait() ? MOBILE_CLOUD_FRAC : CLOUD_FRAC
+      return new THREE.Vector3(width * frac.x, height * frac.y, 0)
     }
 
     const responsiveSandcastlePos = () => {
       const { width, height } = visibleWorldSize()
-      return new THREE.Vector3(-width * SAND_FRAC.x, -height * SAND_FRAC.y, 0)
+      const frac = isPortrait() ? MOBILE_SAND_FRAC : SAND_FRAC
+      return new THREE.Vector3(-width * frac.x, -height * frac.y, 0)
     }
 
     const responsiveModelSize = (desktopSize: number, mobileWidthFactor: number) => {
@@ -88,7 +93,8 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
 
     const responsiveBooksPos = () => {
       const { width, height } = visibleWorldSize()
-      return new THREE.Vector3(width * BOOKS_FRAC.x, -height * BOOKS_FRAC.y, 0)
+      const frac = isPortrait() ? MOBILE_BOOKS_FRAC : BOOKS_FRAC
+      return new THREE.Vector3(width * frac.x, -height * frac.y, 0)
     }
 
     let cloudPos = responsiveCloudPos()
