@@ -27,7 +27,6 @@ export default function SandPage() {
   const roomRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [show, setShow] = useState(false);
-  const [depleted, setDepleted] = useState(false);
   const [desktopMode, setDesktopMode] = useState(false);
   const [driveComplete, setDriveComplete] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
@@ -282,14 +281,50 @@ export default function SandPage() {
       alphaTest: 0.01,
     });
     const pMesh = new THREE.Points(pGeo, pMat);
+
+    // Fine detail particles — smaller, faster, tighter
+    const P2_COUNT = 420;
+    const p2Pos = new Float32Array(P2_COUNT * 3);
+    const p2Geo = new THREE.BufferGeometry();
+    p2Geo.setAttribute("position", new THREE.BufferAttribute(p2Pos, 3));
+    const p2Canvas = document.createElement("canvas");
+    p2Canvas.width = 16; p2Canvas.height = 16;
+    const p2Ctx = p2Canvas.getContext("2d")!;
+    const p2Grad = p2Ctx.createRadialGradient(8, 8, 0, 8, 8, 8);
+    p2Grad.addColorStop(0, "rgba(255,255,255,1)");
+    p2Grad.addColorStop(0.25, "rgba(255,255,255,0.6)");
+    p2Grad.addColorStop(1, "rgba(255,255,255,0)");
+    p2Ctx.fillStyle = p2Grad;
+    p2Ctx.fillRect(0, 0, 16, 16);
+    const p2Tex = new THREE.CanvasTexture(p2Canvas);
+    const p2Mat = new THREE.PointsMaterial({
+      color: "#ffffff",
+      map: p2Tex,
+      size: 0.07,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      sizeAttenuation: true,
+      alphaTest: 0.01,
+    });
+    const p2Mesh = new THREE.Points(p2Geo, p2Mat);
+
     if (isDesktop) {
       for (let i = 0; i < PARTICLE_COUNT; i++) {
         pPos[i * 3]     = (Math.random() - 0.5) * 10;
         pPos[i * 3 + 1] = (Math.random() - 0.5) * 6;
         pPos[i * 3 + 2] = -1 + Math.random() * 36;
       }
+      for (let i = 0; i < P2_COUNT; i++) {
+        p2Pos[i * 3]     = (Math.random() - 0.5) * 7;
+        p2Pos[i * 3 + 1] = (Math.random() - 0.5) * 4;
+        p2Pos[i * 3 + 2] = -1 + Math.random() * 36;
+      }
       scene.add(pMesh);
+      scene.add(p2Mesh);
     }
+
+    let grayscaleProgress = 0;
 
     let mouseX = 0;
     let mouseY = 0;
@@ -330,7 +365,6 @@ export default function SandPage() {
           rubsRef.current += 1;
           if (rubsRef.current >= RUBS_NEEDED) {
             revealedRef.current = true;
-            setDepleted(true);
             window.location.href = "mailto:thecyberfoolz@gmail.com";
           }
         }
@@ -449,6 +483,22 @@ export default function SandPage() {
             }
           }
           pGeo.attributes.position.needsUpdate = true;
+        }
+
+        // Fine detail particles — faster, tighter cone
+        p2Mat.opacity = THREE.MathUtils.lerp(p2Mat.opacity, speedBlend * 0.45 * (1 - finalBlend), 0.07);
+        if (p2Mat.opacity > 0.01) {
+          const p2Speed = speedBlend * 13.0 * dt;
+          for (let i = 0; i < P2_COUNT; i++) {
+            p2Pos[i * 3 + 2] -= p2Speed;
+            if (p2Pos[i * 3 + 2] < camera.position.z - 2) {
+              const d = 4 + Math.random() * 18;
+              p2Pos[i * 3]     = camera.position.x + (Math.random() - 0.5) * d * 0.25;
+              p2Pos[i * 3 + 1] = camera.position.y + (Math.random() - 0.5) * d * 0.18;
+              p2Pos[i * 3 + 2] = camera.position.z + d;
+            }
+          }
+          p2Geo.attributes.position.needsUpdate = true;
         }
         const topDrive = topBlend * (1 - finalBlend);
         const lightTravel = p * 44 + t * (0.38 + speedBlend * 0.24);
@@ -570,6 +620,7 @@ export default function SandPage() {
           const lampScale = THREE.MathUtils.clamp(1 - tmpLampScreen.z, 0.35, 1);
           lampRadiusPx = Math.max(88, Math.min(W, H) * 0.18 * lampScale);
         }
+
       }
 
       if (lamp) {
@@ -609,6 +660,12 @@ export default function SandPage() {
       }
 
       renderer.render(scene, camera);
+
+      // Grayscale depletion — lerps in over ~3s after reveal
+      if (revealedRef.current && grayscaleProgress < 1 && canvasRef.current) {
+        grayscaleProgress = Math.min(1, grayscaleProgress + dt * 0.33);
+        canvasRef.current.style.filter = `grayscale(${grayscaleProgress.toFixed(3)}) brightness(${(1 - grayscaleProgress * 0.2).toFixed(3)})`;
+      }
     };
 
     animate();
@@ -629,9 +686,9 @@ export default function SandPage() {
       window.removeEventListener("resize", onResize);
       driveIntroTimers.forEach((timer) => window.clearTimeout(timer));
       cancelAnimationFrame(animId);
-      pGeo.dispose();
-      pMat.dispose();
-      pTex.dispose();
+      pGeo.dispose(); pMat.dispose(); pTex.dispose();
+      p2Geo.dispose(); p2Mat.dispose(); p2Tex.dispose();
+
       dracoLoader.dispose();
       renderer.dispose();
     };
@@ -645,6 +702,7 @@ export default function SandPage() {
     >
       <div className="sand-kingdom-grid" aria-hidden="true" />
       <div className="sand-night-pulse" aria-hidden="true" />
+
       <GridMouseTrail />
       {desktopMode && driveIntroCue && (
         <div
@@ -718,9 +776,6 @@ export default function SandPage() {
           height: "100%",
           zIndex: 1,
           touchAction: "none",
-          cursor: "pointer",
-          filter: depleted ? "grayscale(1) brightness(0.8)" : "none",
-          transition: "filter 3s ease",
         }}
       />
     </main>

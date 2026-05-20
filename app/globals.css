@@ -65,6 +65,10 @@ canvas {
   font-family: var(--font-geist-mono);
 }
 
+.sand-kingdom-room canvas {
+  cursor: pointer;
+}
+
 .home-room::before,
 .clouds-room-grid,
 .sand-kingdom-grid {
@@ -591,6 +595,7 @@ a.clouds-particle-btn {
   opacity: 1;
   transform: translateY(0);
 }
+
 
 .mobile-gate-btn {
   display: block;
