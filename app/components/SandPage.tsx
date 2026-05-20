@@ -256,6 +256,41 @@ export default function SandPage() {
       });
     }
 
+    // Speed particles — desktop drive only
+    const PARTICLE_COUNT = 260;
+    const pPos = new Float32Array(PARTICLE_COUNT * 3);
+    const pGeo = new THREE.BufferGeometry();
+    pGeo.setAttribute("position", new THREE.BufferAttribute(pPos, 3));
+    const pCanvas = document.createElement("canvas");
+    pCanvas.width = 32; pCanvas.height = 32;
+    const pCtx = pCanvas.getContext("2d")!;
+    const pGrad = pCtx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    pGrad.addColorStop(0, "rgba(255,252,232,1)");
+    pGrad.addColorStop(0.3, "rgba(255,252,232,0.5)");
+    pGrad.addColorStop(1, "rgba(255,252,232,0)");
+    pCtx.fillStyle = pGrad;
+    pCtx.fillRect(0, 0, 32, 32);
+    const pTex = new THREE.CanvasTexture(pCanvas);
+    const pMat = new THREE.PointsMaterial({
+      color: "#ffffff",
+      map: pTex,
+      size: 0.18,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      sizeAttenuation: true,
+      alphaTest: 0.01,
+    });
+    const pMesh = new THREE.Points(pGeo, pMat);
+    if (isDesktop) {
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        pPos[i * 3]     = (Math.random() - 0.5) * 10;
+        pPos[i * 3 + 1] = (Math.random() - 0.5) * 6;
+        pPos[i * 3 + 2] = -1 + Math.random() * 36;
+      }
+      scene.add(pMesh);
+    }
+
     let mouseX = 0;
     let mouseY = 0;
     let leanX = 0;
@@ -398,6 +433,23 @@ export default function SandPage() {
         const speedBlend = THREE.MathUtils.clamp(driveVelocity * DRIVE_DURATION_SECONDS, 0, 1);
         const topBlend = THREE.MathUtils.smoothstep(p, 0.08, 0.36);
         const finalBlend = THREE.MathUtils.smoothstep(p, 0.52, 1);
+
+        // Speed particles — fly from ahead toward and past the camera
+        const targetParticleOpacity = speedBlend * 0.6 * (1 - finalBlend);
+        pMat.opacity = THREE.MathUtils.lerp(pMat.opacity, targetParticleOpacity, 0.07);
+        if (pMat.opacity > 0.01) {
+          const pSpeed = speedBlend * 9.0 * dt;
+          for (let i = 0; i < PARTICLE_COUNT; i++) {
+            pPos[i * 3 + 2] -= pSpeed;
+            if (pPos[i * 3 + 2] < camera.position.z - 2) {
+              const d = 6 + Math.random() * 22;
+              pPos[i * 3]     = camera.position.x + (Math.random() - 0.5) * d * 0.4;
+              pPos[i * 3 + 1] = camera.position.y + (Math.random() - 0.5) * d * 0.28;
+              pPos[i * 3 + 2] = camera.position.z + d;
+            }
+          }
+          pGeo.attributes.position.needsUpdate = true;
+        }
         const topDrive = topBlend * (1 - finalBlend);
         const lightTravel = p * 44 + t * (0.38 + speedBlend * 0.24);
         const passA = Math.max(0, Math.sin(lightTravel * Math.PI));
@@ -577,6 +629,9 @@ export default function SandPage() {
       window.removeEventListener("resize", onResize);
       driveIntroTimers.forEach((timer) => window.clearTimeout(timer));
       cancelAnimationFrame(animId);
+      pGeo.dispose();
+      pMat.dispose();
+      pTex.dispose();
       dracoLoader.dispose();
       renderer.dispose();
     };
