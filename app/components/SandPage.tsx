@@ -469,12 +469,13 @@ export default function SandPage() {
 
         const desiredCamera = new THREE.Vector3(carX + tmpCamera.x, carY + tmpCamera.y, driveZ + tmpCamera.z);
         if (dollyActive && !revealedRef.current) {
-          dollyProgress = Math.min(1.0, dollyProgress + dt * 0.25);
+          dollyProgress = Math.min(1.0, dollyProgress + dt * 0.10);
           const eased = THREE.MathUtils.smoothstep(dollyProgress, 0, 1);
           dollyDir.set(LAMP_X - desiredCamera.x, 0.35, LAMP_Z - desiredCamera.z).normalize();
-          desiredCamera.addScaledVector(dollyDir, eased * 3.0);
+          desiredCamera.addScaledVector(dollyDir, eased * 2.5);
         }
-        camera.position.lerp(desiredCamera, 0.034);
+        const lerpRate = dollyActive ? 0.018 : 0.034;
+        camera.position.lerp(desiredCamera, lerpRate);
         camera.lookAt(tmpTarget);
         camera.fov = THREE.MathUtils.lerp(camera.fov, THREE.MathUtils.lerp(39, 47, topBlend * (1 - finalBlend)) + finalBlend * 8, 0.02);
         camera.updateProjectionMatrix();
