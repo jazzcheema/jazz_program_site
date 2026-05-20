@@ -119,14 +119,17 @@ export default function SandPage() {
 
     if (isDesktop) {
       driveIntroTimers.push(
-        window.setTimeout(() => showDriveIntroCue("driving unlocks in 15 seconds", "lock", 0), 0),
-        window.setTimeout(() => showDriveIntroCue("drive with W or ↑", "hint", 1), 5000),
-        window.setTimeout(() => showDriveIntroCue("get ready", "count", 2), 9000),
-        window.setTimeout(() => showDriveIntroCue("set", "count", 3), 12000),
+        window.setTimeout(() => showDriveIntroCue("driving unlocks in 15", "lock", 0), 0),
+        window.setTimeout(() => showDriveIntroCue("driving unlocks in 14", "lock", 0), 1000),
+        window.setTimeout(() => showDriveIntroCue("driving unlocks in 13", "lock", 0), 2000),
+        window.setTimeout(() => showDriveIntroCue("driving unlocks in 12", "lock", 0), 3000),
+        window.setTimeout(() => showDriveIntroCue("drive with W or ↑", "hint", 3), 5000),
+        window.setTimeout(() => showDriveIntroCue("get ready", "count", 4), 9000),
+        window.setTimeout(() => showDriveIntroCue("set", "count", 5), 12000),
         window.setTimeout(() => {
           driveIntroReadyRef.current = true;
           setAudioControlOpen(true);
-          showDriveIntroCue("go!!", "count", 4);
+          showDriveIntroCue("go!!", "count", 6);
         }, 15000),
         window.setTimeout(() => {
           setDriveIntroCue(null);
