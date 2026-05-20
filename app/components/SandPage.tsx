@@ -621,6 +621,16 @@ export default function SandPage() {
           lampRadiusPx = Math.max(88, Math.min(W, H) * 0.18 * lampScale);
         }
 
+        // Color grade — twilight purple-magenta shift while driving, warm amber burst near lamp
+        if (!revealedRef.current && canvasRef.current) {
+          const hue = THREE.MathUtils.lerp(0, -22, driveMood) + lampBright * 30;
+          const sat = THREE.MathUtils.lerp(1, 1.12, driveMood) + lampBright * 0.35;
+          const bri = THREE.MathUtils.lerp(1, 0.84, driveMood) + lampBright * 0.32;
+          canvasRef.current.style.filter = driveMood > 0.02
+            ? `hue-rotate(${hue.toFixed(1)}deg) saturate(${sat.toFixed(2)}) brightness(${bri.toFixed(2)})`
+            : "none";
+        }
+
       }
 
       if (lamp) {
