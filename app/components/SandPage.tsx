@@ -237,6 +237,9 @@ export default function SandPage() {
     const passingRose = new THREE.PointLight("#ff6a3d", 0, 8);
     passingRose.position.set(DRIVE_START_X - 2.0, 1.0, 1.2);
     scene.add(passingRose);
+    const rearTileReflection = new THREE.PointLight("#ffe0a8", 0, 3.2, 2.25);
+    rearTileReflection.position.set(DRIVE_START_X, -0.2, 0);
+    scene.add(rearTileReflection);
 
     const dracoLoader = new DRACOLoader();
     dracoLoader.setDecoderPath("/draco/gltf/");
@@ -308,6 +311,7 @@ export default function SandPage() {
     const vehicleTrail: { cx: number; cy: number; time: number; strength: number }[] = [];
     let lastVehicleTrailTime = 0;
     let vehicleTrailStep = 0;
+    let rearTileFlash = 0;
 
     const updateLampRub = (clientX: number, clientY: number, travel: number) => {
       if (!lamp || revealedRef.current || (isDesktop && !driveCompleteRef.current)) return;
@@ -643,6 +647,10 @@ export default function SandPage() {
           const trailStrength = Math.max(immediateDrive, driveMood * speedBlend) * (1 - finalBlend);
           const gridOffsetX = currentGridX * 24;
           const gridOffsetY = currentGridY * 24;
+          rearTileReflection.position.copy(tmpCarRear);
+          rearTileReflection.position.y += 0.18;
+          rearTileFlash *= 0.82;
+          rearTileReflection.intensity = rearTileFlash * (0.62 + topDrive * 0.48) * (1 - finalBlend);
 
           if (trailStrength > 0.06 && now - lastVehicleTrailTime > 44) {
             lastVehicleTrailTime = now;
@@ -671,6 +679,7 @@ export default function SandPage() {
             const tailStrengths = [0.78, 0.58, 0.4, 0.26, 0.16, 0.09];
             const tailAges = [135, 285, 455, 650, 860, 1080];
             vehicleTrailStep = (vehicleTrailStep % tailStrengths.length) + 1;
+            rearTileFlash = Math.max(rearTileFlash, trailStrength * sputter);
             const seededCells = [
               { cx: baseCellX, cy: baseCellY, strength: trailStrength * sputter, age: 0 },
               tailCell(
