@@ -15,7 +15,7 @@ interface CarpetSceneProps {
 // Desktop target; the live position is clamped to the camera's visible area.
 const CAMERA_Z = 6
 const REACH_DIST = 1.3
-const SANDCASTLE_REACH_DIST = 0.72
+const SANDCASTLE_REACH_DIST = 1.15
 const SANDCASTLE_PULL_DIST = 2.15
 const BOOKS_REACH_DIST = 0.8
 const MOBILE_CARPET_MIN_SCALE = 0.28
