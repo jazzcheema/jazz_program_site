@@ -415,7 +415,7 @@ export default function SandPage() {
         lampGlowLight.intensity = lampBright * 1.8 * (1 - depletedProgressRef.current);
         sunsetRear.intensity = 0.95 * (1 - driveMood) + lampBright * 0.38;
 
-        if (p >= 0.88 && !wishTriggered) {
+        if (p >= 0.85 && !wishTriggered) {
           wishTriggered = true;
           driveCompleteRef.current = true;
           setDriveComplete(true);
@@ -460,21 +460,31 @@ export default function SandPage() {
           THREE.MathUtils.lerp(carY + 0.28, -0.25, finalBlend),
           THREE.MathUtils.lerp(targetZ, LAMP_Z - 0.5, finalBlend * 0.80),
         );
-        if (dollyActive) {
-          const dollyLook = Math.min(1, dollyProgress * 4);
-          tmpTarget.x = THREE.MathUtils.lerp(tmpTarget.x, LAMP_X - 0.3, dollyLook);
-          tmpTarget.y = THREE.MathUtils.lerp(tmpTarget.y, 0.75, dollyLook);
-          tmpTarget.z = THREE.MathUtils.lerp(tmpTarget.z, LAMP_Z - 0.4, dollyLook);
-        }
-
         const desiredCamera = new THREE.Vector3(carX + tmpCamera.x, carY + tmpCamera.y, driveZ + tmpCamera.z);
         if (dollyActive && !revealedRef.current) {
           dollyProgress = Math.min(1.0, dollyProgress + dt * 0.10);
-          const eased = THREE.MathUtils.smoothstep(dollyProgress, 0, 1);
-          dollyDir.set(LAMP_X - desiredCamera.x, 0.35, LAMP_Z - desiredCamera.z).normalize();
-          desiredCamera.addScaledVector(dollyDir, eased * 2.5);
         }
-        const lerpRate = dollyActive ? 0.018 : 0.034;
+        if (dollyActive) {
+          const eased = THREE.MathUtils.smoothstep(dollyProgress, 0, 1);
+          // LookAt transitions slowly over first 60% of dolly — no snap
+          const dollyLook = THREE.MathUtils.smoothstep(dollyProgress, 0, 0.6);
+          tmpTarget.x = THREE.MathUtils.lerp(tmpTarget.x, LAMP_X - 0.3 + Math.sin(t * 0.41) * 0.03 * eased, dollyLook);
+          tmpTarget.y = THREE.MathUtils.lerp(tmpTarget.y, 0.75 + Math.sin(t * 0.29 + 1.5) * 0.02 * eased, dollyLook);
+          tmpTarget.z = THREE.MathUtils.lerp(tmpTarget.z, LAMP_Z - 0.4, dollyLook);
+
+          if (!revealedRef.current) {
+            dollyDir.set(LAMP_X - desiredCamera.x, 0.35, LAMP_Z - desiredCamera.z).normalize();
+            desiredCamera.addScaledVector(dollyDir, eased * 2.5);
+            // Organic float — layered slow wobble grows in with eased so it doesn't snap at joint
+            desiredCamera.x += Math.sin(t * 0.53 + 1.2) * 0.13 * eased;
+            desiredCamera.y += Math.sin(t * 0.37 + 2.6) * 0.08 * eased;
+            desiredCamera.z += Math.sin(t * 0.28 + 0.7) * 0.07 * eased;
+          }
+        }
+        // LerpRate transitions smoothly from drive rate → float rate over first 25% of dolly
+        const lerpRate = dollyActive
+          ? THREE.MathUtils.lerp(0.034, 0.012, THREE.MathUtils.smoothstep(dollyProgress, 0, 0.25))
+          : 0.034;
         camera.position.lerp(desiredCamera, lerpRate);
         camera.lookAt(tmpTarget);
         camera.fov = THREE.MathUtils.lerp(camera.fov, THREE.MathUtils.lerp(39, 47, topBlend * (1 - finalBlend)) + finalBlend * 8, 0.02);
