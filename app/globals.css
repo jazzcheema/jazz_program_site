@@ -352,6 +352,11 @@ a.clouds-particle-btn {
   animation-duration: 3400ms;
 }
 
+.sand-drive-cue[data-kind="wish"] {
+  top: 72%;
+  animation-duration: 8500ms;
+}
+
 .sand-drive-cue[data-kind="count"] {
   top: 42%;
   color: #111111;

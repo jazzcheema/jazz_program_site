@@ -19,7 +19,7 @@ const CLOUD_LIME = "#c6ff00";
 type DriveIntroCue = {
   id: number;
   text: string;
-  kind: "lock" | "hint" | "count";
+  kind: "lock" | "hint" | "count" | "wish";
 };
 
 export default function SandPage() {
@@ -336,6 +336,10 @@ export default function SandPage() {
 
     let tick = 0;
     let animId: number;
+    let dollyActive = false;
+    let dollyProgress = 0;
+    const dollyDir = new THREE.Vector3();
+    let wishTriggered = false;
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
@@ -408,13 +412,23 @@ export default function SandPage() {
         lampGlowLight.intensity = lampBright * 1.8 * (1 - depletedProgressRef.current);
         sunsetRear.intensity = 0.95 * (1 - driveMood) + lampBright * 0.38;
 
+        if (p >= 0.96 && !wishTriggered) {
+          wishTriggered = true;
+          driveCompleteRef.current = true;
+          setDriveComplete(true);
+          setDriveIntroCue({ id: 5, text: "make a wish", kind: "wish" });
+          dollyActive = true;
+          driveIntroTimers.push(window.setTimeout(() => setDriveIntroCue(null), 8500));
+        }
+
         if (car) {
-          car.position.x = driveX + roadSway * (0.26 + speedBlend * 0.45) * (1 - finalBlend * 0.86);
-          car.position.y = carBaseY + Math.sin(t * 2.4 + p * 12) * 0.035 * speedBlend;
+          const settle = 1 - finalBlend;
+          car.position.x = driveX + roadSway * (0.26 + speedBlend * 0.45) * settle;
+          car.position.y = carBaseY + Math.sin(t * 2.4 + p * 12) * 0.035 * speedBlend * settle;
           car.position.z = driveZ;
-          car.rotation.y = Math.PI / 2 + finalBlend * (Math.PI * 0.48) + Math.sin(t * 0.84 + p * 10) * 0.07 * speedBlend;
-          car.rotation.x = Math.sin(t * 1.5 + p * 8) * 0.018 * speedBlend;
-          car.rotation.z = -Math.sin(t * 1.9 + p * 12) * 0.06 * speedBlend;
+          car.rotation.y = Math.PI / 2 + finalBlend * (Math.PI * 0.42) + Math.sin(t * 0.84 + p * 10) * 0.07 * speedBlend * settle;
+          car.rotation.x = Math.sin(t * 1.5 + p * 8) * 0.018 * speedBlend * settle;
+          car.rotation.z = -Math.sin(t * 1.9 + p * 12) * 0.06 * speedBlend * settle;
         }
 
         if (lamp) {
@@ -432,19 +446,31 @@ export default function SandPage() {
 
         const startOffset = new THREE.Vector3(-4.7, 1.15, -0.3);
         const topOffset = new THREE.Vector3(-0.2, 7.6, -0.55);
-        const finalOffset = new THREE.Vector3(-0.98, 2.04, 5.95);
+        const finalOffset = new THREE.Vector3(-4.0, 0.5, 3.2);
         tmpCamera.copy(startOffset).lerp(topOffset, topBlend).lerp(finalOffset, finalBlend);
         tmpCamera.x += Math.sin(t * 0.42 + p * 4) * 0.16;
         tmpCamera.z += Math.sin(t * 0.31 + p * 6) * 0.2;
 
         const targetZ = THREE.MathUtils.lerp(driveZ, LAMP_Z - 0.55, finalBlend * 0.76);
         tmpTarget.set(
-          THREE.MathUtils.lerp(carX + 0.35, LAMP_X + 0.28, finalBlend * 0.86),
-          THREE.MathUtils.lerp(carY + 0.28, 0.18, finalBlend),
-          THREE.MathUtils.lerp(targetZ, LAMP_Z + 0.42, finalBlend * 0.72),
+          THREE.MathUtils.lerp(carX + 0.35, LAMP_X - 1.8, finalBlend * 0.92),
+          THREE.MathUtils.lerp(carY + 0.28, -0.25, finalBlend),
+          THREE.MathUtils.lerp(targetZ, LAMP_Z - 0.5, finalBlend * 0.80),
         );
+        if (dollyActive) {
+          const dollyLook = Math.min(1, dollyProgress * 4);
+          tmpTarget.x = THREE.MathUtils.lerp(tmpTarget.x, LAMP_X - 0.9, dollyLook);
+          tmpTarget.y = THREE.MathUtils.lerp(tmpTarget.y, 0.18, dollyLook);
+          tmpTarget.z = THREE.MathUtils.lerp(tmpTarget.z, LAMP_Z - 0.4, dollyLook);
+        }
 
         const desiredCamera = new THREE.Vector3(carX + tmpCamera.x, carY + tmpCamera.y, driveZ + tmpCamera.z);
+        if (dollyActive && !revealedRef.current) {
+          dollyProgress = Math.min(1.0, dollyProgress + dt * 0.25);
+          const eased = THREE.MathUtils.smoothstep(dollyProgress, 0, 1);
+          dollyDir.set(LAMP_X - desiredCamera.x, 0.35, LAMP_Z - desiredCamera.z).normalize();
+          desiredCamera.addScaledVector(dollyDir, eased * 5.0);
+        }
         camera.position.lerp(desiredCamera, 0.034);
         camera.lookAt(tmpTarget);
         camera.fov = THREE.MathUtils.lerp(camera.fov, THREE.MathUtils.lerp(39, 47, topBlend * (1 - finalBlend)) + finalBlend * 8, 0.02);
