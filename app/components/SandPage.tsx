@@ -171,6 +171,10 @@ export default function SandPage() {
     const warm = new THREE.PointLight("#c87820", 0.55, 14);
     warm.position.set(-2, -0.4, 2);
     scene.add(warm);
+    // Lamp approach glow — brightens as car nears the lamp, positioned AT the lamp
+    const lampGlowLight = new THREE.PointLight("#ffb84a", 0, 9);
+    lampGlowLight.position.set(LAMP_X, 1.4, LAMP_Z);
+    scene.add(lampGlowLight);
     const carRim = new THREE.PointLight(CLOUD_LIME, isDesktop ? 0.36 : 0, 16);
     carRim.position.set(2.4, 2.2, -2.4);
     scene.add(carRim);
@@ -195,6 +199,10 @@ export default function SandPage() {
     overheadC.position.set(0.2, 4.5, -2);
     scene.add(overheadC);
     scene.add(overheadC.target);
+    const overheadD = new THREE.SpotLight("#ffc870", isDesktop ? 0 : 0, 7.2, 0.52, 0.88, 1.25);
+    overheadD.position.set(-0.5, 5.0, 1);
+    scene.add(overheadD);
+    scene.add(overheadD.target);
 
     const dracoLoader = new DRACOLoader();
     dracoLoader.setDecoderPath("/draco/gltf/");
@@ -362,9 +370,7 @@ export default function SandPage() {
           hasDriven = true;
         }
         driveMood += ((hasDriven ? 1 : 0) - driveMood) * 0.018;
-        const nightPulse = (Math.sin(t * 0.26 + driveProgress * 1.8) + 1) * 0.5;
-        roomRef.current?.style.setProperty("--sand-night-opacity", (driveMood * (0.08 + nightPulse * 0.14)).toFixed(3));
-        roomRef.current?.style.setProperty("--sand-night-glow", (driveMood * (0.035 + (1 - nightPulse) * 0.055)).toFixed(3));
+        const nightPulse = (Math.sin(t * 0.15 + driveProgress * 1.2) + 1) * 0.5;
         const windDrag = Math.sin(t * 1.1 + driveProgress * 18) * 0.07 + Math.sin(t * 0.37 + 2.1) * 0.035;
         const targetVelocity = driving ? (1 / DRIVE_DURATION_SECONDS) * (1 + windDrag) : 0;
         driveVelocity += (targetVelocity - driveVelocity) * (driving ? 0.025 : 0.04);
@@ -386,15 +392,21 @@ export default function SandPage() {
         const topBlend = THREE.MathUtils.smoothstep(p, 0.08, 0.36);
         const finalBlend = THREE.MathUtils.smoothstep(p, 0.52, 1);
         const topDrive = topBlend * (1 - finalBlend);
-        const lightTravel = p * 26 + t * (0.24 + speedBlend * 0.16);
+        const lightTravel = p * 44 + t * (0.38 + speedBlend * 0.24);
         const passA = Math.max(0, Math.sin(lightTravel * Math.PI));
-        const passB = Math.max(0, Math.sin((lightTravel + 0.34) * Math.PI));
-        const passC = Math.max(0, Math.sin((lightTravel + 0.68) * Math.PI));
+        const passB = Math.max(0, Math.sin((lightTravel + 0.26) * Math.PI));
+        const passC = Math.max(0, Math.sin((lightTravel + 0.52) * Math.PI));
+        const passD = Math.max(0, Math.sin((lightTravel + 0.78) * Math.PI));
 
-        ambient.intensity = THREE.MathUtils.lerp(0.4, 0.22, driveMood);
-        key.intensity = THREE.MathUtils.lerp(1.45, 0.62, driveMood);
-        warm.intensity = 0.55 * (1 - depletedProgressRef.current) * THREE.MathUtils.lerp(1, 0.42, driveMood);
-        sunsetRear.intensity = (0.95 + 0.45 * Math.sin(t * 0.18 + p * 2.2)) * (0.35 + driveMood * 0.85);
+        const lampBright = THREE.MathUtils.smoothstep(p, 0.40, 0.95) * driveMood;
+        roomRef.current?.style.setProperty("--sand-night-opacity", (driveMood * (0.52 + nightPulse * 0.10) * (1 - lampBright * 0.90)).toFixed(3));
+        roomRef.current?.style.setProperty("--sand-night-glow", (driveMood * (0.10 + nightPulse * 0.16) * (1 - lampBright * 0.55) + lampBright * 0.26).toFixed(3));
+
+        ambient.intensity = THREE.MathUtils.lerp(0.4, 0.06, driveMood) + lampBright * 0.38;
+        key.intensity = THREE.MathUtils.lerp(1.45, 0.22, driveMood) + lampBright * 0.80;
+        warm.intensity = 0.55 * (1 - depletedProgressRef.current) * THREE.MathUtils.lerp(1, 0.24, driveMood);
+        lampGlowLight.intensity = lampBright * 1.8 * (1 - depletedProgressRef.current);
+        sunsetRear.intensity = 0.95 * (1 - driveMood) + lampBright * 0.38;
 
         if (car) {
           car.position.x = driveX + roadSway * (0.26 + speedBlend * 0.45) * (1 - finalBlend * 0.86);
@@ -442,18 +454,21 @@ export default function SandPage() {
         streetWarm.position.set(carX + sweep(0.08, 9), 4.8, driveZ + 0.2);
         streetAmber.position.set(carX + sweep(0.42, 7), 4.25, driveZ + 1.7);
         streetRose.position.set(carX + sweep(0.72, 5), 3.65, driveZ - 1.8);
-        streetWarm.intensity = driveMood * (0.5 + topDrive * 0.8 + passA * (1.6 + topDrive * 1.8));
-        streetAmber.intensity = driveMood * (0.35 + topDrive * 0.65 + passB * (1.2 + topDrive * 1.55));
-        streetRose.intensity = driveMood * (0.22 + topDrive * 0.38 + passC * (0.78 + topDrive * 0.9));
+        streetWarm.intensity = driveMood * (0.14 + passA * (2.6 + topDrive * 2.4));
+        streetAmber.intensity = driveMood * (0.10 + passB * (2.0 + topDrive * 2.1));
+        streetRose.intensity = driveMood * (0.06 + passC * (1.4 + topDrive * 1.6));
         overheadA.position.set(carX + sweep(0.02, 10), 5.15, driveZ + 0.1);
         overheadA.target.position.set(carX, carY + 0.06, driveZ);
-        overheadA.intensity = driveMood * topDrive * (0.65 + passA * 3.4);
+        overheadA.intensity = driveMood * topDrive * (0.5 + passA * 6.2);
         overheadB.position.set(carX + sweep(0.36, 9), 4.8, driveZ + 0.65);
         overheadB.target.position.set(carX + 0.08, carY + 0.04, driveZ);
-        overheadB.intensity = driveMood * topDrive * (0.5 + passB * 2.8);
+        overheadB.intensity = driveMood * topDrive * (0.38 + passB * 5.4);
         overheadC.position.set(carX + sweep(0.7, 7), 4.55, driveZ - 0.65);
         overheadC.target.position.set(carX - 0.06, carY + 0.04, driveZ);
-        overheadC.intensity = driveMood * topDrive * (0.38 + passC * 2.1);
+        overheadC.intensity = driveMood * topDrive * (0.28 + passC * 4.6);
+        overheadD.position.set(carX + sweep(0.14, 8), 4.9, driveZ + 1.8);
+        overheadD.target.position.set(carX + 0.04, carY + 0.05, driveZ);
+        overheadD.intensity = driveMood * topDrive * (0.22 + passD * 3.8);
         carRim.position.set(carX - 1.3, 1.8, driveZ - 1.4);
         carRim.intensity = driveMood * (0.18 + 0.28 * (1 - finalBlend));
 
