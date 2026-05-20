@@ -13,19 +13,15 @@ interface CarpetSceneProps {
 }
 
 // Desktop target; the live position is clamped to the camera's visible area.
-const DESKTOP_CLOUD_POS = new THREE.Vector3(3.0, 1.6, 0)
-const DESKTOP_SANDCASTLE_POS = new THREE.Vector3(-3.55, -2.05, 0)
-const DESKTOP_BOOKS_POS = new THREE.Vector3(3.15, -1.85, 0)
 const CAMERA_Z = 6
 const REACH_DIST = 1.3
 const SANDCASTLE_REACH_DIST = 0.72
 const SANDCASTLE_PULL_DIST = 2.15
 const BOOKS_REACH_DIST = 0.8
-const MOBILE_ASPECT = 0.74
-const MOBILE_CLOUD_POS = { x: 0.34, y: 0.39 }
-const MOBILE_BOTTOM_POS = { x: 0.37, y: -0.42 }
-const MOBILE_BOOKS_POS = { x: 0.355, y: MOBILE_BOTTOM_POS.y }
 const MOBILE_CARPET_MIN_SCALE = 0.28
+const CLOUD_FRAC  = { x: 0.38, y: 0.39 }
+const SAND_FRAC   = { x: 0.44, y: 0.42 }
+const BOOKS_FRAC  = { x: 0.40, y: 0.40 }
 
 export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachBooks }: CarpetSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -43,15 +39,15 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const isPortraitMobile = () => window.innerWidth / window.innerHeight < MOBILE_ASPECT
-    const isMobile = isPortraitMobile() || ('ontouchstart' in window)
+    const isPortrait = () => window.innerWidth / window.innerHeight < 1.0
+    const isMobile = ('ontouchstart' in window)
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isMobile, alpha: true })
 
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isPortraitMobile() ? 1.25 : 2))
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isPortrait() ? 1.25 : 2))
     renderer.setSize(window.innerWidth, window.innerHeight)
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = isPortraitMobile() ? 1.35 : 1.0
+    renderer.toneMappingExposure = isPortrait() ? 1.35 : 1.0
 
     renderer.setClearColor(0xe9e5e0, 0)
 
@@ -77,25 +73,22 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
 
     const responsiveCloudPos = () => {
       const { width, height } = visibleWorldSize()
-      if (isPortraitMobile()) return new THREE.Vector3(width * MOBILE_CLOUD_POS.x, height * MOBILE_CLOUD_POS.y, 0)
-      return DESKTOP_CLOUD_POS.clone().multiplyScalar(stageScale())
+      return new THREE.Vector3(width * CLOUD_FRAC.x, height * CLOUD_FRAC.y, 0)
     }
 
     const responsiveSandcastlePos = () => {
       const { width, height } = visibleWorldSize()
-      if (isPortraitMobile()) return new THREE.Vector3(-width * MOBILE_BOTTOM_POS.x, height * MOBILE_BOTTOM_POS.y, 0)
-      return DESKTOP_SANDCASTLE_POS.clone().multiplyScalar(stageScale())
+      return new THREE.Vector3(-width * SAND_FRAC.x, -height * SAND_FRAC.y, 0)
     }
 
     const responsiveModelSize = (desktopSize: number, mobileWidthFactor: number) => {
-      if (isPortraitMobile()) return visibleWorldSize().width * mobileWidthFactor
+      if (isPortrait()) return visibleWorldSize().width * mobileWidthFactor
       return desktopSize * stageScale()
     }
 
     const responsiveBooksPos = () => {
       const { width, height } = visibleWorldSize()
-      if (isPortraitMobile()) return new THREE.Vector3(width * MOBILE_BOOKS_POS.x, height * MOBILE_BOOKS_POS.y, 0)
-      return DESKTOP_BOOKS_POS.clone().multiplyScalar(stageScale())
+      return new THREE.Vector3(width * BOOKS_FRAC.x, -height * BOOKS_FRAC.y, 0)
     }
 
     let cloudPos = responsiveCloudPos()
@@ -244,8 +237,8 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     const onResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight
       camera.updateProjectionMatrix()
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, isPortraitMobile() ? 1.25 : 2))
-      renderer.toneMappingExposure = isPortraitMobile() ? 1.35 : 1.0
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, isPortrait() ? 1.25 : 2))
+      renderer.toneMappingExposure = isPortrait() ? 1.35 : 1.0
       renderer.setSize(window.innerWidth, window.innerHeight)
       cloudPos = responsiveCloudPos()
       sandcastlePos = responsiveSandcastlePos()
@@ -325,21 +318,19 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
 
         // Shrink as it moves from center, then tuck smaller into the sandcastle target.
         const currentStageScale = stageScale()
-        const mobile = isPortraitMobile()
         const { width: visW, height: visH } = visibleWorldSize()
-        // On portrait mobile, reach zones scale with visible world width; desktop uses stageScale
-        const reachScale = mobile ? visW * 0.20 : currentStageScale
+        const reachScale = isPortrait() ? visW * 0.20 : currentStageScale
         const dist = cPos.length()
         const mobileEdgeProgress = THREE.MathUtils.clamp(
           dist / Math.hypot(visW * 0.5, visH * 0.5),
           0,
           1,
         )
-        const worldShrink = mobile
+        const worldShrink = isPortrait()
           ? THREE.MathUtils.lerp(1, MOBILE_CARPET_MIN_SCALE, mobileEdgeProgress ** 1.18)
           : Math.max(0.42, 1 - (dist / Math.max(currentStageScale, 0.001)) * 0.09)
         const sandcastleDist = cPos.distanceTo(sandcastlePos)
-        const sandcastlePull = mobile
+        const sandcastlePull = isPortrait()
           ? 0
           : 1 - THREE.MathUtils.clamp(sandcastleDist / (SANDCASTLE_PULL_DIST * currentStageScale), 0, 1)
         const sandcastleShrink = THREE.MathUtils.lerp(worldShrink, 0.2, sandcastlePull * sandcastlePull)
