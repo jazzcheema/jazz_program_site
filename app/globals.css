@@ -91,6 +91,19 @@ canvas {
   z-index: 0;
 }
 
+.sand-night-pulse {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 68% 32%, rgba(255, 255, 255, var(--sand-night-glow, 0)) 0, rgba(255, 255, 255, 0) 42%),
+    radial-gradient(circle at 18% 72%, rgba(198, 255, 0, calc(var(--sand-night-glow, 0) * 0.36)) 0, rgba(198, 255, 0, 0) 34%),
+    rgba(3, 4, 5, var(--sand-night-opacity, 0));
+  transition: background 600ms ease;
+  will-change: background;
+}
+
 .clouds-matrix-shell {
   transform-style: preserve-3d;
 }

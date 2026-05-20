@@ -362,6 +362,9 @@ export default function SandPage() {
           hasDriven = true;
         }
         driveMood += ((hasDriven ? 1 : 0) - driveMood) * 0.018;
+        const nightPulse = (Math.sin(t * 0.26 + driveProgress * 1.8) + 1) * 0.5;
+        roomRef.current?.style.setProperty("--sand-night-opacity", (driveMood * (0.08 + nightPulse * 0.14)).toFixed(3));
+        roomRef.current?.style.setProperty("--sand-night-glow", (driveMood * (0.035 + (1 - nightPulse) * 0.055)).toFixed(3));
         const windDrag = Math.sin(t * 1.1 + driveProgress * 18) * 0.07 + Math.sin(t * 0.37 + 2.1) * 0.035;
         const targetVelocity = driving ? (1 / DRIVE_DURATION_SECONDS) * (1 + windDrag) : 0;
         driveVelocity += (targetVelocity - driveVelocity) * (driving ? 0.025 : 0.04);
@@ -531,6 +534,7 @@ export default function SandPage() {
       style={{ opacity: show ? 1 : 0 }}
     >
       <div className="sand-kingdom-grid" aria-hidden="true" />
+      <div className="sand-night-pulse" aria-hidden="true" />
       <GridMouseTrail />
       {desktopMode && driveIntroCue && (
         <div
