@@ -307,6 +307,7 @@ export default function SandPage() {
     let currentGridY = 0;
     const vehicleTrail: { cx: number; cy: number; time: number; strength: number }[] = [];
     let lastVehicleTrailTime = 0;
+    let vehicleTrailStep = 0;
 
     const updateLampRub = (clientX: number, clientY: number, travel: number) => {
       if (!lamp || revealedRef.current || (isDesktop && !driveCompleteRef.current)) return;
@@ -643,25 +644,39 @@ export default function SandPage() {
           const gridOffsetX = currentGridX * 24;
           const gridOffsetY = currentGridY * 24;
 
-          if (trailStrength > 0.06 && now - lastVehicleTrailTime > 82) {
+          if (trailStrength > 0.06 && now - lastVehicleTrailTime > 44) {
             lastVehicleTrailTime = now;
             const baseCellX = Math.floor((carScreenX - gridOffsetX) / trailCellSize);
             const baseCellY = Math.floor((carScreenY - gridOffsetY) / trailCellSize);
+            const downTrail =
+              THREE.MathUtils.smoothstep(p, 0.24, 0.48) *
+              (1 - THREE.MathUtils.smoothstep(p, 0.525, 0.552)) +
+              THREE.MathUtils.smoothstep(p, 0.568, 0.598);
+            const sputter = 0.68 + Math.random() * 0.62 + (Math.random() > 0.82 ? 0.34 : 0);
+            const tailCell = (step: number, strength: number, age: number) => {
+              const drift = step * downTrail;
+              const cx = baseCellX - Math.round(step * (1 - downTrail) + Math.sin(now * 0.012 + step * 1.7) * 0.32);
+              const cy = baseCellY + Math.round(drift + Math.sin(now * 0.01 + step) * 0.28 * downTrail);
+              return { cx, cy, strength: trailStrength * strength * sputter, age };
+            };
+            const tailStrengths = [0.78, 0.58, 0.4, 0.26, 0.16, 0.09];
+            const tailAges = [135, 285, 455, 650, 860, 1080];
+            vehicleTrailStep = (vehicleTrailStep % tailStrengths.length) + 1;
             const seededCells = [
-              { cx: baseCellX, cy: baseCellY, strength: trailStrength, age: 0 },
-              { cx: baseCellX - 1, cy: baseCellY, strength: trailStrength * 0.72, age: 170 },
-              { cx: baseCellX - 2, cy: baseCellY, strength: trailStrength * 0.5, age: 340 },
-              { cx: baseCellX - 3, cy: baseCellY + 1, strength: trailStrength * 0.32, age: 520 },
-              { cx: baseCellX - 4, cy: baseCellY, strength: trailStrength * 0.2, age: 700 },
-              { cx: baseCellX - 5, cy: baseCellY - 1, strength: trailStrength * 0.12, age: 880 },
+              { cx: baseCellX, cy: baseCellY, strength: trailStrength * sputter, age: 0 },
+              tailCell(
+                vehicleTrailStep,
+                tailStrengths[vehicleTrailStep - 1],
+                tailAges[vehicleTrailStep - 1],
+              ),
             ];
 
             for (const cell of seededCells) {
               const existing = vehicleTrail.findIndex((item) => item.cx === cell.cx && item.cy === cell.cy);
 
               if (existing !== -1) {
-                vehicleTrail[existing].time = Math.max(vehicleTrail[existing].time, now - cell.age);
-                vehicleTrail[existing].strength = Math.max(vehicleTrail[existing].strength, cell.strength);
+                vehicleTrail[existing].time = now - cell.age;
+                vehicleTrail[existing].strength = Math.max(vehicleTrail[existing].strength * 0.72, cell.strength);
               } else {
                 vehicleTrail.push({
                   cx: cell.cx,
@@ -672,15 +687,15 @@ export default function SandPage() {
               }
             }
 
-            if (vehicleTrail.length > 32) {
-              vehicleTrail.splice(0, vehicleTrail.length - 32);
+            if (vehicleTrail.length > 40) {
+              vehicleTrail.splice(0, vehicleTrail.length - 40);
             }
           }
 
           for (let i = vehicleTrail.length - 1; i >= 0; i--) {
             const cell = vehicleTrail[i];
             const age = now - cell.time;
-            const fadeMs = 1680;
+            const fadeMs = 1500;
 
             if (age > fadeMs || finalBlend > 0.75) {
               vehicleTrail.splice(i, 1);
@@ -688,7 +703,7 @@ export default function SandPage() {
             }
 
             const fade = 1 - age / fadeMs;
-            const alpha = fade * fade * 0.21 * cell.strength;
+            const alpha = fade * fade * 0.28 * cell.strength;
             const sx = cell.cx * trailCellSize + gridOffsetX;
             const sy = cell.cy * trailCellSize + gridOffsetY;
 
