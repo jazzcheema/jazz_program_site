@@ -24,6 +24,7 @@ type DriveIntroCue = {
 
 export default function SandPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const vehicleTrailRef = useRef<HTMLCanvasElement>(null);
   const roomRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [show, setShow] = useState(false);
@@ -104,6 +105,7 @@ export default function SandPage() {
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    const vehicleTrailCanvas = vehicleTrailRef.current;
     if (!canvas) return;
 
     const isDesktop = !("ontouchstart" in window) && window.innerWidth >= 768;
@@ -156,6 +158,15 @@ export default function SandPage() {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = isDesktop ? 1.18 : 1.1;
     renderer.setClearColor(0x000000, 0);
+    const trailCtx = vehicleTrailCanvas?.getContext("2d") ?? null;
+    const trailDpr = Math.min(window.devicePixelRatio || 1, 2);
+    const syncVehicleTrailCanvas = () => {
+      if (!vehicleTrailCanvas || !trailCtx) return;
+      vehicleTrailCanvas.width = Math.floor(W * trailDpr);
+      vehicleTrailCanvas.height = Math.floor(H * trailDpr);
+      trailCtx.setTransform(trailDpr, 0, 0, trailDpr, 0, 0);
+    };
+    syncVehicleTrailCanvas();
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(42, W / H, 0.1, 100);
@@ -236,6 +247,7 @@ export default function SandPage() {
     let car: THREE.Group | null = null;
     let carBaseY = 0;
     let carMaxDim = 1;
+    const carRearLocal = new THREE.Vector3();
     let lampBaseY = 0;
     let lampRadiusPx = Math.min(W, H) * 0.22;
     const driveKeys = new Set<string>();
@@ -246,6 +258,8 @@ export default function SandPage() {
     let lastTime = performance.now();
     const tmpTarget = new THREE.Vector3();
     const tmpCamera = new THREE.Vector3();
+    const tmpCarScreen = new THREE.Vector3();
+    const tmpCarRear = new THREE.Vector3();
     const tmpLampScreen = new THREE.Vector3();
     const tmpLampWorld = new THREE.Vector3();
 
@@ -268,6 +282,9 @@ export default function SandPage() {
       loader.load("/models/yellow_fat.glb", (gltf) => {
         car = gltf.scene;
         carMaxDim = fitModel(car, 2.45);
+        const centeredBox = new THREE.Box3().setFromObject(car);
+        const centeredSize = centeredBox.getSize(new THREE.Vector3());
+        carRearLocal.set(centeredSize.x * 0.46, -centeredSize.y * 0.26, 0);
         car.scale.setScalar(carMaxDim);
         car.rotation.y = Math.PI / 2;
         car.position.set(DRIVE_START_X, -0.18, 0);
@@ -288,6 +305,8 @@ export default function SandPage() {
     let targetGridY = 0;
     let currentGridX = 0;
     let currentGridY = 0;
+    const vehicleTrail: { cx: number; cy: number; time: number; strength: number }[] = [];
+    let lastVehicleTrailTime = 0;
 
     const updateLampRub = (clientX: number, clientY: number, travel: number) => {
       if (!lamp || revealedRef.current || (isDesktop && !driveCompleteRef.current)) return;
@@ -378,6 +397,9 @@ export default function SandPage() {
       currentGridY += (targetGridY - currentGridY) * 0.04;
       roomRef.current?.style.setProperty("--grid-x", (currentGridX * 24).toFixed(2));
       roomRef.current?.style.setProperty("--grid-y", (currentGridY * 24).toFixed(2));
+      if (trailCtx) {
+        trailCtx.clearRect(0, 0, W, H);
+      }
 
       // Shake decays after email fires
       if (revealedRef.current && shakeProgressRef.current > 0) {
@@ -610,6 +632,73 @@ export default function SandPage() {
         carRim.position.set(carX - 1.3, 1.8, driveZ - 1.4);
         carRim.intensity = driveMood * (0.12 + 0.22 * (1 - finalBlend)) + broadPass * 0.2;
 
+        if (car && trailCtx) {
+          const trailCellSize = 192;
+          car.localToWorld(tmpCarRear.copy(carRearLocal));
+          tmpCarScreen.copy(tmpCarRear).project(camera);
+          const carScreenX = (tmpCarScreen.x * 0.5 + 0.5) * W;
+          const carScreenY = (-tmpCarScreen.y * 0.5 + 0.5) * H;
+          const immediateDrive = driving ? 0.52 : 0;
+          const trailStrength = Math.max(immediateDrive, driveMood * speedBlend) * (1 - finalBlend);
+          const gridOffsetX = currentGridX * 24;
+          const gridOffsetY = currentGridY * 24;
+
+          if (trailStrength > 0.06 && now - lastVehicleTrailTime > 82) {
+            lastVehicleTrailTime = now;
+            const baseCellX = Math.floor((carScreenX - gridOffsetX) / trailCellSize);
+            const baseCellY = Math.floor((carScreenY - gridOffsetY) / trailCellSize);
+            const seededCells = [
+              { cx: baseCellX, cy: baseCellY, strength: trailStrength, age: 0 },
+              { cx: baseCellX - 1, cy: baseCellY, strength: trailStrength * 0.72, age: 170 },
+              { cx: baseCellX - 2, cy: baseCellY, strength: trailStrength * 0.5, age: 340 },
+              { cx: baseCellX - 3, cy: baseCellY + 1, strength: trailStrength * 0.32, age: 520 },
+              { cx: baseCellX - 4, cy: baseCellY, strength: trailStrength * 0.2, age: 700 },
+              { cx: baseCellX - 5, cy: baseCellY - 1, strength: trailStrength * 0.12, age: 880 },
+            ];
+
+            for (const cell of seededCells) {
+              const existing = vehicleTrail.findIndex((item) => item.cx === cell.cx && item.cy === cell.cy);
+
+              if (existing !== -1) {
+                vehicleTrail[existing].time = Math.max(vehicleTrail[existing].time, now - cell.age);
+                vehicleTrail[existing].strength = Math.max(vehicleTrail[existing].strength, cell.strength);
+              } else {
+                vehicleTrail.push({
+                  cx: cell.cx,
+                  cy: cell.cy,
+                  strength: cell.strength,
+                  time: now - cell.age,
+                });
+              }
+            }
+
+            if (vehicleTrail.length > 32) {
+              vehicleTrail.splice(0, vehicleTrail.length - 32);
+            }
+          }
+
+          for (let i = vehicleTrail.length - 1; i >= 0; i--) {
+            const cell = vehicleTrail[i];
+            const age = now - cell.time;
+            const fadeMs = 1680;
+
+            if (age > fadeMs || finalBlend > 0.75) {
+              vehicleTrail.splice(i, 1);
+              continue;
+            }
+
+            const fade = 1 - age / fadeMs;
+            const alpha = fade * fade * 0.21 * cell.strength;
+            const sx = cell.cx * trailCellSize + gridOffsetX;
+            const sy = cell.cy * trailCellSize + gridOffsetY;
+
+            trailCtx.fillStyle = `rgba(255,255,255,${alpha.toFixed(4)})`;
+            trailCtx.fillRect(sx + 1, sy + 1, trailCellSize - 2, trailCellSize - 2);
+            trailCtx.fillStyle = `rgba(255,184,86,${(alpha * 0.18).toFixed(4)})`;
+            trailCtx.fillRect(sx + 1, sy + 1, trailCellSize - 2, trailCellSize - 2);
+          }
+        }
+
         if (lamp) {
           lamp.getWorldPosition(tmpLampWorld);
           tmpLampScreen.copy(tmpLampWorld).project(camera);
@@ -682,6 +771,7 @@ export default function SandPage() {
       renderer.setSize(W, H);
       camera.aspect = W / H;
       camera.updateProjectionMatrix();
+      syncVehicleTrailCanvas();
     };
     window.addEventListener("resize", onResize);
 
@@ -706,6 +796,19 @@ export default function SandPage() {
       <div className="sand-kingdom-grid" aria-hidden="true" />
       <div className="sand-night-pulse" aria-hidden="true" />
       <div className="sand-drive-light" aria-hidden="true" />
+      <canvas
+        ref={vehicleTrailRef}
+        aria-hidden="true"
+        style={{
+          position: "fixed",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          zIndex: 0,
+          pointerEvents: "none",
+          mixBlendMode: "screen",
+        }}
+      />
 
       <GridMouseTrail />
       {desktopMode && driveIntroCue && (
