@@ -354,6 +354,11 @@ a.clouds-particle-btn {
 
 .sand-drive-cue[data-kind="wish"] {
   top: 72%;
+  font-size: clamp(1.1rem, 1.6vw, 1.6rem) !important;
+  color: #111111 !important;
+  text-shadow:
+    0 0 18px rgba(198, 255, 0, 0.32),
+    0 14px 36px rgba(17, 17, 17, 0.1) !important;
   animation-duration: 8500ms;
 }
 

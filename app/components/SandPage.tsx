@@ -6,7 +6,7 @@ import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import GridMouseTrail from "./GridMouseTrail";
 
-const RUBS_NEEDED = 10;
+const RUBS_NEEDED = 8;
 const RUB_STROKE_PX = 180;
 const TOTAL_RUB_PX = RUBS_NEEDED * RUB_STROKE_PX;
 const DRIVE_DURATION_SECONDS = 60;
@@ -415,7 +415,7 @@ export default function SandPage() {
         lampGlowLight.intensity = lampBright * 1.8 * (1 - depletedProgressRef.current);
         sunsetRear.intensity = 0.95 * (1 - driveMood) + lampBright * 0.38;
 
-        if (p >= 0.96 && !wishTriggered) {
+        if (p >= 0.88 && !wishTriggered) {
           wishTriggered = true;
           driveCompleteRef.current = true;
           setDriveComplete(true);
@@ -449,7 +449,7 @@ export default function SandPage() {
 
         const startOffset = new THREE.Vector3(-4.7, 1.15, -0.3);
         const topOffset = new THREE.Vector3(-0.2, 7.6, -0.55);
-        const finalOffset = new THREE.Vector3(-4.0, 0.5, 3.2);
+        const finalOffset = new THREE.Vector3(-2.8, 0.2, 3.2);
         tmpCamera.copy(startOffset).lerp(topOffset, topBlend).lerp(finalOffset, finalBlend);
         tmpCamera.x += Math.sin(t * 0.42 + p * 4) * 0.16;
         tmpCamera.z += Math.sin(t * 0.31 + p * 6) * 0.2;
@@ -462,8 +462,8 @@ export default function SandPage() {
         );
         if (dollyActive) {
           const dollyLook = Math.min(1, dollyProgress * 4);
-          tmpTarget.x = THREE.MathUtils.lerp(tmpTarget.x, LAMP_X - 0.9, dollyLook);
-          tmpTarget.y = THREE.MathUtils.lerp(tmpTarget.y, 0.18, dollyLook);
+          tmpTarget.x = THREE.MathUtils.lerp(tmpTarget.x, LAMP_X - 0.3, dollyLook);
+          tmpTarget.y = THREE.MathUtils.lerp(tmpTarget.y, 0.75, dollyLook);
           tmpTarget.z = THREE.MathUtils.lerp(tmpTarget.z, LAMP_Z - 0.4, dollyLook);
         }
 
@@ -472,7 +472,7 @@ export default function SandPage() {
           dollyProgress = Math.min(1.0, dollyProgress + dt * 0.25);
           const eased = THREE.MathUtils.smoothstep(dollyProgress, 0, 1);
           dollyDir.set(LAMP_X - desiredCamera.x, 0.35, LAMP_Z - desiredCamera.z).normalize();
-          desiredCamera.addScaledVector(dollyDir, eased * 5.0);
+          desiredCamera.addScaledVector(dollyDir, eased * 3.0);
         }
         camera.position.lerp(desiredCamera, 0.034);
         camera.lookAt(tmpTarget);
