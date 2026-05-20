@@ -808,7 +808,7 @@ function ProjectCard({
             />
           )}
         </div>
-        {showEasterCue && (
+        {!isMobile && (
           <div
             style={{
               position: "relative",
@@ -819,11 +819,13 @@ function ProjectCard({
               fontSize: "0.58rem",
               lineHeight: 1.2,
               letterSpacing: "0.12em",
-              opacity: 0.82,
+              opacity: showEasterCue ? 0.82 : 0,
               textAlign: "center",
               textShadow: "0 0 8px rgba(211, 50, 47, 0.4)",
               pointerEvents: "none",
+              transition: "opacity 140ms ease",
             }}
+            aria-hidden={!showEasterCue}
           >
             CLICK KRATE AGAIN TO OPEN THE HIDDEN ROOM
           </div>
