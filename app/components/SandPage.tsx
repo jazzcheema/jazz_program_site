@@ -205,6 +205,18 @@ export default function SandPage() {
     overheadD.position.set(-0.5, 5.0, 1);
     scene.add(overheadD);
     scene.add(overheadD.target);
+    const birdOverheadA = new THREE.SpotLight("#e2a05d", 0, 16, 1.02, 0.96, 0.95);
+    birdOverheadA.position.set(-3.4, 8.4, 0);
+    scene.add(birdOverheadA);
+    scene.add(birdOverheadA.target);
+    const birdOverheadB = new THREE.SpotLight("#6774a6", 0, 15, 0.94, 0.98, 1.0);
+    birdOverheadB.position.set(3.2, 8.8, 0);
+    scene.add(birdOverheadB);
+    scene.add(birdOverheadB.target);
+    const birdOverheadC = new THREE.SpotLight("#c46343", 0, 14.5, 0.98, 0.97, 1.0);
+    birdOverheadC.position.set(-1.8, 8.1, 0);
+    scene.add(birdOverheadC);
+    scene.add(birdOverheadC.target);
     const passingCabin = new THREE.PointLight("#ffd18a", 0, 9);
     passingCabin.position.set(DRIVE_START_X - 0.8, 1.2, 0);
     scene.add(passingCabin);
@@ -409,19 +421,27 @@ export default function SandPage() {
         const finalBlend = THREE.MathUtils.smoothstep(p, 0.52, 1);
 
         const topDrive = topBlend * (1 - finalBlend);
+        const birdEyeLightBlend =
+          THREE.MathUtils.smoothstep(p, 0.22, 0.31) *
+          (1 - THREE.MathUtils.smoothstep(p, 0.58, 0.70)) *
+          topDrive *
+          driveMood;
+        const birdLightTravel = p * 18 + t * (0.12 + speedBlend * 0.06);
+        const birdLightPulse = (phase: number, sharpness = 3.6) =>
+          Math.pow(Math.max(0, Math.sin((birdLightTravel + phase) * Math.PI)), sharpness) * birdEyeLightBlend;
         const lateLightBlend = THREE.MathUtils.smoothstep(p, 0.20, 0.42);
         const earlyLightTravel = p * 44 + t * (0.38 + speedBlend * 0.24);
-        const lateLightTravel = p * 22 + t * (0.16 + speedBlend * 0.08);
-        const lateLightPulse = (phase: number, sharpness = 3.8) =>
+        const lateLightTravel = p * 12 + t * (0.08 + speedBlend * 0.035);
+        const lateLightPulse = (phase: number, sharpness = 7.2) =>
           Math.pow(Math.max(0, Math.sin((lateLightTravel + phase) * Math.PI)), sharpness);
         const earlyPassA = Math.max(0, Math.sin(earlyLightTravel * Math.PI));
         const earlyPassB = Math.max(0, Math.sin((earlyLightTravel + 0.26) * Math.PI));
         const earlyPassC = Math.max(0, Math.sin((earlyLightTravel + 0.52) * Math.PI));
         const earlyPassD = Math.max(0, Math.sin((earlyLightTravel + 0.78) * Math.PI));
-        const passA = THREE.MathUtils.lerp(earlyPassA, lateLightPulse(0.04, 4.4), lateLightBlend);
-        const passB = THREE.MathUtils.lerp(earlyPassB, lateLightPulse(0.34, 3.8), lateLightBlend);
-        const passC = THREE.MathUtils.lerp(earlyPassC, lateLightPulse(0.62, 4.1), lateLightBlend);
-        const passD = THREE.MathUtils.lerp(earlyPassD, lateLightPulse(0.88, 4.8), lateLightBlend);
+        const passA = THREE.MathUtils.lerp(earlyPassA, lateLightPulse(0.04, 8.2), lateLightBlend);
+        const passB = THREE.MathUtils.lerp(earlyPassB, lateLightPulse(0.37, 7.2), lateLightBlend);
+        const passC = THREE.MathUtils.lerp(earlyPassC, lateLightPulse(0.68, 7.8), lateLightBlend);
+        const passD = THREE.MathUtils.lerp(earlyPassD, lateLightPulse(0.91, 8.8), lateLightBlend);
         const broadPass = Math.max(passA, passB * 0.72, passC * 0.58, passD * 0.46) * topDrive * driveMood * lateLightBlend;
         const warmFlash = (passA * 0.95 + passD * 0.45) * topDrive * driveMood * lateLightBlend;
         const coolFlash = passB * topDrive * driveMood * lateLightBlend;
@@ -430,14 +450,14 @@ export default function SandPage() {
         const lampBright = THREE.MathUtils.smoothstep(p, 0.40, 0.95) * driveMood;
         roomRef.current?.style.setProperty("--sand-night-opacity", (driveMood * (0.52 + nightPulse * 0.10) * (1 - lampBright * 0.90)).toFixed(3));
         roomRef.current?.style.setProperty("--sand-night-glow", (driveMood * (0.10 + nightPulse * 0.16) * (1 - lampBright * 0.55) + lampBright * 0.26).toFixed(3));
-        roomRef.current?.style.setProperty("--sand-drive-light-opacity", Math.min(0.22, broadPass * 0.32).toFixed(3));
-        roomRef.current?.style.setProperty("--sand-drive-light-hot", Math.min(0.14, warmFlash * 0.12).toFixed(3));
-        roomRef.current?.style.setProperty("--sand-drive-light-cool", Math.min(0.08, coolFlash * 0.07).toFixed(3));
-        roomRef.current?.style.setProperty("--sand-drive-light-rose", Math.min(0.10, roseFlash * 0.08).toFixed(3));
-        roomRef.current?.style.setProperty("--sand-drive-light-shift", (Math.sin((lateLightTravel + 0.18) * Math.PI) * 12 * lateLightBlend).toFixed(3));
+        roomRef.current?.style.setProperty("--sand-drive-light-opacity", Math.min(0.34, broadPass * 0.48).toFixed(3));
+        roomRef.current?.style.setProperty("--sand-drive-light-hot", Math.min(0.22, warmFlash * 0.19).toFixed(3));
+        roomRef.current?.style.setProperty("--sand-drive-light-cool", Math.min(0.11, coolFlash * 0.10).toFixed(3));
+        roomRef.current?.style.setProperty("--sand-drive-light-rose", Math.min(0.14, roseFlash * 0.12).toFixed(3));
+        roomRef.current?.style.setProperty("--sand-drive-light-shift", (Math.sin((lateLightTravel + 0.18) * Math.PI) * 14 * lateLightBlend).toFixed(3));
 
-        ambient.intensity = THREE.MathUtils.lerp(0.4, 0.06, driveMood) + lampBright * 0.38 + broadPass * 0.015;
-        key.intensity = THREE.MathUtils.lerp(1.45, 0.22, driveMood) + lampBright * 0.80 + broadPass * 0.07;
+        ambient.intensity = THREE.MathUtils.lerp(0.4, 0.06, driveMood) + lampBright * 0.38 + broadPass * 0.02;
+        key.intensity = THREE.MathUtils.lerp(1.45, 0.22, driveMood) + lampBright * 0.80 + broadPass * 0.12;
         warm.intensity = 0.55 * (1 - depletedProgressRef.current) * THREE.MathUtils.lerp(1, 0.24, driveMood);
         lampGlowLight.intensity = lampBright * 1.8 * (1 - depletedProgressRef.current);
         sunsetRear.intensity = 0.95 * (1 - driveMood) + lampBright * 0.38;
@@ -528,55 +548,67 @@ export default function SandPage() {
         streetRose.position.set(carX + streetRoseSweep, THREE.MathUtils.lerp(3.65, 3.75, lateLightBlend), driveZ - 1.8);
         streetWarm.intensity = THREE.MathUtils.lerp(
           driveMood * (0.14 + earlyPassA * (2.6 + topDrive * 2.4)),
-          driveMood * topDrive * (0.04 + passA * (2.0 + speedBlend * 0.8)),
+          driveMood * topDrive * (0.035 + passA * (3.0 + speedBlend * 1.05)),
           lateLightBlend,
         );
         streetAmber.intensity = THREE.MathUtils.lerp(
           driveMood * (0.10 + earlyPassB * (2.0 + topDrive * 2.1)),
-          driveMood * topDrive * (0.03 + passB * (1.6 + speedBlend * 0.65)),
+          driveMood * topDrive * (0.025 + passB * (2.35 + speedBlend * 0.85)),
           lateLightBlend,
         );
         streetRose.intensity = THREE.MathUtils.lerp(
           driveMood * (0.06 + earlyPassC * (1.4 + topDrive * 1.6)),
-          driveMood * topDrive * (0.02 + passC * (1.25 + speedBlend * 0.5)),
+          driveMood * topDrive * (0.018 + passC * (1.85 + speedBlend * 0.68)),
           lateLightBlend,
         );
         overheadA.position.set(carX + sweep(0.02, 10), 5.15, driveZ + 0.1);
         overheadA.target.position.set(carX, carY + 0.06, driveZ);
         overheadA.intensity = THREE.MathUtils.lerp(
           driveMood * topDrive * (0.5 + earlyPassA * 6.2),
-          driveMood * topDrive * (0.05 + passA * 4.2),
+          driveMood * topDrive * (0.04 + passA * 5.9),
           lateLightBlend,
         );
         overheadB.position.set(carX + sweep(0.36, 9), 4.8, driveZ + 0.65);
         overheadB.target.position.set(carX + 0.08, carY + 0.04, driveZ);
         overheadB.intensity = THREE.MathUtils.lerp(
           driveMood * topDrive * (0.38 + earlyPassB * 5.4),
-          driveMood * topDrive * (0.04 + passB * 3.4),
+          driveMood * topDrive * (0.032 + passB * 4.7),
           lateLightBlend,
         );
         overheadC.position.set(carX + sweep(0.7, 7), 4.55, driveZ - 0.65);
         overheadC.target.position.set(carX - 0.06, carY + 0.04, driveZ);
         overheadC.intensity = THREE.MathUtils.lerp(
           driveMood * topDrive * (0.28 + earlyPassC * 4.6),
-          driveMood * topDrive * (0.035 + passC * 2.8),
+          driveMood * topDrive * (0.028 + passC * 3.7),
           lateLightBlend,
         );
         overheadD.position.set(carX + sweep(0.14, 8), 4.9, driveZ + 1.8);
         overheadD.target.position.set(carX + 0.04, carY + 0.05, driveZ);
         overheadD.intensity = THREE.MathUtils.lerp(
           driveMood * topDrive * (0.22 + earlyPassD * 3.8),
-          driveMood * topDrive * (0.025 + passD * 2.35),
+          driveMood * topDrive * (0.02 + passD * 3.15),
           lateLightBlend,
         );
+        const birdPassA = birdLightPulse(0.08, 3.4);
+        const birdPassB = birdLightPulse(0.36, 3.9);
+        const birdPassC = birdLightPulse(0.64, 3.6);
+        birdOverheadA.position.set(carX + sweep(0.18, 6) * 0.88, 8.4, driveZ + 0.15);
+        birdOverheadA.target.position.set(carX - 0.08, carY + 0.02, driveZ);
+        birdOverheadA.intensity = birdPassA * (13.0 + speedBlend * 3.6);
+        birdOverheadB.position.set(carX + sweep(0.54, 5) * 0.84, 8.8, driveZ - 0.55);
+        birdOverheadB.target.position.set(carX + 0.12, carY + 0.02, driveZ - 0.1);
+        birdOverheadB.intensity = birdPassB * (9.2 + speedBlend * 2.8);
+        birdOverheadC.position.set(carX + sweep(0.82, 4) * 0.78, 8.1, driveZ + 0.7);
+        birdOverheadC.target.position.set(carX - 0.04, carY + 0.02, driveZ + 0.08);
+        birdOverheadC.intensity = birdPassC * (10.4 + speedBlend * 3.0);
         passingCabin.position.set(carX - 0.5 + sweep(0.2, 5) * 0.18, carY + 1.15, driveZ - 0.35);
-        passingCabin.intensity = warmFlash * (0.75 + speedBlend * 0.35);
+        passingCabin.intensity = warmFlash * (1.35 + speedBlend * 0.62);
         passingBlue.position.set(carX + 1.35 + sweep(0.52, 4) * 0.12, carY + 1.45, driveZ - 0.9);
-        passingBlue.intensity = coolFlash * (0.42 + speedBlend * 0.22);
+        passingBlue.intensity = coolFlash * (0.7 + speedBlend * 0.34);
         passingRose.position.set(carX - 1.8 + sweep(0.82, 4) * 0.16, carY + 0.9, driveZ + 1.1);
-        passingRose.intensity = roseFlash * (0.46 + speedBlend * 0.25);
+        passingRose.intensity = roseFlash * (0.78 + speedBlend * 0.38);
         carRim.position.set(carX - 1.3, 1.8, driveZ - 1.4);
-        carRim.intensity = driveMood * (0.12 + 0.22 * (1 - finalBlend)) + broadPass * 0.12;
+        carRim.intensity = driveMood * (0.12 + 0.22 * (1 - finalBlend)) + broadPass * 0.2;
 
         if (lamp) {
           lamp.getWorldPosition(tmpLampWorld);
