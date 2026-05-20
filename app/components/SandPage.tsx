@@ -589,6 +589,8 @@ export default function SandPage() {
           : 0.034;
         camera.position.lerp(desiredCamera, lerpRate);
         camera.lookAt(tmpTarget);
+        // Subtle roll after lookAt — handheld/mounted feel, fades out at lamp
+        camera.rotateZ(driveMood * 0.007 * Math.sin(t * 0.11 + driveProgress * 1.4) * (1 - finalBlend));
         camera.fov = THREE.MathUtils.lerp(camera.fov, THREE.MathUtils.lerp(39, 47, topBlend * (1 - finalBlend)) + finalBlend * 8, 0.02);
         camera.updateProjectionMatrix();
 
