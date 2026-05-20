@@ -652,6 +652,9 @@ export default function SandPage() {
               THREE.MathUtils.smoothstep(p, 0.24, 0.48) *
               (1 - THREE.MathUtils.smoothstep(p, 0.525, 0.552)) +
               THREE.MathUtils.smoothstep(p, 0.568, 0.598);
+            const fanTrail =
+              THREE.MathUtils.smoothstep(p, 0.525, 0.552) *
+              (1 - THREE.MathUtils.smoothstep(p, 0.568, 0.598));
             const sputter = 0.68 + Math.random() * 0.62 + (Math.random() > 0.82 ? 0.34 : 0);
             const tailCell = (step: number, strength: number, age: number) => {
               const drift = step * downTrail;
@@ -659,6 +662,12 @@ export default function SandPage() {
               const cy = baseCellY + Math.round(drift + Math.sin(now * 0.01 + step) * 0.28 * downTrail);
               return { cx, cy, strength: trailStrength * strength * sputter, age };
             };
+            const fanCell = (step: number, branch: -1 | 1, strength: number, age: number) => ({
+              cx: baseCellX - step,
+              cy: baseCellY + Math.round(branch * Math.max(1, step * 0.5)),
+              strength: trailStrength * strength * sputter * fanTrail,
+              age,
+            });
             const tailStrengths = [0.78, 0.58, 0.4, 0.26, 0.16, 0.09];
             const tailAges = [135, 285, 455, 650, 860, 1080];
             vehicleTrailStep = (vehicleTrailStep % tailStrengths.length) + 1;
@@ -669,6 +678,14 @@ export default function SandPage() {
                 tailStrengths[vehicleTrailStep - 1],
                 tailAges[vehicleTrailStep - 1],
               ),
+              ...(fanTrail > 0.04
+                ? [
+                    fanCell(1, -1, 0.32, 130),
+                    fanCell(2, 1, 0.26, 250),
+                    fanCell(3, -1, 0.18, 390),
+                    fanCell(3, 1, 0.14, 520),
+                  ]
+                : []),
             ];
 
             for (const cell of seededCells) {
