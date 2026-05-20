@@ -205,6 +205,15 @@ export default function SandPage() {
     overheadD.position.set(-0.5, 5.0, 1);
     scene.add(overheadD);
     scene.add(overheadD.target);
+    const passingCabin = new THREE.PointLight("#ffd18a", 0, 9);
+    passingCabin.position.set(DRIVE_START_X - 0.8, 1.2, 0);
+    scene.add(passingCabin);
+    const passingBlue = new THREE.PointLight("#9fbfff", 0, 10);
+    passingBlue.position.set(DRIVE_START_X + 1.4, 1.5, -1);
+    scene.add(passingBlue);
+    const passingRose = new THREE.PointLight("#ff6a3d", 0, 8);
+    passingRose.position.set(DRIVE_START_X - 2.0, 1.0, 1.2);
+    scene.add(passingRose);
 
     const dracoLoader = new DRACOLoader();
     dracoLoader.setDecoderPath("/draco/gltf/");
@@ -253,75 +262,6 @@ export default function SandPage() {
         carBaseY = car.position.y;
         scene.add(car);
       });
-    }
-
-    // Speed particles — desktop drive only
-    const PARTICLE_COUNT = 260;
-    const pPos = new Float32Array(PARTICLE_COUNT * 3);
-    const pGeo = new THREE.BufferGeometry();
-    pGeo.setAttribute("position", new THREE.BufferAttribute(pPos, 3));
-    const pCanvas = document.createElement("canvas");
-    pCanvas.width = 32; pCanvas.height = 32;
-    const pCtx = pCanvas.getContext("2d")!;
-    const pGrad = pCtx.createRadialGradient(16, 16, 0, 16, 16, 16);
-    pGrad.addColorStop(0, "rgba(255,252,232,1)");
-    pGrad.addColorStop(0.3, "rgba(255,252,232,0.5)");
-    pGrad.addColorStop(1, "rgba(255,252,232,0)");
-    pCtx.fillStyle = pGrad;
-    pCtx.fillRect(0, 0, 32, 32);
-    const pTex = new THREE.CanvasTexture(pCanvas);
-    const pMat = new THREE.PointsMaterial({
-      color: "#ffffff",
-      map: pTex,
-      size: 0.18,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      sizeAttenuation: true,
-      alphaTest: 0.01,
-    });
-    const pMesh = new THREE.Points(pGeo, pMat);
-
-    // Fine detail particles — smaller, faster, tighter
-    const P2_COUNT = 420;
-    const p2Pos = new Float32Array(P2_COUNT * 3);
-    const p2Geo = new THREE.BufferGeometry();
-    p2Geo.setAttribute("position", new THREE.BufferAttribute(p2Pos, 3));
-    const p2Canvas = document.createElement("canvas");
-    p2Canvas.width = 16; p2Canvas.height = 16;
-    const p2Ctx = p2Canvas.getContext("2d")!;
-    const p2Grad = p2Ctx.createRadialGradient(8, 8, 0, 8, 8, 8);
-    p2Grad.addColorStop(0, "rgba(255,255,255,1)");
-    p2Grad.addColorStop(0.25, "rgba(255,255,255,0.6)");
-    p2Grad.addColorStop(1, "rgba(255,255,255,0)");
-    p2Ctx.fillStyle = p2Grad;
-    p2Ctx.fillRect(0, 0, 16, 16);
-    const p2Tex = new THREE.CanvasTexture(p2Canvas);
-    const p2Mat = new THREE.PointsMaterial({
-      color: "#ffffff",
-      map: p2Tex,
-      size: 0.07,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      sizeAttenuation: true,
-      alphaTest: 0.01,
-    });
-    const p2Mesh = new THREE.Points(p2Geo, p2Mat);
-
-    if (isDesktop) {
-      for (let i = 0; i < PARTICLE_COUNT; i++) {
-        pPos[i * 3]     = (Math.random() - 0.5) * 10;
-        pPos[i * 3 + 1] = (Math.random() - 0.5) * 6;
-        pPos[i * 3 + 2] = -1 + Math.random() * 36;
-      }
-      for (let i = 0; i < P2_COUNT; i++) {
-        p2Pos[i * 3]     = (Math.random() - 0.5) * 7;
-        p2Pos[i * 3 + 1] = (Math.random() - 0.5) * 4;
-        p2Pos[i * 3 + 2] = -1 + Math.random() * 36;
-      }
-      scene.add(pMesh);
-      scene.add(p2Mesh);
     }
 
     let grayscaleProgress = 0;
@@ -468,51 +408,36 @@ export default function SandPage() {
         const topBlend = THREE.MathUtils.smoothstep(p, 0.08, 0.36);
         const finalBlend = THREE.MathUtils.smoothstep(p, 0.52, 1);
 
-        // Speed particles — fly from ahead toward and past the camera
-        const targetParticleOpacity = speedBlend * 0.6 * (1 - finalBlend);
-        pMat.opacity = THREE.MathUtils.lerp(pMat.opacity, targetParticleOpacity, 0.07);
-        if (pMat.opacity > 0.01) {
-          const pSpeed = speedBlend * 9.0 * dt;
-          for (let i = 0; i < PARTICLE_COUNT; i++) {
-            pPos[i * 3 + 2] -= pSpeed;
-            if (pPos[i * 3 + 2] < camera.position.z - 2) {
-              const d = 6 + Math.random() * 22;
-              pPos[i * 3]     = camera.position.x + (Math.random() - 0.5) * d * 0.4;
-              pPos[i * 3 + 1] = camera.position.y + (Math.random() - 0.5) * d * 0.28;
-              pPos[i * 3 + 2] = camera.position.z + d;
-            }
-          }
-          pGeo.attributes.position.needsUpdate = true;
-        }
-
-        // Fine detail particles — faster, tighter cone
-        p2Mat.opacity = THREE.MathUtils.lerp(p2Mat.opacity, speedBlend * 0.45 * (1 - finalBlend), 0.07);
-        if (p2Mat.opacity > 0.01) {
-          const p2Speed = speedBlend * 13.0 * dt;
-          for (let i = 0; i < P2_COUNT; i++) {
-            p2Pos[i * 3 + 2] -= p2Speed;
-            if (p2Pos[i * 3 + 2] < camera.position.z - 2) {
-              const d = 4 + Math.random() * 18;
-              p2Pos[i * 3]     = camera.position.x + (Math.random() - 0.5) * d * 0.25;
-              p2Pos[i * 3 + 1] = camera.position.y + (Math.random() - 0.5) * d * 0.18;
-              p2Pos[i * 3 + 2] = camera.position.z + d;
-            }
-          }
-          p2Geo.attributes.position.needsUpdate = true;
-        }
         const topDrive = topBlend * (1 - finalBlend);
-        const lightTravel = p * 44 + t * (0.38 + speedBlend * 0.24);
-        const passA = Math.max(0, Math.sin(lightTravel * Math.PI));
-        const passB = Math.max(0, Math.sin((lightTravel + 0.26) * Math.PI));
-        const passC = Math.max(0, Math.sin((lightTravel + 0.52) * Math.PI));
-        const passD = Math.max(0, Math.sin((lightTravel + 0.78) * Math.PI));
+        const lateLightBlend = THREE.MathUtils.smoothstep(p, 0.20, 0.42);
+        const earlyLightTravel = p * 44 + t * (0.38 + speedBlend * 0.24);
+        const lateLightTravel = p * 22 + t * (0.16 + speedBlend * 0.08);
+        const lateLightPulse = (phase: number, sharpness = 3.8) =>
+          Math.pow(Math.max(0, Math.sin((lateLightTravel + phase) * Math.PI)), sharpness);
+        const earlyPassA = Math.max(0, Math.sin(earlyLightTravel * Math.PI));
+        const earlyPassB = Math.max(0, Math.sin((earlyLightTravel + 0.26) * Math.PI));
+        const earlyPassC = Math.max(0, Math.sin((earlyLightTravel + 0.52) * Math.PI));
+        const earlyPassD = Math.max(0, Math.sin((earlyLightTravel + 0.78) * Math.PI));
+        const passA = THREE.MathUtils.lerp(earlyPassA, lateLightPulse(0.04, 4.4), lateLightBlend);
+        const passB = THREE.MathUtils.lerp(earlyPassB, lateLightPulse(0.34, 3.8), lateLightBlend);
+        const passC = THREE.MathUtils.lerp(earlyPassC, lateLightPulse(0.62, 4.1), lateLightBlend);
+        const passD = THREE.MathUtils.lerp(earlyPassD, lateLightPulse(0.88, 4.8), lateLightBlend);
+        const broadPass = Math.max(passA, passB * 0.72, passC * 0.58, passD * 0.46) * topDrive * driveMood * lateLightBlend;
+        const warmFlash = (passA * 0.95 + passD * 0.45) * topDrive * driveMood * lateLightBlend;
+        const coolFlash = passB * topDrive * driveMood * lateLightBlend;
+        const roseFlash = passC * topDrive * driveMood * lateLightBlend;
 
         const lampBright = THREE.MathUtils.smoothstep(p, 0.40, 0.95) * driveMood;
         roomRef.current?.style.setProperty("--sand-night-opacity", (driveMood * (0.52 + nightPulse * 0.10) * (1 - lampBright * 0.90)).toFixed(3));
         roomRef.current?.style.setProperty("--sand-night-glow", (driveMood * (0.10 + nightPulse * 0.16) * (1 - lampBright * 0.55) + lampBright * 0.26).toFixed(3));
+        roomRef.current?.style.setProperty("--sand-drive-light-opacity", Math.min(0.22, broadPass * 0.32).toFixed(3));
+        roomRef.current?.style.setProperty("--sand-drive-light-hot", Math.min(0.14, warmFlash * 0.12).toFixed(3));
+        roomRef.current?.style.setProperty("--sand-drive-light-cool", Math.min(0.08, coolFlash * 0.07).toFixed(3));
+        roomRef.current?.style.setProperty("--sand-drive-light-rose", Math.min(0.10, roseFlash * 0.08).toFixed(3));
+        roomRef.current?.style.setProperty("--sand-drive-light-shift", (Math.sin((lateLightTravel + 0.18) * Math.PI) * 12 * lateLightBlend).toFixed(3));
 
-        ambient.intensity = THREE.MathUtils.lerp(0.4, 0.06, driveMood) + lampBright * 0.38;
-        key.intensity = THREE.MathUtils.lerp(1.45, 0.22, driveMood) + lampBright * 0.80;
+        ambient.intensity = THREE.MathUtils.lerp(0.4, 0.06, driveMood) + lampBright * 0.38 + broadPass * 0.015;
+        key.intensity = THREE.MathUtils.lerp(1.45, 0.22, driveMood) + lampBright * 0.80 + broadPass * 0.07;
         warm.intensity = 0.55 * (1 - depletedProgressRef.current) * THREE.MathUtils.lerp(1, 0.24, driveMood);
         lampGlowLight.intensity = lampBright * 1.8 * (1 - depletedProgressRef.current);
         sunsetRear.intensity = 0.95 * (1 - driveMood) + lampBright * 0.38;
@@ -595,26 +520,63 @@ export default function SandPage() {
         camera.updateProjectionMatrix();
 
         const sweep = (phase: number, length: number) => ((p * length + phase) % 1 - 0.5) * 8;
-        streetWarm.position.set(carX + sweep(0.08, 9), 4.8, driveZ + 0.2);
-        streetAmber.position.set(carX + sweep(0.42, 7), 4.25, driveZ + 1.7);
-        streetRose.position.set(carX + sweep(0.72, 5), 3.65, driveZ - 1.8);
-        streetWarm.intensity = driveMood * (0.14 + passA * (2.6 + topDrive * 2.4));
-        streetAmber.intensity = driveMood * (0.10 + passB * (2.0 + topDrive * 2.1));
-        streetRose.intensity = driveMood * (0.06 + passC * (1.4 + topDrive * 1.6));
+        const streetWarmSweep = THREE.MathUtils.lerp(sweep(0.08, 9), sweep(0.08, 6), lateLightBlend);
+        const streetAmberSweep = THREE.MathUtils.lerp(sweep(0.42, 7), sweep(0.42, 5), lateLightBlend);
+        const streetRoseSweep = THREE.MathUtils.lerp(sweep(0.72, 5), sweep(0.72, 4), lateLightBlend);
+        streetWarm.position.set(carX + streetWarmSweep, THREE.MathUtils.lerp(4.8, 4.9, lateLightBlend), THREE.MathUtils.lerp(driveZ + 0.2, driveZ + 0.15, lateLightBlend));
+        streetAmber.position.set(carX + streetAmberSweep, THREE.MathUtils.lerp(4.25, 4.35, lateLightBlend), driveZ + 1.7);
+        streetRose.position.set(carX + streetRoseSweep, THREE.MathUtils.lerp(3.65, 3.75, lateLightBlend), driveZ - 1.8);
+        streetWarm.intensity = THREE.MathUtils.lerp(
+          driveMood * (0.14 + earlyPassA * (2.6 + topDrive * 2.4)),
+          driveMood * topDrive * (0.04 + passA * (2.0 + speedBlend * 0.8)),
+          lateLightBlend,
+        );
+        streetAmber.intensity = THREE.MathUtils.lerp(
+          driveMood * (0.10 + earlyPassB * (2.0 + topDrive * 2.1)),
+          driveMood * topDrive * (0.03 + passB * (1.6 + speedBlend * 0.65)),
+          lateLightBlend,
+        );
+        streetRose.intensity = THREE.MathUtils.lerp(
+          driveMood * (0.06 + earlyPassC * (1.4 + topDrive * 1.6)),
+          driveMood * topDrive * (0.02 + passC * (1.25 + speedBlend * 0.5)),
+          lateLightBlend,
+        );
         overheadA.position.set(carX + sweep(0.02, 10), 5.15, driveZ + 0.1);
         overheadA.target.position.set(carX, carY + 0.06, driveZ);
-        overheadA.intensity = driveMood * topDrive * (0.5 + passA * 6.2);
+        overheadA.intensity = THREE.MathUtils.lerp(
+          driveMood * topDrive * (0.5 + earlyPassA * 6.2),
+          driveMood * topDrive * (0.05 + passA * 4.2),
+          lateLightBlend,
+        );
         overheadB.position.set(carX + sweep(0.36, 9), 4.8, driveZ + 0.65);
         overheadB.target.position.set(carX + 0.08, carY + 0.04, driveZ);
-        overheadB.intensity = driveMood * topDrive * (0.38 + passB * 5.4);
+        overheadB.intensity = THREE.MathUtils.lerp(
+          driveMood * topDrive * (0.38 + earlyPassB * 5.4),
+          driveMood * topDrive * (0.04 + passB * 3.4),
+          lateLightBlend,
+        );
         overheadC.position.set(carX + sweep(0.7, 7), 4.55, driveZ - 0.65);
         overheadC.target.position.set(carX - 0.06, carY + 0.04, driveZ);
-        overheadC.intensity = driveMood * topDrive * (0.28 + passC * 4.6);
+        overheadC.intensity = THREE.MathUtils.lerp(
+          driveMood * topDrive * (0.28 + earlyPassC * 4.6),
+          driveMood * topDrive * (0.035 + passC * 2.8),
+          lateLightBlend,
+        );
         overheadD.position.set(carX + sweep(0.14, 8), 4.9, driveZ + 1.8);
         overheadD.target.position.set(carX + 0.04, carY + 0.05, driveZ);
-        overheadD.intensity = driveMood * topDrive * (0.22 + passD * 3.8);
+        overheadD.intensity = THREE.MathUtils.lerp(
+          driveMood * topDrive * (0.22 + earlyPassD * 3.8),
+          driveMood * topDrive * (0.025 + passD * 2.35),
+          lateLightBlend,
+        );
+        passingCabin.position.set(carX - 0.5 + sweep(0.2, 5) * 0.18, carY + 1.15, driveZ - 0.35);
+        passingCabin.intensity = warmFlash * (0.75 + speedBlend * 0.35);
+        passingBlue.position.set(carX + 1.35 + sweep(0.52, 4) * 0.12, carY + 1.45, driveZ - 0.9);
+        passingBlue.intensity = coolFlash * (0.42 + speedBlend * 0.22);
+        passingRose.position.set(carX - 1.8 + sweep(0.82, 4) * 0.16, carY + 0.9, driveZ + 1.1);
+        passingRose.intensity = roseFlash * (0.46 + speedBlend * 0.25);
         carRim.position.set(carX - 1.3, 1.8, driveZ - 1.4);
-        carRim.intensity = driveMood * (0.18 + 0.28 * (1 - finalBlend));
+        carRim.intensity = driveMood * (0.12 + 0.22 * (1 - finalBlend)) + broadPass * 0.12;
 
         if (lamp) {
           lamp.getWorldPosition(tmpLampWorld);
@@ -698,9 +660,6 @@ export default function SandPage() {
       window.removeEventListener("resize", onResize);
       driveIntroTimers.forEach((timer) => window.clearTimeout(timer));
       cancelAnimationFrame(animId);
-      pGeo.dispose(); pMat.dispose(); pTex.dispose();
-      p2Geo.dispose(); p2Mat.dispose(); p2Tex.dispose();
-
       dracoLoader.dispose();
       renderer.dispose();
     };
@@ -714,6 +673,7 @@ export default function SandPage() {
     >
       <div className="sand-kingdom-grid" aria-hidden="true" />
       <div className="sand-night-pulse" aria-hidden="true" />
+      <div className="sand-drive-light" aria-hidden="true" />
 
       <GridMouseTrail />
       {desktopMode && driveIntroCue && (

@@ -107,6 +107,22 @@ canvas {
   will-change: background;
 }
 
+.sand-drive-light {
+  position: fixed;
+  inset: -18%;
+  z-index: 2;
+  pointer-events: none;
+  opacity: var(--sand-drive-light-opacity, 0);
+  background:
+    linear-gradient(103deg, transparent 24%, rgba(221, 128, 54, var(--sand-drive-light-hot, 0)) 43%, rgba(255, 172, 86, calc(var(--sand-drive-light-hot, 0) * 0.42)) 49%, transparent 64%),
+    linear-gradient(78deg, transparent 38%, rgba(92, 101, 150, var(--sand-drive-light-cool, 0)) 51%, transparent 65%),
+    radial-gradient(ellipse 70% 38% at 58% 76%, rgba(132, 45, 48, var(--sand-drive-light-rose, 0)), transparent 70%);
+  filter: blur(18px);
+  mix-blend-mode: screen;
+  transform: translateX(calc(var(--sand-drive-light-shift, 0) * 1vw));
+  will-change: opacity, transform, background;
+}
+
 .clouds-matrix-shell {
   transform-style: preserve-3d;
 }
