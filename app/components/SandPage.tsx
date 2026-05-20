@@ -16,6 +16,11 @@ const DRIVE_END_Z = 15.5;
 const LAMP_X = 4.45;
 const LAMP_Z = 17.15;
 const CLOUD_LIME = "#c6ff00";
+type DriveIntroCue = {
+  id: number;
+  text: string;
+  kind: "lock" | "hint" | "count";
+};
 
 export default function SandPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -29,6 +34,8 @@ export default function SandPage() {
   const [audioVolume, setAudioVolume] = useState(0.58);
   const [audioTime, setAudioTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
+  const [driveIntroCue, setDriveIntroCue] = useState<DriveIntroCue | null>(null);
+  const [audioControlOpen, setAudioControlOpen] = useState(false);
   const revealedRef = useRef(false);
   const rubDistRef = useRef(0);
   const rubsRef = useRef(0);
@@ -36,6 +43,7 @@ export default function SandPage() {
   // 0 = alive, 1 = fully drooped/drained (drives lamp settle animation)
   const depletedProgressRef = useRef(0);
   const driveCompleteRef = useRef(false);
+  const driveIntroReadyRef = useRef(false);
 
   useEffect(() => {
     const t = setTimeout(() => setShow(true), 60);
@@ -102,6 +110,29 @@ export default function SandPage() {
     const isDesktop = !("ontouchstart" in window) && window.innerWidth >= 768;
     setDriveComplete(!isDesktop);
     driveCompleteRef.current = !isDesktop;
+    driveIntroReadyRef.current = !isDesktop;
+    const driveIntroTimers: number[] = [];
+
+    const showDriveIntroCue = (text: string, kind: DriveIntroCue["kind"], id: number) => {
+      setDriveIntroCue({ id, text, kind });
+    };
+
+    if (isDesktop) {
+      driveIntroTimers.push(
+        window.setTimeout(() => showDriveIntroCue("driving unlocks in 15 seconds", "lock", 0), 0),
+        window.setTimeout(() => showDriveIntroCue("drive with W or ↑", "hint", 1), 5000),
+        window.setTimeout(() => showDriveIntroCue("get ready", "count", 2), 9000),
+        window.setTimeout(() => showDriveIntroCue("set", "count", 3), 12000),
+        window.setTimeout(() => {
+          driveIntroReadyRef.current = true;
+          setAudioControlOpen(true);
+          showDriveIntroCue("go!!", "count", 4);
+        }, 15000),
+        window.setTimeout(() => {
+          setDriveIntroCue(null);
+        }, 17800),
+      );
+    }
 
     const tryStartAudio = () => {
       if (!isDesktop) return;
@@ -276,7 +307,9 @@ export default function SandPage() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "w" || e.key === "W" || e.key === "ArrowUp") {
         driveKeys.add("forward");
-        hasDriven = true;
+        if (driveIntroReadyRef.current) {
+          hasDriven = true;
+        }
         tryStartAudio();
         e.preventDefault();
       }
@@ -324,7 +357,10 @@ export default function SandPage() {
       warm.intensity = 0.55 * (1 - depletedProgressRef.current);
 
       if (isDesktop) {
-        const driving = driveKeys.has("forward") && driveProgress < 1 && !revealedRef.current;
+        const driving = driveIntroReadyRef.current && driveKeys.has("forward") && driveProgress < 1 && !revealedRef.current;
+        if (driving) {
+          hasDriven = true;
+        }
         driveMood += ((hasDriven ? 1 : 0) - driveMood) * 0.018;
         const windDrag = Math.sin(t * 1.1 + driveProgress * 18) * 0.07 + Math.sin(t * 0.37 + 2.1) * 0.035;
         const targetVelocity = driving ? (1 / DRIVE_DURATION_SECONDS) * (1 + windDrag) : 0;
@@ -481,6 +517,7 @@ export default function SandPage() {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("resize", onResize);
+      driveIntroTimers.forEach((timer) => window.clearTimeout(timer));
       cancelAnimationFrame(animId);
       dracoLoader.dispose();
       renderer.dispose();
@@ -495,8 +532,22 @@ export default function SandPage() {
     >
       <div className="sand-kingdom-grid" aria-hidden="true" />
       <GridMouseTrail />
+      {desktopMode && driveIntroCue && (
+        <div
+          key={driveIntroCue.id}
+          className="sand-drive-cue"
+          data-kind={driveIntroCue.kind}
+          aria-live="polite"
+        >
+          {driveIntroCue.text}
+        </div>
+      )}
       {desktopMode && (
-        <div className="sand-audio-control" data-ready={driveComplete ? "true" : "false"}>
+        <div
+          className="sand-audio-control"
+          data-expanded={audioControlOpen ? "true" : "false"}
+          data-ready={driveComplete ? "true" : "false"}
+        >
           <audio
             ref={audioRef}
             src="/audio/nina.mp3"
@@ -507,38 +558,41 @@ export default function SandPage() {
             onTimeUpdate={(event) => setAudioTime(event.currentTarget.currentTime)}
             onLoadedMetadata={(event) => setAudioDuration(event.currentTarget.duration)}
           />
-          <button
-            className="sand-audio-toggle"
-            type="button"
-            aria-label={audioPlaying ? "Pause audio" : "Play audio"}
-            onClick={toggleAudio}
-          >
-            <span className={audioPlaying ? "sand-audio-pause-icon" : "sand-audio-play-icon"} aria-hidden="true" />
-          </button>
-          <span className="sand-audio-time">
-            {formatAudioTime(audioTime)} / {formatAudioTime(audioDuration)}
-          </span>
-          <input
-            className="sand-audio-progress"
-            type="range"
-            min="0"
-            max={audioDuration || 0}
-            step="0.1"
-            value={audioDuration ? Math.min(audioTime, audioDuration) : 0}
-            aria-label="Audio position"
-            onChange={(event) => seekAudio(Number(event.target.value))}
-          />
-          <span className="sand-audio-speaker" aria-hidden="true" />
-          <input
-            className="sand-audio-volume"
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={audioVolume}
-            aria-label="Audio volume"
-            onChange={(event) => setAudioVolume(Number(event.target.value))}
-          />
+          <span className="sand-audio-seal" aria-hidden="true">×</span>
+          <div className="sand-audio-strip">
+            <button
+              className="sand-audio-toggle"
+              type="button"
+              aria-label={audioPlaying ? "Pause audio" : "Play audio"}
+              onClick={toggleAudio}
+            >
+              <span className={audioPlaying ? "sand-audio-pause-icon" : "sand-audio-play-icon"} aria-hidden="true" />
+            </button>
+            <span className="sand-audio-time">
+              {formatAudioTime(audioTime)} / {formatAudioTime(audioDuration)}
+            </span>
+            <input
+              className="sand-audio-progress"
+              type="range"
+              min="0"
+              max={audioDuration || 0}
+              step="0.1"
+              value={audioDuration ? Math.min(audioTime, audioDuration) : 0}
+              aria-label="Audio position"
+              onChange={(event) => seekAudio(Number(event.target.value))}
+            />
+            <span className="sand-audio-speaker" aria-hidden="true" />
+            <input
+              className="sand-audio-volume"
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={audioVolume}
+              aria-label="Audio volume"
+              onChange={(event) => setAudioVolume(Number(event.target.value))}
+            />
+          </div>
         </div>
       )}
       <canvas
