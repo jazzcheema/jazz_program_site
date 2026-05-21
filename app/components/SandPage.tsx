@@ -103,20 +103,20 @@ export default function SandPage() {
 
     const loadWeather = async () => {
       try {
-        const geoResponse = await fetch("https://ipapi.co/json/", {
+        const geoResponse = await fetch("https://free.freeipapi.com/api/json", {
           signal: controller.signal,
         });
         if (!geoResponse.ok) throw new Error("ip geolocation failed");
         const geo = await geoResponse.json() as {
           latitude?: number;
           longitude?: number;
-          city?: string;
-          region?: string;
-          country_code?: string;
+          cityName?: string;
+          regionName?: string;
+          countryCode?: string;
         };
         if (!geo.latitude || !geo.longitude) throw new Error("missing coordinates");
 
-        const useFahrenheit = geo.country_code === "US";
+        const useFahrenheit = geo.countryCode === "US";
         const params = new URLSearchParams({
           latitude: String(geo.latitude),
           longitude: String(geo.longitude),
@@ -136,7 +136,7 @@ export default function SandPage() {
         setWeatherReading({
           temp: Math.round(temp),
           unit: useFahrenheit ? "F" : "C",
-          place: geo.city || geo.region || "local",
+          place: (geo.cityName || geo.regionName || "local").replace(/\s*\([^)]*\)/g, "").trim(),
           status: "ready",
         });
       } catch (error) {
@@ -1134,12 +1134,13 @@ export default function SandPage() {
             overflow: "hidden",
             border: weatherControlOpen ? "1px solid rgba(17, 17, 17, 0.1)" : "1px solid rgba(22, 22, 22, 0.14)",
             borderRadius: "999px",
-            background: weatherControlOpen ? "rgba(236, 239, 239, 0.92)" : "rgba(233, 229, 224, 0.88)",
+            background: weatherControlOpen ? "rgba(233, 229, 224, 0.52)" : "rgba(233, 229, 224, 0.42)",
             color: "#111111",
             boxShadow: weatherControlOpen
               ? "inset 0 1px 0 rgba(255,255,255,0.72), 0 8px 24px rgba(22,22,22,0.1)"
               : "inset 0 1px 0 rgba(255,255,255,0.72), 0 4px 16px rgba(22,22,22,0.08)",
-            backdropFilter: "blur(16px)",
+            backdropFilter: "blur(28px) saturate(1.4)",
+            WebkitBackdropFilter: "blur(28px) saturate(1.4)",
             transition: "width 700ms cubic-bezier(0.2, 0.8, 0.2, 1), padding 700ms cubic-bezier(0.2, 0.8, 0.2, 1), border-color 240ms ease, background 240ms ease, box-shadow 520ms ease",
           }}
         >
@@ -1161,7 +1162,19 @@ export default function SandPage() {
               transition: "opacity 260ms ease, transform 520ms ease",
             }}
           >
-            <span className="sand-weather-temp-icon" aria-hidden="true" />
+            <span style={{
+              fontFamily: "var(--font-geist-mono)",
+              fontSize: "0.78rem",
+              fontWeight: 900,
+              lineHeight: 1,
+              letterSpacing: "-0.02em",
+              color: "#111111",
+              whiteSpace: "nowrap",
+            }}>
+              {weatherReading.status === "ready" && weatherReading.temp !== null
+                ? `${weatherReading.temp}°${weatherReading.unit}`
+                : "--"}
+            </span>
           </span>
           <div
             className="sand-weather-strip"
