@@ -229,7 +229,7 @@ export default function SandPage() {
   const lampMeterPulseStyle = lampMeterFull
     ? {
         animation: "sandLampMeterReady 2.4s ease-in-out infinite",
-        borderRadius: "0.18rem",
+        borderRadius: weatherControlOpen ? "0 0.3rem 0 0" : "0 0.3rem 0.3rem 0",
       }
     : {};
 
