@@ -1117,146 +1117,106 @@ export default function SandPage() {
       )}
       {desktopMode && (
         <div
-          className="sand-weather-control"
-          data-expanded={weatherControlOpen ? "true" : "false"}
-          data-status={weatherReading.status}
           style={{
             position: "fixed",
             right: "max(18px, 2.6dvw)",
             top: "max(18px, 2.6dvh)",
             zIndex: 4,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: weatherControlOpen ? "min(16rem, calc(100vw - 56px))" : "3.1rem",
-            minHeight: "3.1rem",
-            padding: weatherControlOpen ? "0.58rem 0.88rem" : "0.58rem",
             overflow: "hidden",
-            border: weatherControlOpen ? "1px solid rgba(17, 17, 17, 0.1)" : "1px solid rgba(22, 22, 22, 0.14)",
-            borderRadius: "999px",
-            background: weatherControlOpen ? "rgba(233, 229, 224, 0.52)" : "rgba(233, 229, 224, 0.42)",
-            color: "#111111",
-            boxShadow: weatherControlOpen
-              ? "inset 0 1px 0 rgba(255,255,255,0.72), 0 8px 24px rgba(22,22,22,0.1)"
-              : "inset 0 1px 0 rgba(255,255,255,0.72), 0 4px 16px rgba(22,22,22,0.08)",
+            borderRadius: "0.3rem",
+            background: "rgba(233, 229, 224, 0.38)",
+            border: "1px solid rgba(22, 22, 22, 0.09)",
             backdropFilter: "blur(28px) saturate(1.4)",
             WebkitBackdropFilter: "blur(28px) saturate(1.4)",
-            transition: "width 700ms cubic-bezier(0.2, 0.8, 0.2, 1), padding 700ms cubic-bezier(0.2, 0.8, 0.2, 1), border-color 240ms ease, background 240ms ease, box-shadow 520ms ease",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72), 0 8px 24px rgba(22,22,22,0.07)",
           }}
         >
-          <span
-            className="sand-weather-seal"
-            aria-hidden="true"
+          {/* Temp — lime fills full top, number centered */}
+          <div
             style={{
-              display: "grid",
-              placeItems: "center",
-              width: "2rem",
-              height: "1.8rem",
-              flex: "0 0 2rem",
+              background: "#c6ff00",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.42)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "0.5rem 0.56rem",
               fontFamily: "var(--font-geist-mono)",
-              fontSize: "1.26rem",
+              fontSize: "0.82rem",
               fontWeight: 900,
-              lineHeight: 1,
-              opacity: weatherControlOpen ? 0 : 1,
-              transform: weatherControlOpen ? "scale(0.42) rotate(-90deg)" : "none",
-              transition: "opacity 260ms ease, transform 520ms ease",
-            }}
-          >
-            <span style={{
-              fontFamily: "var(--font-geist-mono)",
-              fontSize: "0.78rem",
-              fontWeight: 900,
-              lineHeight: 1,
               letterSpacing: "-0.02em",
               color: "#111111",
               whiteSpace: "nowrap",
-            }}>
-              {weatherReading.status === "ready" && weatherReading.temp !== null
-                ? `${weatherReading.temp}°${weatherReading.unit}`
-                : "--"}
-            </span>
-          </span>
-          <div
-            className="sand-weather-strip"
-            aria-live="polite"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "auto minmax(3.8rem, 1fr) minmax(4.8rem, 6rem)",
-              gap: "0.62rem",
-              alignItems: "center",
-              width: weatherControlOpen ? "100%" : 0,
-              maxWidth: "100%",
-              marginLeft: weatherControlOpen ? "-1.8rem" : 0,
-              opacity: weatherControlOpen ? 1 : 0,
-              pointerEvents: "none",
-              transform: weatherControlOpen ? "translateX(0)" : "translateX(0.45rem)",
-              transition: "opacity 360ms ease 220ms, transform 520ms ease 150ms, width 700ms cubic-bezier(0.2, 0.8, 0.2, 1)",
-              overflow: "hidden",
             }}
           >
-            <span
-              className="sand-weather-temp"
+            {weatherReading.status === "ready" && weatherReading.temp !== null
+              ? `${weatherReading.temp}°${weatherReading.unit}`
+              : weatherReading.status === "loading" ? "--°" : "n/a"}
+          </div>
+
+          {/* Gauge + city — collapses upward on drive */}
+          <div
+            style={{
+              maxHeight: weatherControlOpen ? "10rem" : "0px",
+              overflow: "hidden",
+              transition: "max-height 600ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+            }}
+          >
+            <div
+              aria-live="polite"
               style={{
-                minWidth: "3rem",
-                overflow: "hidden",
-                fontFamily: "var(--font-geist-mono)",
-                fontSize: "0.82rem",
-                fontWeight: 900,
-                lineHeight: 1,
-                padding: "0.34rem 0.48rem",
-                border: "1px solid rgba(198, 255, 0, 0.9)",
-                borderRadius: "999px",
-                background: "#c6ff00",
-                boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.42), 0 0 18px rgba(198, 255, 0, 0.18)",
-                color: "#111111",
-                whiteSpace: "nowrap",
+                display: "flex",
+                flexDirection: "row",
+                gap: "0.45rem",
+                padding: "0.6rem 0.56rem 0.8rem",
+                alignItems: "flex-start",
+                opacity: weatherControlOpen ? 1 : 0,
+                transform: weatherControlOpen ? "translateY(0)" : "translateY(-0.6rem)",
+                transition: "opacity 380ms ease, transform 500ms ease",
               }}
             >
-              {weatherReading.status === "ready" && weatherReading.temp !== null
-                ? `${weatherReading.temp}°${weatherReading.unit}`
-                : weatherReading.status === "loading"
-                  ? "--°"
-                  : "n/a"}
-            </span>
-            <span
-              className="sand-weather-place"
-              style={{
-                overflow: "hidden",
-                color: "rgba(17, 17, 17, 0.62)",
-                fontFamily: "var(--font-geist-mono)",
-                fontSize: "0.62rem",
-                fontWeight: 800,
-                lineHeight: 1,
-                textOverflow: "ellipsis",
-                textTransform: "uppercase",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {weatherReading.place}
-            </span>
-            <span
-              className="sand-weather-gauge"
-              aria-hidden="true"
-              style={{
-                position: "relative",
-                display: "block",
-                height: "0.28rem",
-                overflow: "hidden",
-                borderRadius: "999px",
-                background: "rgba(17, 17, 17, 0.14)",
-              }}
-            >
+              {/* Vertical gauge bar */}
+              <div
+                aria-hidden="true"
+                style={{
+                  position: "relative",
+                  flex: "0 0 0.22rem",
+                  alignSelf: "stretch",
+                  minHeight: "6rem",
+                  borderRadius: "2px",
+                  background: "rgba(17, 17, 17, 0.1)",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    borderRadius: "inherit",
+                    background: "linear-gradient(to top, #7ad7ff, #c6ff00, #ffb24a)",
+                    height: weatherGaugePercent,
+                    transition: "height 520ms ease",
+                  }}
+                />
+              </div>
+
+              {/* City — vertical */}
               <span
                 style={{
-                  position: "absolute",
-                  inset: "0 auto 0 0",
-                  borderRadius: "inherit",
-                  background: "linear-gradient(90deg, #7ad7ff, #c6ff00, #ffb24a)",
-                  transition: "width 520ms ease",
-                  width: weatherGaugePercent,
+                  writingMode: "vertical-lr",
+                  fontFamily: "var(--font-geist-mono)",
+                  fontSize: "0.55rem",
+                  fontWeight: 800,
+                  color: "rgba(17, 17, 17, 0.48)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.14em",
+                  whiteSpace: "nowrap",
                 }}
-              />
-            </span>
+              >
+                {weatherReading.place}
+              </span>
+            </div>
           </div>
         </div>
       )}
