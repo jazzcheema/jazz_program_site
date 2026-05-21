@@ -24,33 +24,6 @@ type DriveIntroCue = {
   kind: "lock" | "hint" | "count" | "wish";
 };
 
-type WeatherReading = {
-  temp: number | null;
-  unit: "F" | "C";
-  place: string;
-  status: "loading" | "ready" | "unavailable";
-};
-
-type MoonReading = {
-  glyph: string;
-  label: string;
-  phase: "new" | "wax" | "full" | "wane";
-};
-
-const getMoonReading = (date: Date): MoonReading => {
-  const lunarCycleDays = 29.530588853;
-  const knownNewMoon = Date.UTC(2000, 0, 6, 18, 14);
-  const elapsedDays = (date.getTime() - knownNewMoon) / 86400000;
-  const phase = ((elapsedDays % lunarCycleDays) + lunarCycleDays) % lunarCycleDays / lunarCycleDays;
-
-  if (phase < 0.0625 || phase >= 0.9375) return { glyph: "●", label: "NEW", phase: "new" };
-  if (phase < 0.3125) return { glyph: "◐", label: "WAX", phase: "wax" };
-  if (phase < 0.4375) return { glyph: "◐", label: "RISE", phase: "wax" };
-  if (phase < 0.5625) return { glyph: "○", label: "FULL", phase: "full" };
-  if (phase < 0.8125) return { glyph: "◑", label: "WANE", phase: "wane" };
-  return { glyph: "◑", label: "REST", phase: "wane" };
-};
-
 export default function SandPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const vehicleTrailRef = useRef<HTMLCanvasElement>(null);
@@ -65,15 +38,6 @@ export default function SandPage() {
   const [audioDuration, setAudioDuration] = useState(0);
   const [driveIntroCue, setDriveIntroCue] = useState<DriveIntroCue | null>(null);
   const [audioControlOpen, setAudioControlOpen] = useState(false);
-  const [weatherControlOpen, setWeatherControlOpen] = useState(false);
-  const [weatherReading, setWeatherReading] = useState<WeatherReading>({
-    temp: null,
-    unit: "F",
-    place: "local",
-    status: "loading",
-  });
-  const [moonReading, setMoonReading] = useState<MoonReading>({ glyph: "◐", label: "MOON", phase: "wax" });
-  const [lampChargeLevel, setLampChargeLevel] = useState(1);
   const revealedRef = useRef(false);
   const rubDistRef = useRef(0);
   const rubsRef = useRef(0);
@@ -82,15 +46,10 @@ export default function SandPage() {
   const depletedProgressRef = useRef(0);
   const driveCompleteRef = useRef(false);
   const driveIntroReadyRef = useRef(false);
-  const lampChargeLevelRef = useRef(1);
 
   useEffect(() => {
     const t = setTimeout(() => setShow(true), 60);
-    const moonTimer = setTimeout(() => setMoonReading(getMoonReading(new Date())), 0);
-    return () => {
-      clearTimeout(t);
-      clearTimeout(moonTimer);
-    };
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {
@@ -116,70 +75,6 @@ export default function SandPage() {
     audio.play()
       .then(() => setAudioPlaying(true))
       .catch(() => setAudioPlaying(false));
-  }, [desktopMode]);
-
-  useEffect(() => {
-    if (!desktopMode) {
-      const closeTimer = window.setTimeout(() => setWeatherControlOpen(false), 0);
-      return () => window.clearTimeout(closeTimer);
-    }
-
-    const openTimer = window.setTimeout(() => setWeatherControlOpen(true), 0);
-
-    const controller = new AbortController();
-
-    const loadWeather = async () => {
-      try {
-        const geoResponse = await fetch("https://free.freeipapi.com/api/json", {
-          signal: controller.signal,
-        });
-        if (!geoResponse.ok) throw new Error("ip geolocation failed");
-        const geo = await geoResponse.json() as {
-          latitude?: number;
-          longitude?: number;
-          cityName?: string;
-          regionName?: string;
-          countryCode?: string;
-        };
-        if (!geo.latitude || !geo.longitude) throw new Error("missing coordinates");
-
-        const useFahrenheit = geo.countryCode === "US";
-        const params = new URLSearchParams({
-          latitude: String(geo.latitude),
-          longitude: String(geo.longitude),
-          current: "temperature_2m",
-          temperature_unit: useFahrenheit ? "fahrenheit" : "celsius",
-        });
-        const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
-          signal: controller.signal,
-        });
-        if (!weatherResponse.ok) throw new Error("weather lookup failed");
-        const weather = await weatherResponse.json() as {
-          current?: { temperature_2m?: number };
-        };
-        const temp = weather.current?.temperature_2m;
-        if (typeof temp !== "number") throw new Error("missing temperature");
-
-        setWeatherReading({
-          temp: Math.round(temp),
-          unit: useFahrenheit ? "F" : "C",
-          place: (geo.cityName || geo.regionName || "local").replace(/\s*\([^)]*\)/g, "").trim(),
-          status: "ready",
-        });
-      } catch {
-        if (controller.signal.aborted) return;
-        setWeatherReading((current) => ({
-          ...current,
-          status: "unavailable",
-        }));
-      }
-    };
-
-    loadWeather();
-    return () => {
-      window.clearTimeout(openTimer);
-      controller.abort();
-    };
   }, [desktopMode]);
 
   const toggleAudio = () => {
@@ -209,29 +104,6 @@ export default function SandPage() {
     audio.currentTime = value;
     setAudioTime(value);
   };
-
-  const normalizedWeatherTemp = weatherReading.temp === null
-    ? 0.38
-    : Math.min(1, Math.max(0, weatherReading.unit === "F"
-      ? (weatherReading.temp + 10) / 120
-      : (weatherReading.temp + 20) / 60));
-  const weatherGaugePercent = `${Math.min(100, Math.max(8, normalizedWeatherTemp * 100))}%`;
-  const lampMeterFull = lampChargeLevel === 3;
-  const moonShapeStyle = {
-    background: moonReading.phase === "new" ? "#111111" : "transparent",
-    border: moonReading.phase === "full" ? "2px solid #111111" : "0",
-    boxShadow: moonReading.phase === "wax"
-      ? "inset -0.44rem 0 0 #111111"
-      : moonReading.phase === "wane"
-        ? "inset 0.44rem 0 0 #111111"
-      : "none",
-  };
-  const lampMeterPulseStyle = lampMeterFull
-    ? {
-        animation: "sandLampMeterReady 2.4s ease-in-out infinite",
-        borderRadius: weatherControlOpen ? "0 0.3rem 0 0" : "0 0.3rem 0.3rem 0",
-      }
-    : {};
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -599,7 +471,6 @@ export default function SandPage() {
         driveKeys.add("forward");
         if (driveIntroReadyRef.current) {
           hasDriven = true;
-          setWeatherControlOpen(false);
         }
         tryStartAudio();
         e.preventDefault();
@@ -673,11 +544,6 @@ export default function SandPage() {
         }
 
         const p = driveProgress;
-        const nextLampChargeLevel = p >= 0.84 ? 3 : p >= 0.5 ? 2 : 1;
-        if (nextLampChargeLevel !== lampChargeLevelRef.current) {
-          lampChargeLevelRef.current = nextLampChargeLevel;
-          setLampChargeLevel(nextLampChargeLevel);
-        }
         const roadSway =
           Math.sin(t * 0.72 + p * 16) * 0.32 +
           Math.sin(t * 1.37 + p * 7.4) * 0.12;
@@ -1138,29 +1004,6 @@ export default function SandPage() {
       className="sand-kingdom-room"
       style={{ opacity: show ? 1 : 0 }}
     >
-      <style>{`
-        @keyframes sandLampMeterReady {
-          0%, 100% {
-            background: rgba(17, 17, 17, 0);
-            box-shadow: inset 0 0 0 rgba(17, 17, 17, 0);
-          }
-          50% {
-            background: rgba(17, 17, 17, 0.88);
-            box-shadow: inset 0 0 18px rgba(198, 255, 0, 0.16), 0 0 18px rgba(255, 178, 74, 0.18);
-          }
-        }
-
-        @keyframes sandLampPipReady {
-          0%, 100% {
-            background: #111111;
-            box-shadow: none;
-          }
-          50% {
-            background: #c6ff00;
-            box-shadow: 0 0 9px rgba(198, 255, 0, 0.75), 0 0 16px rgba(255, 178, 74, 0.42);
-          }
-        }
-      `}</style>
       <div className="sand-kingdom-grid" aria-hidden="true" />
       <div className="sand-night-pulse" aria-hidden="true" />
       <div className="sand-drive-light" aria-hidden="true" />
@@ -1187,284 +1030,6 @@ export default function SandPage() {
           aria-live="polite"
         >
           {driveIntroCue.text}
-        </div>
-      )}
-      {desktopMode && (
-        <div
-          style={{
-            position: "fixed",
-            right: "max(18px, 2.6dvw)",
-            top: "max(18px, 2.6dvh)",
-            zIndex: 4,
-            width: "12.35rem",
-          }}
-          aria-label="Travel instruments"
-        >
-          {/* Travel instruments — each segment owns the detail pipe beneath it */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1.15fr 0.85fr 1fr",
-              minHeight: "2.12rem",
-              overflow: "hidden",
-              borderRadius: weatherControlOpen ? "0.3rem 0.3rem 0 0" : "0.3rem",
-              background: weatherControlOpen ? "#c6ff00" : "rgba(198, 255, 0, 0.45)",
-              border: "1px solid rgba(22, 22, 22, 0.16)",
-              backdropFilter: weatherControlOpen ? "none" : "blur(32px) saturate(1.4)",
-              WebkitBackdropFilter: weatherControlOpen ? "none" : "blur(32px) saturate(1.4)",
-              boxShadow: weatherControlOpen
-                ? "inset 0 1px 0 rgba(255,255,255,0.42), 0 8px 24px rgba(22,22,22,0.08)"
-                : "inset 0 1px 0 rgba(255,255,255,0.2), 0 8px 24px rgba(22,22,22,0.08)",
-              fontFamily: "var(--font-geist-mono)",
-              fontWeight: 900,
-              letterSpacing: 0,
-              color: "#111111",
-              whiteSpace: "nowrap",
-              transition: "background 600ms ease, box-shadow 600ms ease, border-radius 600ms ease",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRight: "1px solid rgba(17, 17, 17, 0.16)",
-                fontSize: weatherControlOpen ? "0.82rem" : "0.68rem",
-              }}
-            >
-              {weatherReading.status === "ready" && weatherReading.temp !== null
-                ? `${weatherReading.temp}°${weatherControlOpen ? weatherReading.unit : ""}`
-                : weatherReading.status === "loading" ? "--°" : "n/a"}
-            </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRight: "1px solid rgba(17, 17, 17, 0.16)",
-                fontSize: "0.86rem",
-                lineHeight: 1,
-              }}
-              aria-label={`Moon ${moonReading.label.toLowerCase()}`}
-            >
-              <span
-                aria-hidden="true"
-                style={{
-                  display: "block",
-                  width: "0.92rem",
-                  height: "0.92rem",
-                  borderRadius: "999px",
-                  ...moonShapeStyle,
-                }}
-              />
-            </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.16rem",
-                ...lampMeterPulseStyle,
-              }}
-              aria-label={`Lamp progress ${lampChargeLevel} of 3`}
-            >
-              {[0, 1, 2].map((pip) => (
-                <span
-                  key={pip}
-                  aria-hidden="true"
-                  style={{
-                    width: "0.28rem",
-                    height: "0.28rem",
-                    borderRadius: "999px",
-                    background: pip < lampChargeLevel ? "#111111" : "rgba(17, 17, 17, 0.22)",
-                    animation: lampMeterFull && pip < lampChargeLevel
-                      ? "sandLampPipReady 2.4s ease-in-out infinite"
-                      : "none",
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Detail pipes — independent vertical extensions from each segment */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1.15fr 0.85fr 1fr",
-              maxHeight: weatherControlOpen ? "10.75rem" : "0px",
-              overflow: "hidden",
-              transition: "max-height 600ms cubic-bezier(0.2, 0.8, 0.2, 1)",
-            }}
-          >
-            <div
-              aria-live="polite"
-              style={{
-                display: "flex",
-                flexDirection: "row",
-                gap: "0.45rem",
-                minHeight: "8.85rem",
-                padding: "0.78rem 0.56rem 0.72rem",
-                alignItems: "flex-start",
-                justifyContent: "center",
-                overflow: "hidden",
-                borderRadius: 0,
-                background: "rgba(22, 22, 22, 0.1)",
-                border: "1px solid rgba(22, 22, 22, 0.12)",
-                borderTop: "0",
-                backdropFilter: "blur(28px) saturate(1.15)",
-                WebkitBackdropFilter: "blur(28px) saturate(1.15)",
-                boxShadow: "0 12px 26px rgba(22,22,22,0.08)",
-                opacity: weatherControlOpen ? 1 : 0,
-                transform: weatherControlOpen ? "translateY(0)" : "translateY(-0.6rem)",
-                transition: "opacity 380ms ease, transform 500ms ease",
-              }}
-            >
-              {/* Vertical gauge bar */}
-              <div
-                aria-hidden="true"
-                style={{
-                  position: "relative",
-                  flex: "0 0 0.22rem",
-                  alignSelf: "stretch",
-                  minHeight: "6rem",
-                  borderRadius: "2px",
-                  background: "rgba(17, 17, 17, 0.18)",
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    borderRadius: "inherit",
-                    background: "linear-gradient(to top, #7ad7ff, #c6ff00, #ffb24a)",
-                    height: weatherGaugePercent,
-                    transition: "height 520ms ease",
-                  }}
-                />
-              </div>
-
-              {/* City — vertical */}
-              <span
-                style={{
-                  writingMode: "vertical-lr",
-                  fontFamily: "var(--font-geist-mono)",
-                  fontSize: "0.55rem",
-                  fontWeight: 800,
-                  color: "rgba(17, 17, 17, 0.6)",
-                  textTransform: "uppercase",
-                  letterSpacing: 0,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {weatherReading.place}
-              </span>
-            </div>
-
-            <div
-              style={{
-                minHeight: "5.3rem",
-                padding: "0.55rem 0.36rem",
-                borderRadius: 0,
-                background: "rgba(22, 22, 22, 0.1)",
-                border: "1px solid rgba(22, 22, 22, 0.12)",
-                borderTop: "0",
-                backdropFilter: "blur(28px) saturate(1.15)",
-                WebkitBackdropFilter: "blur(28px) saturate(1.15)",
-                boxShadow: "0 12px 26px rgba(22,22,22,0.08)",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.38rem",
-                fontFamily: "var(--font-geist-mono)",
-                opacity: weatherControlOpen ? 1 : 0,
-                transform: weatherControlOpen ? "translateY(0)" : "translateY(-0.6rem)",
-                transition: "opacity 420ms ease 60ms, transform 520ms ease 40ms",
-              }}
-              aria-label={`Moon ${moonReading.label.toLowerCase()}`}
-            >
-              <span
-                style={{
-                  fontSize: "0.68rem",
-                  fontWeight: 900,
-                  color: "rgba(17, 17, 17, 0.58)",
-                  letterSpacing: 0,
-                }}
-              >
-                {moonReading.label}
-              </span>
-              <span
-                style={{
-                  fontSize: "0.62rem",
-                  fontWeight: 900,
-                  color: "rgba(17, 17, 17, 0.46)",
-                  letterSpacing: 0,
-                }}
-              >
-                MOON
-              </span>
-            </div>
-
-            <div
-              style={{
-                minHeight: "6.15rem",
-                padding: "0.55rem 0.36rem",
-                borderRadius: 0,
-                background: "rgba(22, 22, 22, 0.1)",
-                border: "1px solid rgba(22, 22, 22, 0.12)",
-                borderTop: "0",
-                backdropFilter: "blur(28px) saturate(1.15)",
-                WebkitBackdropFilter: "blur(28px) saturate(1.15)",
-                boxShadow: "0 12px 26px rgba(22,22,22,0.08)",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.36rem",
-                fontFamily: "var(--font-geist-mono)",
-                opacity: weatherControlOpen ? 1 : 0,
-                transform: weatherControlOpen ? "translateY(0)" : "translateY(-0.6rem)",
-                transition: "opacity 460ms ease 110ms, transform 560ms ease 80ms",
-              }}
-              aria-label={`Lamp progress ${lampChargeLevel} of 3`}
-            >
-              <span
-                style={{
-                  fontSize: "0.68rem",
-                  fontWeight: 900,
-                  color: "rgba(17, 17, 17, 0.58)",
-                  letterSpacing: 0,
-                }}
-              >
-                LAMP
-              </span>
-              <span
-                aria-hidden="true"
-                style={{
-                  position: "relative",
-                  width: "1.76rem",
-                  height: "0.14rem",
-                  borderRadius: "999px",
-                  background: "rgba(22, 22, 22, 0.24)",
-                  overflow: "hidden",
-                }}
-              >
-                <span
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    width: `${(lampChargeLevel / 3) * 100}%`,
-                    background: "#ffb24a",
-                    borderRadius: "inherit",
-                    boxShadow: "0 0 8px rgba(255, 178, 74, 0.72)",
-                  }}
-                />
-              </span>
-            </div>
-          </div>
         </div>
       )}
       {desktopMode && (
