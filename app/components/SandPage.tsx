@@ -31,6 +31,26 @@ type WeatherReading = {
   status: "loading" | "ready" | "unavailable";
 };
 
+type MoonReading = {
+  glyph: string;
+  label: string;
+  phase: "new" | "wax" | "full" | "wane";
+};
+
+const getMoonReading = (date: Date): MoonReading => {
+  const lunarCycleDays = 29.530588853;
+  const knownNewMoon = Date.UTC(2000, 0, 6, 18, 14);
+  const elapsedDays = (date.getTime() - knownNewMoon) / 86400000;
+  const phase = ((elapsedDays % lunarCycleDays) + lunarCycleDays) % lunarCycleDays / lunarCycleDays;
+
+  if (phase < 0.0625 || phase >= 0.9375) return { glyph: "●", label: "NEW", phase: "new" };
+  if (phase < 0.3125) return { glyph: "◐", label: "WAX", phase: "wax" };
+  if (phase < 0.4375) return { glyph: "◐", label: "RISE", phase: "wax" };
+  if (phase < 0.5625) return { glyph: "○", label: "FULL", phase: "full" };
+  if (phase < 0.8125) return { glyph: "◑", label: "WANE", phase: "wane" };
+  return { glyph: "◑", label: "REST", phase: "wane" };
+};
+
 export default function SandPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const vehicleTrailRef = useRef<HTMLCanvasElement>(null);
@@ -52,6 +72,8 @@ export default function SandPage() {
     place: "local",
     status: "loading",
   });
+  const [moonReading, setMoonReading] = useState<MoonReading>({ glyph: "◐", label: "MOON", phase: "wax" });
+  const [lampChargeLevel, setLampChargeLevel] = useState(1);
   const revealedRef = useRef(false);
   const rubDistRef = useRef(0);
   const rubsRef = useRef(0);
@@ -60,10 +82,15 @@ export default function SandPage() {
   const depletedProgressRef = useRef(0);
   const driveCompleteRef = useRef(false);
   const driveIntroReadyRef = useRef(false);
+  const lampChargeLevelRef = useRef(1);
 
   useEffect(() => {
     const t = setTimeout(() => setShow(true), 60);
-    return () => clearTimeout(t);
+    const moonTimer = setTimeout(() => setMoonReading(getMoonReading(new Date())), 0);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(moonTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -93,11 +120,11 @@ export default function SandPage() {
 
   useEffect(() => {
     if (!desktopMode) {
-      setWeatherControlOpen(false);
-      return;
+      const closeTimer = window.setTimeout(() => setWeatherControlOpen(false), 0);
+      return () => window.clearTimeout(closeTimer);
     }
 
-    setWeatherControlOpen(true);
+    const openTimer = window.setTimeout(() => setWeatherControlOpen(true), 0);
 
     const controller = new AbortController();
 
@@ -139,7 +166,7 @@ export default function SandPage() {
           place: (geo.cityName || geo.regionName || "local").replace(/\s*\([^)]*\)/g, "").trim(),
           status: "ready",
         });
-      } catch (error) {
+      } catch {
         if (controller.signal.aborted) return;
         setWeatherReading((current) => ({
           ...current,
@@ -149,7 +176,10 @@ export default function SandPage() {
     };
 
     loadWeather();
-    return () => controller.abort();
+    return () => {
+      window.clearTimeout(openTimer);
+      controller.abort();
+    };
   }, [desktopMode]);
 
   const toggleAudio = () => {
@@ -186,6 +216,15 @@ export default function SandPage() {
       ? (weatherReading.temp + 10) / 120
       : (weatherReading.temp + 20) / 60));
   const weatherGaugePercent = `${Math.min(100, Math.max(8, normalizedWeatherTemp * 100))}%`;
+  const moonShapeStyle = {
+    background: moonReading.phase === "new" ? "#111111" : "transparent",
+    border: moonReading.phase === "full" ? "2px solid #111111" : "0",
+    boxShadow: moonReading.phase === "wax"
+      ? "inset -0.44rem 0 0 #111111"
+      : moonReading.phase === "wane"
+        ? "inset 0.44rem 0 0 #111111"
+        : "none",
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -627,6 +666,11 @@ export default function SandPage() {
         }
 
         const p = driveProgress;
+        const nextLampChargeLevel = p >= 0.84 ? 3 : p >= 0.5 ? 2 : 1;
+        if (nextLampChargeLevel !== lampChargeLevelRef.current) {
+          lampChargeLevelRef.current = nextLampChargeLevel;
+          setLampChargeLevel(nextLampChargeLevel);
+        }
         const roadSway =
           Math.sin(t * 0.72 + p * 16) * 0.32 +
           Math.sin(t * 1.37 + p * 7.4) * 0.12;
@@ -1122,46 +1166,98 @@ export default function SandPage() {
             right: "max(18px, 2.6dvw)",
             top: "max(18px, 2.6dvh)",
             zIndex: 4,
-            overflow: "hidden",
-            borderRadius: "0.3rem",
-            background: "rgba(22, 22, 22, 0.1)",
-            border: "1px solid rgba(22, 22, 22, 0.14)",
-            backdropFilter: "blur(28px) saturate(1.2)",
-            WebkitBackdropFilter: "blur(28px) saturate(1.2)",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(22,22,22,0.08)",
+            width: "12.35rem",
           }}
+          aria-label="Travel instruments"
         >
-          {/* Temp — lime fills full top, number centered */}
+          {/* Travel instruments — each segment owns the detail pipe beneath it */}
           <div
             style={{
+              display: "grid",
+              gridTemplateColumns: "1.15fr 0.85fr 1fr",
+              minHeight: "2.12rem",
+              overflow: "hidden",
+              borderRadius: weatherControlOpen ? "0.3rem 0.3rem 0 0" : "0.3rem",
               background: weatherControlOpen ? "#c6ff00" : "rgba(198, 255, 0, 0.45)",
+              border: "1px solid rgba(22, 22, 22, 0.16)",
               backdropFilter: weatherControlOpen ? "none" : "blur(32px) saturate(1.4)",
               WebkitBackdropFilter: weatherControlOpen ? "none" : "blur(32px) saturate(1.4)",
               boxShadow: weatherControlOpen
-                ? "inset 0 1px 0 rgba(255,255,255,0.42)"
-                : "inset 0 1px 0 rgba(255,255,255,0.2)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "0.5rem 0.56rem",
+                ? "inset 0 1px 0 rgba(255,255,255,0.42), 0 8px 24px rgba(22,22,22,0.08)"
+                : "inset 0 1px 0 rgba(255,255,255,0.2), 0 8px 24px rgba(22,22,22,0.08)",
               fontFamily: "var(--font-geist-mono)",
-              fontSize: "0.82rem",
               fontWeight: 900,
-              letterSpacing: "-0.02em",
+              letterSpacing: 0,
               color: "#111111",
               whiteSpace: "nowrap",
-              transition: "background 600ms ease, box-shadow 600ms ease",
+              transition: "background 600ms ease, box-shadow 600ms ease, border-radius 600ms ease",
             }}
           >
-            {weatherReading.status === "ready" && weatherReading.temp !== null
-              ? `${weatherReading.temp}°${weatherReading.unit}`
-              : weatherReading.status === "loading" ? "--°" : "n/a"}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRight: "1px solid rgba(17, 17, 17, 0.16)",
+                fontSize: weatherControlOpen ? "0.82rem" : "0.68rem",
+              }}
+            >
+              {weatherReading.status === "ready" && weatherReading.temp !== null
+                ? `${weatherReading.temp}°${weatherControlOpen ? weatherReading.unit : ""}`
+                : weatherReading.status === "loading" ? "--°" : "n/a"}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRight: "1px solid rgba(17, 17, 17, 0.16)",
+                fontSize: "0.86rem",
+                lineHeight: 1,
+              }}
+              aria-label={`Moon ${moonReading.label.toLowerCase()}`}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  display: "block",
+                  width: "0.92rem",
+                  height: "0.92rem",
+                  borderRadius: "999px",
+                  ...moonShapeStyle,
+                }}
+              />
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.16rem",
+              }}
+              aria-label={`Lamp progress ${lampChargeLevel} of 3`}
+            >
+              {[0, 1, 2].map((pip) => (
+                <span
+                  key={pip}
+                  aria-hidden="true"
+                  style={{
+                    width: "0.28rem",
+                    height: "0.28rem",
+                    borderRadius: "999px",
+                    background: pip < lampChargeLevel ? "#111111" : "rgba(17, 17, 17, 0.22)",
+                  }}
+                />
+              ))}
+            </div>
           </div>
 
-          {/* Gauge + city — collapses upward on drive */}
+          {/* Detail pipes — independent vertical extensions from each segment */}
           <div
             style={{
-              maxHeight: weatherControlOpen ? "10rem" : "0px",
+              display: "grid",
+              gridTemplateColumns: "1.15fr 0.85fr 1fr",
+              maxHeight: weatherControlOpen ? "10.75rem" : "0px",
               overflow: "hidden",
               transition: "max-height 600ms cubic-bezier(0.2, 0.8, 0.2, 1)",
             }}
@@ -1172,8 +1268,18 @@ export default function SandPage() {
                 display: "flex",
                 flexDirection: "row",
                 gap: "0.45rem",
-                padding: "0.6rem 0.56rem 0.8rem",
+                minHeight: "8.85rem",
+                padding: "0.78rem 0.56rem 0.72rem",
                 alignItems: "flex-start",
+                justifyContent: "center",
+                overflow: "hidden",
+                borderRadius: 0,
+                background: "rgba(22, 22, 22, 0.1)",
+                border: "1px solid rgba(22, 22, 22, 0.12)",
+                borderTop: "0",
+                backdropFilter: "blur(28px) saturate(1.15)",
+                WebkitBackdropFilter: "blur(28px) saturate(1.15)",
+                boxShadow: "0 12px 26px rgba(22,22,22,0.08)",
                 opacity: weatherControlOpen ? 1 : 0,
                 transform: weatherControlOpen ? "translateY(0)" : "translateY(-0.6rem)",
                 transition: "opacity 380ms ease, transform 500ms ease",
@@ -1215,11 +1321,113 @@ export default function SandPage() {
                   fontWeight: 800,
                   color: "rgba(17, 17, 17, 0.6)",
                   textTransform: "uppercase",
-                  letterSpacing: "0.14em",
+                  letterSpacing: 0,
                   whiteSpace: "nowrap",
                 }}
               >
                 {weatherReading.place}
+              </span>
+            </div>
+
+            <div
+              style={{
+                minHeight: "5.3rem",
+                padding: "0.55rem 0.36rem",
+                borderRadius: 0,
+                background: "rgba(22, 22, 22, 0.1)",
+                border: "1px solid rgba(22, 22, 22, 0.12)",
+                borderTop: "0",
+                backdropFilter: "blur(28px) saturate(1.15)",
+                WebkitBackdropFilter: "blur(28px) saturate(1.15)",
+                boxShadow: "0 12px 26px rgba(22,22,22,0.08)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.38rem",
+                fontFamily: "var(--font-geist-mono)",
+                opacity: weatherControlOpen ? 1 : 0,
+                transform: weatherControlOpen ? "translateY(0)" : "translateY(-0.6rem)",
+                transition: "opacity 420ms ease 60ms, transform 520ms ease 40ms",
+              }}
+              aria-label={`Moon ${moonReading.label.toLowerCase()}`}
+            >
+              <span
+                style={{
+                  fontSize: "0.68rem",
+                  fontWeight: 900,
+                  color: "rgba(17, 17, 17, 0.58)",
+                  letterSpacing: 0,
+                }}
+              >
+                {moonReading.label}
+              </span>
+              <span
+                style={{
+                  fontSize: "0.62rem",
+                  fontWeight: 900,
+                  color: "rgba(17, 17, 17, 0.46)",
+                  letterSpacing: 0,
+                }}
+              >
+                MOON
+              </span>
+            </div>
+
+            <div
+              style={{
+                minHeight: "6.15rem",
+                padding: "0.55rem 0.36rem",
+                borderRadius: 0,
+                background: "rgba(22, 22, 22, 0.1)",
+                border: "1px solid rgba(22, 22, 22, 0.12)",
+                borderTop: "0",
+                backdropFilter: "blur(28px) saturate(1.15)",
+                WebkitBackdropFilter: "blur(28px) saturate(1.15)",
+                boxShadow: "0 12px 26px rgba(22,22,22,0.08)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.36rem",
+                fontFamily: "var(--font-geist-mono)",
+                opacity: weatherControlOpen ? 1 : 0,
+                transform: weatherControlOpen ? "translateY(0)" : "translateY(-0.6rem)",
+                transition: "opacity 460ms ease 110ms, transform 560ms ease 80ms",
+              }}
+              aria-label={`Lamp progress ${lampChargeLevel} of 3`}
+            >
+              <span
+                style={{
+                  fontSize: "0.68rem",
+                  fontWeight: 900,
+                  color: "rgba(17, 17, 17, 0.58)",
+                  letterSpacing: 0,
+                }}
+              >
+                LAMP
+              </span>
+              <span
+                aria-hidden="true"
+                style={{
+                  position: "relative",
+                  width: "1.76rem",
+                  height: "0.14rem",
+                  borderRadius: "999px",
+                  background: "rgba(22, 22, 22, 0.24)",
+                  overflow: "hidden",
+                }}
+              >
+                <span
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: `${(lampChargeLevel / 3) * 100}%`,
+                    background: "#ffb24a",
+                    borderRadius: "inherit",
+                    boxShadow: "0 0 8px rgba(255, 178, 74, 0.72)",
+                  }}
+                />
               </span>
             </div>
           </div>
