@@ -216,6 +216,7 @@ export default function SandPage() {
       ? (weatherReading.temp + 10) / 120
       : (weatherReading.temp + 20) / 60));
   const weatherGaugePercent = `${Math.min(100, Math.max(8, normalizedWeatherTemp * 100))}%`;
+  const lampMeterFull = lampChargeLevel === 3;
   const moonShapeStyle = {
     background: moonReading.phase === "new" ? "#111111" : "transparent",
     border: moonReading.phase === "full" ? "2px solid #111111" : "0",
@@ -223,8 +224,14 @@ export default function SandPage() {
       ? "inset -0.44rem 0 0 #111111"
       : moonReading.phase === "wane"
         ? "inset 0.44rem 0 0 #111111"
-        : "none",
+      : "none",
   };
+  const lampMeterPulseStyle = lampMeterFull
+    ? {
+        animation: "sandLampMeterReady 2.4s ease-in-out infinite",
+        borderRadius: "0.18rem",
+      }
+    : {};
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1131,6 +1138,29 @@ export default function SandPage() {
       className="sand-kingdom-room"
       style={{ opacity: show ? 1 : 0 }}
     >
+      <style>{`
+        @keyframes sandLampMeterReady {
+          0%, 100% {
+            background: rgba(17, 17, 17, 0);
+            box-shadow: inset 0 0 0 rgba(17, 17, 17, 0);
+          }
+          50% {
+            background: rgba(17, 17, 17, 0.88);
+            box-shadow: inset 0 0 18px rgba(198, 255, 0, 0.16), 0 0 18px rgba(255, 178, 74, 0.18);
+          }
+        }
+
+        @keyframes sandLampPipReady {
+          0%, 100% {
+            background: #111111;
+            box-shadow: none;
+          }
+          50% {
+            background: #c6ff00;
+            box-shadow: 0 0 9px rgba(198, 255, 0, 0.75), 0 0 16px rgba(255, 178, 74, 0.42);
+          }
+        }
+      `}</style>
       <div className="sand-kingdom-grid" aria-hidden="true" />
       <div className="sand-night-pulse" aria-hidden="true" />
       <div className="sand-drive-light" aria-hidden="true" />
@@ -1234,6 +1264,7 @@ export default function SandPage() {
                 alignItems: "center",
                 justifyContent: "center",
                 gap: "0.16rem",
+                ...lampMeterPulseStyle,
               }}
               aria-label={`Lamp progress ${lampChargeLevel} of 3`}
             >
@@ -1246,6 +1277,9 @@ export default function SandPage() {
                     height: "0.28rem",
                     borderRadius: "999px",
                     background: pip < lampChargeLevel ? "#111111" : "rgba(17, 17, 17, 0.22)",
+                    animation: lampMeterFull && pip < lampChargeLevel
+                      ? "sandLampPipReady 2.4s ease-in-out infinite"
+                      : "none",
                   }}
                 />
               ))}
