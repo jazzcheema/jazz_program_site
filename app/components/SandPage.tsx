@@ -1124,18 +1124,22 @@ export default function SandPage() {
             zIndex: 4,
             overflow: "hidden",
             borderRadius: "0.3rem",
-            background: "rgba(233, 229, 224, 0.38)",
-            border: "1px solid rgba(22, 22, 22, 0.09)",
-            backdropFilter: "blur(28px) saturate(1.4)",
-            WebkitBackdropFilter: "blur(28px) saturate(1.4)",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72), 0 8px 24px rgba(22,22,22,0.07)",
+            background: "rgba(22, 22, 22, 0.1)",
+            border: "1px solid rgba(22, 22, 22, 0.14)",
+            backdropFilter: "blur(28px) saturate(1.2)",
+            WebkitBackdropFilter: "blur(28px) saturate(1.2)",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(22,22,22,0.08)",
           }}
         >
           {/* Temp — lime fills full top, number centered */}
           <div
             style={{
-              background: "#c6ff00",
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.42)",
+              background: weatherControlOpen ? "#c6ff00" : "rgba(198, 255, 0, 0.45)",
+              backdropFilter: weatherControlOpen ? "none" : "blur(32px) saturate(1.4)",
+              WebkitBackdropFilter: weatherControlOpen ? "none" : "blur(32px) saturate(1.4)",
+              boxShadow: weatherControlOpen
+                ? "inset 0 1px 0 rgba(255,255,255,0.42)"
+                : "inset 0 1px 0 rgba(255,255,255,0.2)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -1146,6 +1150,7 @@ export default function SandPage() {
               letterSpacing: "-0.02em",
               color: "#111111",
               whiteSpace: "nowrap",
+              transition: "background 600ms ease, box-shadow 600ms ease",
             }}
           >
             {weatherReading.status === "ready" && weatherReading.temp !== null
@@ -1183,7 +1188,7 @@ export default function SandPage() {
                   alignSelf: "stretch",
                   minHeight: "6rem",
                   borderRadius: "2px",
-                  background: "rgba(17, 17, 17, 0.1)",
+                  background: "rgba(17, 17, 17, 0.18)",
                   overflow: "hidden",
                 }}
               >
@@ -1208,7 +1213,7 @@ export default function SandPage() {
                   fontFamily: "var(--font-geist-mono)",
                   fontSize: "0.55rem",
                   fontWeight: 800,
-                  color: "rgba(17, 17, 17, 0.48)",
+                  color: "rgba(17, 17, 17, 0.6)",
                   textTransform: "uppercase",
                   letterSpacing: "0.14em",
                   whiteSpace: "nowrap",
