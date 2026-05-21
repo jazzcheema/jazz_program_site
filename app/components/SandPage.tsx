@@ -16,10 +16,19 @@ const DRIVE_END_Z = 15.5;
 const LAMP_X = 4.45;
 const LAMP_Z = 17.15;
 const CLOUD_LIME = "#c6ff00";
+const TURBO_FAN_START_Z = 2.72;
+const TURBO_FAN_TOW_Z = 6.25;
 type DriveIntroCue = {
   id: number;
   text: string;
   kind: "lock" | "hint" | "count" | "wish";
+};
+
+type WeatherReading = {
+  temp: number | null;
+  unit: "F" | "C";
+  place: string;
+  status: "loading" | "ready" | "unavailable";
 };
 
 export default function SandPage() {
@@ -36,6 +45,13 @@ export default function SandPage() {
   const [audioDuration, setAudioDuration] = useState(0);
   const [driveIntroCue, setDriveIntroCue] = useState<DriveIntroCue | null>(null);
   const [audioControlOpen, setAudioControlOpen] = useState(false);
+  const [weatherControlOpen, setWeatherControlOpen] = useState(false);
+  const [weatherReading, setWeatherReading] = useState<WeatherReading>({
+    temp: null,
+    unit: "F",
+    place: "local",
+    status: "loading",
+  });
   const revealedRef = useRef(false);
   const rubDistRef = useRef(0);
   const rubsRef = useRef(0);
@@ -75,6 +91,67 @@ export default function SandPage() {
       .catch(() => setAudioPlaying(false));
   }, [desktopMode]);
 
+  useEffect(() => {
+    if (!desktopMode) {
+      setWeatherControlOpen(false);
+      return;
+    }
+
+    setWeatherControlOpen(true);
+
+    const controller = new AbortController();
+
+    const loadWeather = async () => {
+      try {
+        const geoResponse = await fetch("https://ipapi.co/json/", {
+          signal: controller.signal,
+        });
+        if (!geoResponse.ok) throw new Error("ip geolocation failed");
+        const geo = await geoResponse.json() as {
+          latitude?: number;
+          longitude?: number;
+          city?: string;
+          region?: string;
+          country_code?: string;
+        };
+        if (!geo.latitude || !geo.longitude) throw new Error("missing coordinates");
+
+        const useFahrenheit = geo.country_code === "US";
+        const params = new URLSearchParams({
+          latitude: String(geo.latitude),
+          longitude: String(geo.longitude),
+          current: "temperature_2m",
+          temperature_unit: useFahrenheit ? "fahrenheit" : "celsius",
+        });
+        const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        if (!weatherResponse.ok) throw new Error("weather lookup failed");
+        const weather = await weatherResponse.json() as {
+          current?: { temperature_2m?: number };
+        };
+        const temp = weather.current?.temperature_2m;
+        if (typeof temp !== "number") throw new Error("missing temperature");
+
+        setWeatherReading({
+          temp: Math.round(temp),
+          unit: useFahrenheit ? "F" : "C",
+          place: geo.city || geo.region || "local",
+          status: "ready",
+        });
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setWeatherReading((current) => ({
+          ...current,
+          status: "unavailable",
+        }));
+      }
+    };
+
+    loadWeather();
+    return () => controller.abort();
+  }, [desktopMode]);
+
   const toggleAudio = () => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -102,6 +179,13 @@ export default function SandPage() {
     audio.currentTime = value;
     setAudioTime(value);
   };
+
+  const normalizedWeatherTemp = weatherReading.temp === null
+    ? 0.38
+    : Math.min(1, Math.max(0, weatherReading.unit === "F"
+      ? (weatherReading.temp + 10) / 120
+      : (weatherReading.temp + 20) / 60));
+  const weatherGaugePercent = `${Math.min(100, Math.max(8, normalizedWeatherTemp * 100))}%`;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -248,11 +332,16 @@ export default function SandPage() {
 
     let lamp: THREE.Group | null = null;
     let car: THREE.Group | null = null;
+    let turboFan: THREE.Group | null = null;
     let carBaseY = 0;
     let carMaxDim = 1;
+    let turboFanBaseScale = 1;
     const carRearLocal = new THREE.Vector3();
     let lampBaseY = 0;
     let lampRadiusPx = Math.min(W, H) * 0.22;
+    let turboFanTowProgress = 0;
+    let turboFanIntroPresence = 0;
+    let turboFanSpin = 0;
     const driveKeys = new Set<string>();
     let hasDriven = false;
     let driveMood = 0;
@@ -265,12 +354,86 @@ export default function SandPage() {
     const tmpCarRear = new THREE.Vector3();
     const tmpLampScreen = new THREE.Vector3();
     const tmpLampWorld = new THREE.Vector3();
+    const tmpTurboFanStart = new THREE.Vector3();
+    const tmpTurboFanTow = new THREE.Vector3();
+    const windStreamGroup = new THREE.Group();
+    const windStreamMaterials: THREE.MeshBasicMaterial[] = [];
+    const windStreamMeshes: THREE.Mesh<THREE.TubeGeometry, THREE.MeshBasicMaterial>[] = [];
+    const windStreamCurves: THREE.CatmullRomCurve3[] = [];
+    const windStreamBaseOpacity: number[] = [];
+    const windPulseMeshes: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>[] = [];
+    const windPulseCurveIndex: number[] = [];
+    const windPulsePhase: number[] = [];
 
     const fitModel = (model: THREE.Group, targetSize: number) => {
       const box = new THREE.Box3().setFromObject(model);
       model.position.sub(box.getCenter(new THREE.Vector3()));
       const size = box.getSize(new THREE.Vector3());
       return targetSize / Math.max(size.x, size.y, size.z);
+    };
+
+    const setModelOpacity = (model: THREE.Object3D, opacity: number) => {
+      model.traverse((child) => {
+        if (!(child instanceof THREE.Mesh)) return;
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+
+        for (const material of materials) {
+          material.transparent = opacity < 0.995;
+          material.opacity = opacity;
+          material.depthWrite = opacity > 0.48;
+          material.needsUpdate = true;
+        }
+      });
+    };
+
+    const makeWindStream = (
+      yOffset: number,
+      xOffset: number,
+      zOffset: number,
+      radius: number,
+      opacity: number,
+      color: THREE.ColorRepresentation,
+    ) => {
+      const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(DRIVE_START_X + xOffset, carBaseY + 0.18 + yOffset, TURBO_FAN_START_Z - 0.44 + zOffset),
+        new THREE.Vector3(DRIVE_START_X + xOffset, carBaseY + 0.20 + yOffset, 1.38 + zOffset),
+        new THREE.Vector3(DRIVE_START_X + xOffset, carBaseY + 0.34 + yOffset, 0.86 + zOffset),
+        new THREE.Vector3(DRIVE_START_X + xOffset, carBaseY + 0.64 + yOffset, 0.22 + zOffset),
+        new THREE.Vector3(DRIVE_START_X + xOffset, carBaseY + 0.68 + yOffset, -0.42 + zOffset),
+        new THREE.Vector3(DRIVE_START_X + xOffset, carBaseY + 0.50 + yOffset, -1.08 + zOffset),
+        new THREE.Vector3(DRIVE_START_X + xOffset, carBaseY + 0.30 + yOffset, -1.72 + zOffset),
+      ]);
+      const curveIndex = windStreamCurves.length;
+      const geometry = new THREE.TubeGeometry(curve, 96, radius, 7, false);
+      const material = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        depthTest: false,
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      windStreamGroup.add(mesh);
+      windStreamMeshes.push(mesh);
+      windStreamCurves.push(curve);
+      windStreamMaterials.push(material);
+      windStreamBaseOpacity.push(opacity);
+
+      const pulseCount = opacity > 0.6 ? 3 : 2;
+      for (let i = 0; i < pulseCount; i++) {
+        const pulseMaterial = new THREE.MeshBasicMaterial({
+          color,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          depthTest: false,
+        });
+        const pulse = new THREE.Mesh(new THREE.SphereGeometry(Math.max(radius * 2.4, 0.018), 10, 8), pulseMaterial);
+        windStreamGroup.add(pulse);
+        windPulseMeshes.push(pulse);
+        windPulseCurveIndex.push(curveIndex);
+        windPulsePhase.push((i / pulseCount + windPulseMeshes.length * 0.137) % 1);
+      }
     };
 
     loader.load("/models/lamp1.glb", (gltf) => {
@@ -293,6 +456,31 @@ export default function SandPage() {
         car.position.set(DRIVE_START_X, -0.18, 0);
         carBaseY = car.position.y;
         scene.add(car);
+        makeWindStream(0.00, -0.26, 0.00, 0.026, 0.68, "#ffffff");
+        makeWindStream(0.04, -0.30, -0.04, 0.016, 0.46, "#a9dfff");
+        makeWindStream(-0.05, -0.22, 0.08, 0.015, 0.40, "#f8fbff");
+        makeWindStream(0.08, -0.34, 0.03, 0.012, 0.34, "#8fd0ff");
+        makeWindStream(-0.09, -0.18, -0.06, 0.011, 0.30, "#ffffff");
+        makeWindStream(0.00, -0.27, 0.012, 0.006, 0.92, "#ffffff");
+        scene.add(windStreamGroup);
+      });
+
+      loader.load("/models/turbo_fan.glb", (gltf) => {
+        turboFan = gltf.scene;
+        turboFanBaseScale = fitModel(turboFan, 1.18);
+        turboFan.scale.setScalar(turboFanBaseScale);
+        turboFan.rotation.set(-0.02, Math.PI * 0.94, 0.03);
+        turboFan.position.set(DRIVE_START_X, -0.17, TURBO_FAN_START_Z);
+        turboFan.traverse((child) => {
+          if (!(child instanceof THREE.Mesh)) return;
+          if (Array.isArray(child.material)) {
+            child.material = child.material.map((material) => material.clone());
+          } else {
+            child.material = child.material.clone();
+          }
+        });
+        setModelOpacity(turboFan, 0);
+        scene.add(turboFan);
       });
     }
 
@@ -365,6 +553,7 @@ export default function SandPage() {
         driveKeys.add("forward");
         if (driveIntroReadyRef.current) {
           hasDriven = true;
+          setWeatherControlOpen(false);
         }
         tryStartAudio();
         e.preventDefault();
@@ -506,6 +695,62 @@ export default function SandPage() {
           car.rotation.y = Math.PI / 2 + finalBlend * (Math.PI * 0.42) + Math.sin(t * 0.84 + p * 10) * 0.07 * speedBlend * settle;
           car.rotation.x = Math.sin(t * 1.5 + p * 8) * 0.018 * speedBlend * settle;
           car.rotation.z = -Math.sin(t * 1.9 + p * 12) * 0.06 * speedBlend * settle;
+        }
+
+        if (turboFan) {
+          const shouldTowFan = hasDriven || driveProgress > 0.001;
+          turboFanIntroPresence += (1 - turboFanIntroPresence) * 0.045;
+          if (shouldTowFan) {
+            turboFanTowProgress = Math.min(1, turboFanTowProgress + dt * 0.18);
+          }
+
+          const fanTowEase = THREE.MathUtils.smoothstep(turboFanTowProgress, 0, 1);
+          const fanGhostEase = THREE.MathUtils.smoothstep(turboFanTowProgress, 0.05, 0.82);
+          const fanFloat = Math.sin(t * 0.5 + 0.8) * 0.045 + Math.sin(t * 0.17) * 0.024;
+          turboFanSpin += dt * (0.18 + turboFanIntroPresence * 0.42 + fanGhostEase * 1.4);
+          tmpTurboFanStart.set(
+            DRIVE_START_X + Math.sin(t * 0.19) * 0.02,
+            carBaseY + 0.01 + fanFloat,
+            TURBO_FAN_START_Z,
+          );
+          tmpTurboFanTow.set(
+            DRIVE_START_X + Math.sin(t * 0.37) * 0.08,
+            carBaseY + 0.42 + Math.sin(t * 0.44 + 1.2) * 0.13,
+            TURBO_FAN_TOW_Z,
+          );
+          turboFan.position.copy(tmpTurboFanStart).lerp(tmpTurboFanTow, fanTowEase);
+          turboFan.rotation.x = -0.02 + Math.sin(t * 0.4) * 0.018 + fanTowEase * 0.08;
+          turboFan.rotation.y = Math.PI * 0.94 + Math.sin(turboFanSpin) * 0.035 + fanTowEase * 0.28;
+          turboFan.rotation.z = 0.03 + Math.sin(t * 0.32 + 1.7) * 0.025 - fanTowEase * 0.18;
+          turboFan.scale.setScalar(turboFanBaseScale * THREE.MathUtils.lerp(1, 0.86, fanTowEase));
+          setModelOpacity(turboFan, Math.max(0, turboFanIntroPresence * (1 - fanGhostEase)));
+          turboFan.visible = turboFanIntroPresence > 0.01 || turboFanTowProgress < 1;
+        }
+
+        if (windStreamMaterials.length) {
+          const windTowFade = 1 - THREE.MathUtils.smoothstep(turboFanTowProgress, 0.02, 0.46);
+          const windOpacity = turboFanIntroPresence * windTowFade * (1 - finalBlend);
+          windStreamGroup.visible = windOpacity > 0.01;
+          windStreamMeshes.forEach((mesh, index) => {
+            const flowPhase = t * (1.12 + index * 0.08) + index * 1.7;
+            const pulse = 0.62 + Math.pow(Math.max(0, Math.sin(flowPhase)), 1.8) * 0.38;
+            mesh.position.y = Math.sin(flowPhase * 0.58) * 0.012;
+            mesh.position.z = Math.sin(flowPhase * 0.42 + 0.8) * 0.018;
+            mesh.material.opacity = windStreamBaseOpacity[index] * windOpacity * pulse;
+          });
+          windPulseMeshes.forEach((pulse, index) => {
+            const curve = windStreamCurves[windPulseCurveIndex[index]];
+            const travel = (windPulsePhase[index] + t * 0.34) % 1;
+            const envelope =
+              THREE.MathUtils.smoothstep(travel, 0.04, 0.18) *
+              (1 - THREE.MathUtils.smoothstep(travel, 0.78, 0.98));
+            const flutter = 0.68 + Math.sin(t * 5.8 + index * 1.31) * 0.32;
+            pulse.position.copy(curve.getPointAt(travel));
+            pulse.position.y += Math.sin(t * 1.2 + index) * 0.01;
+            pulse.position.z += Math.sin(t * 0.9 + index * 0.7) * 0.012;
+            pulse.material.opacity = windOpacity * envelope * flutter * 0.62;
+            pulse.scale.setScalar(THREE.MathUtils.lerp(0.75, 1.45, envelope));
+          });
         }
 
         if (lamp) {
@@ -823,6 +1068,14 @@ export default function SandPage() {
       window.removeEventListener("resize", onResize);
       driveIntroTimers.forEach((timer) => window.clearTimeout(timer));
       cancelAnimationFrame(animId);
+      windStreamMeshes.forEach((mesh) => {
+        mesh.geometry.dispose();
+        mesh.material.dispose();
+      });
+      windPulseMeshes.forEach((mesh) => {
+        mesh.geometry.dispose();
+        mesh.material.dispose();
+      });
       dracoLoader.dispose();
       renderer.dispose();
     };
@@ -860,6 +1113,138 @@ export default function SandPage() {
           aria-live="polite"
         >
           {driveIntroCue.text}
+        </div>
+      )}
+      {desktopMode && (
+        <div
+          className="sand-weather-control"
+          data-expanded={weatherControlOpen ? "true" : "false"}
+          data-status={weatherReading.status}
+          style={{
+            position: "fixed",
+            right: "max(18px, 2.6dvw)",
+            top: "max(18px, 2.6dvh)",
+            zIndex: 4,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: weatherControlOpen ? "min(16rem, calc(100vw - 56px))" : "3.1rem",
+            minHeight: "3.1rem",
+            padding: weatherControlOpen ? "0.58rem 0.88rem" : "0.58rem",
+            overflow: "hidden",
+            border: weatherControlOpen ? "1px solid rgba(17, 17, 17, 0.1)" : "1px solid rgba(22, 22, 22, 0.14)",
+            borderRadius: "999px",
+            background: weatherControlOpen ? "rgba(236, 239, 239, 0.92)" : "rgba(233, 229, 224, 0.88)",
+            color: "#111111",
+            boxShadow: weatherControlOpen
+              ? "inset 0 1px 0 rgba(255,255,255,0.72), 0 8px 24px rgba(22,22,22,0.1)"
+              : "inset 0 1px 0 rgba(255,255,255,0.72), 0 4px 16px rgba(22,22,22,0.08)",
+            backdropFilter: "blur(16px)",
+            transition: "width 700ms cubic-bezier(0.2, 0.8, 0.2, 1), padding 700ms cubic-bezier(0.2, 0.8, 0.2, 1), border-color 240ms ease, background 240ms ease, box-shadow 520ms ease",
+          }}
+        >
+          <span
+            className="sand-weather-seal"
+            aria-hidden="true"
+            style={{
+              display: "grid",
+              placeItems: "center",
+              width: "2rem",
+              height: "1.8rem",
+              flex: "0 0 2rem",
+              fontFamily: "var(--font-geist-mono)",
+              fontSize: "1.26rem",
+              fontWeight: 900,
+              lineHeight: 1,
+              opacity: weatherControlOpen ? 0 : 1,
+              transform: weatherControlOpen ? "scale(0.42) rotate(-90deg)" : "none",
+              transition: "opacity 260ms ease, transform 520ms ease",
+            }}
+          >
+            <span className="sand-weather-temp-icon" aria-hidden="true" />
+          </span>
+          <div
+            className="sand-weather-strip"
+            aria-live="polite"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "auto minmax(3.8rem, 1fr) minmax(4.8rem, 6rem)",
+              gap: "0.62rem",
+              alignItems: "center",
+              width: weatherControlOpen ? "100%" : 0,
+              maxWidth: "100%",
+              marginLeft: weatherControlOpen ? "-1.8rem" : 0,
+              opacity: weatherControlOpen ? 1 : 0,
+              pointerEvents: "none",
+              transform: weatherControlOpen ? "translateX(0)" : "translateX(0.45rem)",
+              transition: "opacity 360ms ease 220ms, transform 520ms ease 150ms, width 700ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+              overflow: "hidden",
+            }}
+          >
+            <span
+              className="sand-weather-temp"
+              style={{
+                minWidth: "3rem",
+                overflow: "hidden",
+                fontFamily: "var(--font-geist-mono)",
+                fontSize: "0.82rem",
+                fontWeight: 900,
+                lineHeight: 1,
+                padding: "0.34rem 0.48rem",
+                border: "1px solid rgba(198, 255, 0, 0.9)",
+                borderRadius: "999px",
+                background: "#c6ff00",
+                boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.42), 0 0 18px rgba(198, 255, 0, 0.18)",
+                color: "#111111",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {weatherReading.status === "ready" && weatherReading.temp !== null
+                ? `${weatherReading.temp}°${weatherReading.unit}`
+                : weatherReading.status === "loading"
+                  ? "--°"
+                  : "n/a"}
+            </span>
+            <span
+              className="sand-weather-place"
+              style={{
+                overflow: "hidden",
+                color: "rgba(17, 17, 17, 0.62)",
+                fontFamily: "var(--font-geist-mono)",
+                fontSize: "0.62rem",
+                fontWeight: 800,
+                lineHeight: 1,
+                textOverflow: "ellipsis",
+                textTransform: "uppercase",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {weatherReading.place}
+            </span>
+            <span
+              className="sand-weather-gauge"
+              aria-hidden="true"
+              style={{
+                position: "relative",
+                display: "block",
+                height: "0.28rem",
+                overflow: "hidden",
+                borderRadius: "999px",
+                background: "rgba(17, 17, 17, 0.14)",
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  inset: "0 auto 0 0",
+                  borderRadius: "inherit",
+                  background: "linear-gradient(90deg, #7ad7ff, #c6ff00, #ffb24a)",
+                  transition: "width 520ms ease",
+                  width: weatherGaugePercent,
+                }}
+              />
+            </span>
+          </div>
         </div>
       )}
       {desktopMode && (
