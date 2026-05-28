@@ -71,7 +71,7 @@ const PROJECTS: ProjectData[] = [
     id: "episode",
     model: "/models/mobile_tv.glb",
     label: "EPISODE",
-    href: "https://episode-eta.vercel.app/",
+    href: "https://www.episodecompanies.com/",
     stack: "NEXT.JS + THREE.JS + REACT",
     type: "PROPERTY DEVELOPMENT WEBSITE",
     description:
