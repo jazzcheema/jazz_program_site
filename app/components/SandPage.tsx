@@ -115,29 +115,38 @@ export default function SandPage() {
     driveCompleteRef.current = !isDesktop;
     driveIntroReadyRef.current = !isDesktop;
     const driveIntroTimers: number[] = [];
+    const driveIntroSchedule: Array<{ delay: number; fn: () => void }> = [];
+    let countdownStart = 0;
+    let countdownHiddenAt = 0;
+    let audioWasPlaying = false;
+
+    const scheduleCountdownFrom = (elapsed: number) => {
+      driveIntroTimers.forEach(t => window.clearTimeout(t));
+      driveIntroTimers.length = 0;
+      driveIntroSchedule.forEach(({ delay, fn }) => {
+        const remaining = delay - elapsed;
+        if (remaining >= 0) driveIntroTimers.push(window.setTimeout(fn, remaining));
+      });
+    };
 
     const showDriveIntroCue = (text: string, kind: DriveIntroCue["kind"], id: number) => {
       setDriveIntroCue({ id, text, kind });
     };
 
     if (isDesktop) {
-      driveIntroTimers.push(
-        window.setTimeout(() => showDriveIntroCue("driving unlocks in 15", "lock", 0), 0),
-        window.setTimeout(() => showDriveIntroCue("driving unlocks in 14", "lock", 0), 1000),
-        window.setTimeout(() => showDriveIntroCue("driving unlocks in 13", "lock", 0), 2000),
-        window.setTimeout(() => showDriveIntroCue("driving unlocks in 12", "lock", 0), 3000),
-        window.setTimeout(() => showDriveIntroCue("drive with W or ↑", "hint", 3), 5000),
-        window.setTimeout(() => showDriveIntroCue("get ready", "count", 4), 9000),
-        window.setTimeout(() => showDriveIntroCue("set", "count", 5), 12000),
-        window.setTimeout(() => {
-          driveIntroReadyRef.current = true;
-          setAudioControlOpen(true);
-          showDriveIntroCue("go!!", "count", 6);
-        }, 15000),
-        window.setTimeout(() => {
-          setDriveIntroCue(null);
-        }, 17800),
+      driveIntroSchedule.push(
+        { delay: 0,     fn: () => showDriveIntroCue("driving unlocks in 15", "lock", 0) },
+        { delay: 1000,  fn: () => showDriveIntroCue("driving unlocks in 14", "lock", 0) },
+        { delay: 2000,  fn: () => showDriveIntroCue("driving unlocks in 13", "lock", 0) },
+        { delay: 3000,  fn: () => showDriveIntroCue("driving unlocks in 12", "lock", 0) },
+        { delay: 5000,  fn: () => showDriveIntroCue("drive with W or ↑", "hint", 3) },
+        { delay: 9000,  fn: () => showDriveIntroCue("get ready", "count", 4) },
+        { delay: 12000, fn: () => showDriveIntroCue("set", "count", 5) },
+        { delay: 15000, fn: () => { driveIntroReadyRef.current = true; setAudioControlOpen(true); showDriveIntroCue("go!!", "count", 6); } },
+        { delay: 17800, fn: () => setDriveIntroCue(null) },
       );
+      countdownStart = Date.now();
+      scheduleCountdownFrom(0);
     }
 
     const tryStartAudio = () => {
@@ -968,6 +977,34 @@ export default function SandPage() {
 
     animate();
 
+    const onVisibility = () => {
+      const audio = audioRef.current;
+      if (document.hidden) {
+        cancelAnimationFrame(animId);
+        if (!driveIntroReadyRef.current) {
+          countdownHiddenAt = Date.now();
+          driveIntroTimers.forEach(t => window.clearTimeout(t));
+          driveIntroTimers.length = 0;
+        }
+        if (audio && !audio.paused) {
+          audio.pause();
+          setAudioPlaying(false);
+          audioWasPlaying = true;
+        }
+      } else {
+        animId = requestAnimationFrame(animate);
+        if (!driveIntroReadyRef.current && driveIntroSchedule.length > 0) {
+          countdownStart += Date.now() - countdownHiddenAt;
+          scheduleCountdownFrom(Date.now() - countdownStart);
+        }
+        if (audioWasPlaying && audio) {
+          audio.play().then(() => setAudioPlaying(true)).catch(() => {});
+          audioWasPlaying = false;
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
     const onResize = () => {
       W = window.innerWidth;
       H = window.innerHeight;
@@ -979,6 +1016,7 @@ export default function SandPage() {
     window.addEventListener("resize", onResize);
 
     return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);

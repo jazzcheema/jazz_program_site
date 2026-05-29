@@ -223,8 +223,18 @@ function ParticleButton({
     ro.observe(canvas);
     animate();
 
+    const onVisibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(raf);
+      } else {
+        raf = requestAnimationFrame(animate);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
       cancelAnimationFrame(raf);
+      document.removeEventListener("visibilitychange", onVisibility);
       ro.disconnect();
     };
   }, [label, rgb, isMobile, scatterDir]);
@@ -442,8 +452,18 @@ function DotMatrixProjectSignal({
     window.addEventListener("pointerleave", onPointerLeave);
     animate();
 
+    const onVisibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(raf);
+      } else {
+        raf = requestAnimationFrame(animate);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
       cancelAnimationFrame(raf);
+      document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("resize", buildDots);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerleave", onPointerLeave);
@@ -935,10 +955,19 @@ export default function CloudsPage() {
       rootRef.current?.style.setProperty("--grid-x", (currentX * 24).toFixed(2));
       rootRef.current?.style.setProperty("--grid-y", (currentY * 24).toFixed(2));
     };
+    const onVisibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(frame);
+      } else {
+        frame = requestAnimationFrame(tick);
+      }
+    };
     window.addEventListener("mousemove", onMouseMove, { passive: true });
+    document.addEventListener("visibilitychange", onVisibility);
     frame = requestAnimationFrame(tick);
     return () => {
       window.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("visibilitychange", onVisibility);
       cancelAnimationFrame(frame);
     };
   }, []);
@@ -1463,8 +1492,18 @@ export default function CloudsPage() {
 
     animate();
 
+    const onVisibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(animId);
+      } else {
+        animId = requestAnimationFrame(animate);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
       cancelAnimationFrame(animId);
+      document.removeEventListener("visibilitychange", onVisibility);
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("pointermove", onPointerMove);
