@@ -7,6 +7,13 @@ const ABOUT =
 
 const EXPERIENCE = [
   {
+    role: 'Creative Developer & Interactive Director',
+    company: 'Episode Companies',
+    type: 'Contract',
+    period: 'Feb – May 2026',
+    detail: 'Built a cinematic 3D real estate flagship-- CRT television interface with knob navigation, film-inspired motion, and synchronized video textures. Architected a purpose-built mobile experience with device-specific models and dedicated camera choreography. Custom shaders, render textures, raycasting, and adaptive GPU optimization.',
+  },
+  {
     role: 'Software Engineer',
     company: 'Krate',
     type: 'Freelance',
@@ -62,7 +69,7 @@ const TECHNICAL_SKILLS = [
   },
   {
     label: 'Tools / Methodologies',
-    skills: ['SQLAlchemy', 'PostgreSQL', 'Amazon S3', 'Google Firebase', 'Xcode', 'Android Studio', 'npm', 'Cron', 'VS Code', 'Jinja', 'Git', 'GitHub', 'Sentry.io', 'PostHog', 'Microservices Architecture', 'Object-Oriented Programming', 'Agile Development', 'Scrum', 'Test-Driven Development', 'DevTools / Debugging'],
+    skills: ['SQLAlchemy', 'PostgreSQL', 'Amazon S3', 'Google Firebase', 'Xcode', 'Android Studio', 'npm', 'Cron', 'VS Code', 'Jinja', 'Git', 'GitHub', 'Sentry.io', 'PostHog', 'Microservices Architecture', 'Object-Oriented Programming', 'Agile Development', 'Scrum', 'Test-Driven Development', 'DevTools / Debugging', 'Adobe Premiere Pro', 'After Effects', 'Figma', 'Photoshop', 'Final Cut Pro', 'Ableton Live', 'Logic Pro'],
   },
 ]
 
