@@ -17,6 +17,7 @@ export default function SceneWrapper() {
   const [showMobileGate, setShowMobileGate] = useState(false);
   const [gateVisible, setGateVisible] = useState(false);
   const [bfgUnlocked, setBfgUnlocked] = useState(false);
+  const [bfgDesktopReady, setBfgDesktopReady] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [audioVolume, setAudioVolume] = useState(0.75);
   const [audioTime, setAudioTime] = useState(0);
@@ -28,6 +29,23 @@ export default function SceneWrapper() {
   const konamiProgress = useRef(0);
   const bfgFlashRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    const updateDesktopReady = () => {
+      const canHover = window.matchMedia("(hover: hover) and (pointer: fine)").matches
+      const desktopReady = window.innerWidth >= 768 && canHover
+      setBfgDesktopReady(desktopReady)
+      if (!desktopReady) {
+        konamiProgress.current = 0
+        setBfgUnlocked(false)
+        setBfgExiting(false)
+        setBfgReturning(false)
+      }
+    }
+    updateDesktopReady()
+    window.addEventListener("resize", updateDesktopReady)
+    return () => window.removeEventListener("resize", updateDesktopReady)
+  }, [])
 
   useEffect(() => {
     const isMobile = window.innerWidth < 768 && "ontouchstart" in window;
@@ -47,6 +65,7 @@ export default function SceneWrapper() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!bfgDesktopReady) return
       if (e.key === KONAMI[konamiProgress.current]) {
         konamiProgress.current++
         if (konamiProgress.current === KONAMI.length) {
@@ -59,7 +78,7 @@ export default function SceneWrapper() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [bfgDesktopReady])
 
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('bfg-active', { detail: bfgUnlocked && !bfgExiting }))
@@ -124,19 +143,33 @@ export default function SceneWrapper() {
     if (!audio) return
     const startVolume = audio.volume
     const startedAt = performance.now()
-    const duration = 2600
-    const fade = window.setInterval(() => {
+    const duration = 2900
+    let frame = 0
+    let pauseTimer: ReturnType<typeof setTimeout> | null = null
+    let completed = false
+
+    const fade = () => {
       const p = Math.min(1, (performance.now() - startedAt) / duration)
-      audio.volume = startVolume * (1 - p)
+      const eased = p * p * (3 - 2 * p)
+      const tail = 1 - eased
+      audio.volume = p >= 1 ? 0 : startVolume * tail * tail * tail
       if (p >= 1) {
-        window.clearInterval(fade)
-        audio.pause()
-        setAudioPlaying(false)
+        completed = true
+        audio.volume = 0
+        pauseTimer = setTimeout(() => {
+          audio.pause()
+          setAudioPlaying(false)
+        }, 160)
+        return
       }
-    }, 40)
+      frame = requestAnimationFrame(fade)
+    }
+
+    frame = requestAnimationFrame(fade)
     return () => {
-      window.clearInterval(fade)
-      if (audioRef.current && !bfgReturning) audioRef.current.volume = audioVolume
+      cancelAnimationFrame(frame)
+      if (pauseTimer) clearTimeout(pauseTimer)
+      if (!completed && audioRef.current) audioRef.current.volume = audioVolume
     }
   }, [bfgReturning, audioVolume])
 
@@ -368,6 +401,14 @@ export default function SceneWrapper() {
     >
       <GridMouseTrail eerie={bfgUnlocked && !bfgExiting} />
 
+      {bfgDesktopReady && !bfgUnlocked && (
+        <button
+          type="button"
+          className="bfg-konami-hint"
+          aria-label="Do you know the Konami code?"
+        />
+      )}
+
       <div className="absolute inset-0">
         <CarpetScene
           onReachClouds={handleReachClouds}
@@ -391,8 +432,8 @@ export default function SceneWrapper() {
             zIndex: 70,
             cursor: "pointer",
             opacity: bfgExiting ? 0 : 1,
-            transform: bfgExiting ? "translate(-50%, 1rem) scale(0.96)" : undefined,
-            transition: "opacity 2400ms ease, transform 2400ms ease",
+            transform: bfgExiting ? "translate(-50%, 0.82rem) scale(0.98)" : undefined,
+            transition: "width 820ms cubic-bezier(0.2, 0.8, 0.2, 1), padding 820ms cubic-bezier(0.2, 0.8, 0.2, 1), border-color 240ms ease, background 240ms ease, box-shadow 520ms ease, opacity 1900ms ease 360ms, transform 1900ms ease 360ms",
             pointerEvents: bfgExiting ? "none" : "auto",
           }}
           onClick={() => setAudioControlOpen(o => !o)}
@@ -447,15 +488,19 @@ export default function SceneWrapper() {
         </div>
       )}
 
-      {bfgUnlocked && !bfgExiting && (
+      {bfgUnlocked && (
         <button
           type="button"
           className="bfg-exit-btn"
           style={{ zIndex: 1200 }}
           onClick={beginBfgExit}
           aria-label="Drain BFG mode"
+          data-label="Drain"
+          data-hover="Exit"
+          data-ready={audioControlOpen && !bfgExiting ? "true" : "false"}
+          data-exiting={bfgExiting ? "true" : "false"}
+          disabled={bfgExiting}
         >
-          DRAIN
         </button>
       )}
 
