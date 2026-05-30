@@ -60,6 +60,10 @@ export default function SceneWrapper() {
   }, [])
 
   useEffect(() => {
+    window.dispatchEvent(new CustomEvent('bfg-active', { detail: bfgUnlocked }))
+  }, [bfgUnlocked])
+
+  useEffect(() => {
     if (!bfgUnlocked) return
     const el = bfgFlashRef.current
     if (!el) return
@@ -314,6 +318,7 @@ export default function SceneWrapper() {
           onReachSandcastle={handleReachSandcastle}
           onReachBooks={handleReachBooks}
           showBfg={bfgUnlocked}
+          audioRef={audioRef}
         />
       </div>
 

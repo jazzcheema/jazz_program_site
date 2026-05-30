@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import React, { useEffect, useRef } from 'react'
+import { initAudioAnalyser, getAudioFreqs } from '../lib/audioAnalyser'
 import * as THREE from 'three'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
@@ -11,6 +12,7 @@ interface CarpetSceneProps {
   onReachSandcastle: () => void
   onReachBooks: () => void
   showBfg?: boolean
+  audioRef?: React.RefObject<HTMLAudioElement | null>
 }
 
 // Desktop target; the live position is clamped to the camera's visible area.
@@ -27,7 +29,7 @@ const MOBILE_CLOUD_FRAC = { x: 0.31, y: 0.44 }
 const MOBILE_SAND_FRAC = { x: 0.36, y: 0.44 }
 const MOBILE_BOOKS_FRAC = { x: 0.32, y: 0.43 }
 
-export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachBooks, showBfg }: CarpetSceneProps) {
+export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachBooks, showBfg, audioRef }: CarpetSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
@@ -46,6 +48,12 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
   const chargeFramesRef = useRef(0)
   const shotsFiredRef = useRef(false)
   const chargePctRef = useRef(0)
+  const frontalTargetRef = useRef(Math.PI / 2)
+  const cloudsCloudRef = useRef<THREE.Points | null>(null)
+  const cloudsCloudGeoRef = useRef<THREE.BufferGeometry | null>(null)
+  const cloudsCloudBaseRef = useRef<Float32Array | null>(null)
+  const cloudsCloudPhasesRef = useRef<Float32Array | null>(null)
+  const cloudsCloudMatRef = useRef<THREE.PointsMaterial | null>(null)
 
   useEffect(() => {
     onReachRef.current = onReachClouds
@@ -204,6 +212,37 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
       clouds.scale.setScalar(responsiveModelSize(1.6, 0.26) / cloudsMaxDim)
       clouds.position.copy(cloudPos)
       scene.add(clouds)
+
+      // Sample mesh vertices for point cloud overlay (in clouds local space)
+      clouds.updateMatrixWorld(true)
+      const inv = new THREE.Matrix4().copy(clouds.matrixWorld).invert()
+      const cVerts: number[] = []
+      clouds.traverse((child) => {
+        const mesh = child as THREE.Mesh
+        if (!mesh.isMesh) return
+        const posAttr = mesh.geometry.attributes.position
+        if (!posAttr) return
+        mesh.updateWorldMatrix(true, false)
+        const toLocal = new THREE.Matrix4().multiplyMatrices(inv, mesh.matrixWorld)
+        for (let i = 0; i < posAttr.count; i += 2) {
+          const v = new THREE.Vector3().fromBufferAttribute(posAttr, i).applyMatrix4(toLocal)
+          cVerts.push(v.x, v.y, v.z)
+        }
+      })
+      const cBase = new Float32Array(cVerts)
+      const cPos = new Float32Array(cVerts)
+      const cPhases = new Float32Array(cBase.length / 3).map(() => Math.random() * Math.PI * 2)
+      const cGeo = new THREE.BufferGeometry()
+      cGeo.setAttribute('position', new THREE.BufferAttribute(cPos, 3))
+      const cMat = new THREE.PointsMaterial({ color: 0x44ffaa, size: 0.018, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })
+      const cPoints = new THREE.Points(cGeo, cMat)
+      cPoints.visible = false
+      clouds.add(cPoints)
+      cloudsCloudRef.current = cPoints
+      cloudsCloudGeoRef.current = cGeo
+      cloudsCloudBaseRef.current = cBase
+      cloudsCloudPhasesRef.current = cPhases
+      cloudsCloudMatRef.current = cMat
     })
 
     loader.load('/models/sandcastle.glb', (gltf) => {
@@ -474,6 +513,29 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
         clouds.position.y = cloudPos.y + Math.sin(t * 0.8) * 0.055
         clouds.position.x = cloudPos.x + Math.sin(t * 0.4) * 0.02
         clouds.rotation.y = Math.sin(t * 0.3) * 0.04
+
+        // BFG mode: swap mesh for point cloud, react to audio
+        const bfgOn = !!showBfgRef.current
+        const cCloud = cloudsCloudRef.current
+        const cGeo = cloudsCloudGeoRef.current
+        const cBase = cloudsCloudBaseRef.current
+        const cPhases = cloudsCloudPhasesRef.current
+        const cMat = cloudsCloudMatRef.current
+        clouds.traverse((child) => { if ((child as THREE.Mesh).isMesh) child.visible = !bfgOn })
+        if (cCloud) cCloud.visible = bfgOn
+        if (bfgOn && cGeo && cBase && cPhases && cMat) {
+          const { bass, mid } = getAudioFreqs()
+          const cpos = cGeo.attributes.position as THREE.BufferAttribute
+          const scatter = bass * 0.14
+          for (let i = 0; i < cpos.count; i++) {
+            const bx = cBase[i * 3], by = cBase[i * 3 + 1], bz = cBase[i * 3 + 2]
+            const len = Math.sqrt(bx * bx + by * by + bz * bz) || 1
+            const s = scatter * (0.5 + 0.5 * Math.sin(t * 80 + cPhases[i]))
+            cpos.setXYZ(i, bx + bx / len * s, by + by / len * s, bz + bz / len * s)
+          }
+          cpos.needsUpdate = true
+          cMat.opacity = Math.min(0.8, 0.3 + bass * 0.7 + mid * 0.4)
+        }
       }
 
       if (sandcastle) {
@@ -545,6 +607,13 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     let animId: number
     let t = 0
     let rotY = 0
+    let envPoints: THREE.Points | null = null
+    let envGeo: THREE.BufferGeometry | null = null
+    let envMat: THREE.PointsMaterial | null = null
+    let bfgCloudGeo: THREE.BufferGeometry | null = null
+    let bfgCloudMat: THREE.PointsMaterial | null = null
+    let bfgCloudBase: Float32Array | null = null
+    let bfgCloudPhases: Float32Array | null = null
 
     loader.load('/models/bfg.glb', (gltf) => {
       bfg = gltf.scene
@@ -595,6 +664,53 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
 
       scene.add(bfg)
 
+      // --- Audio analysis via singleton ---
+      if (audioRef?.current) initAudioAnalyser(audioRef.current)
+
+      // --- BFG point cloud (charge-up only) ---
+      bfg.updateMatrixWorld(true)
+      const bfgWorldInv = new THREE.Matrix4().copy(bfg.matrixWorld).invert()
+      const bfgVerts: number[] = []
+      bfg.traverse((child) => {
+        const mesh = child as THREE.Mesh
+        if (!mesh.isMesh) return
+        const posAttr = mesh.geometry.attributes.position
+        if (!posAttr) return
+        mesh.updateWorldMatrix(true, false)
+        const toLocal = new THREE.Matrix4().multiplyMatrices(bfgWorldInv, mesh.matrixWorld)
+        for (let i = 0; i < posAttr.count; i += 2) {
+          const v = new THREE.Vector3().fromBufferAttribute(posAttr, i).applyMatrix4(toLocal)
+          bfgVerts.push(v.x, v.y, v.z)
+        }
+      })
+      bfgCloudBase = new Float32Array(bfgVerts)
+      bfgCloudPhases = new Float32Array(bfgCloudBase.length / 3).map(() => Math.random() * Math.PI * 2)
+      bfgCloudGeo = new THREE.BufferGeometry()
+      bfgCloudGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(bfgVerts), 3))
+      bfgCloudMat = new THREE.PointsMaterial({ color: 0x44ff88, size: 0.007, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })
+      bfg.add(new THREE.Points(bfgCloudGeo, bfgCloudMat))
+
+      // --- Environmental particles (sphere field, react to mids) ---
+      const ENV_N = 2200
+      const envBase = new Float32Array(ENV_N * 3)
+      const envPos = new Float32Array(ENV_N * 3)
+      const envPhases = new Float32Array(ENV_N)
+      for (let i = 0; i < ENV_N; i++) {
+        const theta = Math.random() * Math.PI * 2
+        const phi = Math.acos(2 * Math.random() - 1)
+        const r = 1.8 + Math.random() * 2.8
+        envBase[i * 3]     = r * Math.sin(phi) * Math.cos(theta)
+        envBase[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta)
+        envBase[i * 3 + 2] = r * Math.cos(phi)
+        envPos[i * 3] = envBase[i * 3]; envPos[i * 3 + 1] = envBase[i * 3 + 1]; envPos[i * 3 + 2] = envBase[i * 3 + 2]
+        envPhases[i] = Math.random() * Math.PI * 2
+      }
+      envGeo = new THREE.BufferGeometry()
+      envGeo.setAttribute('position', new THREE.BufferAttribute(envPos, 3))
+      envMat = new THREE.PointsMaterial({ color: 0x1aff66, size: 0.013, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })
+      envPoints = new THREE.Points(envGeo, envMat)
+      scene.add(envPoints)
+
       const REVEAL_START = 0.88  // darkness threshold before BFG begins to show
       const REVEAL_RANGE = 1 - REVEAL_START
 
@@ -603,7 +719,14 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
         t += 0.006
         if (!bfg) return
 
-        if (bfgGrabbedRef.current || enterHeldRef.current || shotsFiredRef.current) {
+        if (enterHeldRef.current) {
+          // Pick a frontal target once per charge session (±5° of dead-front)
+          if (chargeFramesRef.current === 1) {
+            frontalTargetRef.current = Math.PI / 2 + (Math.random() - 0.5) * (36 * Math.PI / 180)
+          }
+          bfgManualRotYRef.current += (frontalTargetRef.current - bfgManualRotYRef.current) * 0.04
+          rotY += (bfgManualRotYRef.current - rotY) * 0.1
+        } else if (bfgGrabbedRef.current || shotsFiredRef.current) {
           rotY += (bfgManualRotYRef.current - rotY) * 0.1
         } else {
           rotY += 0.008
@@ -619,6 +742,40 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
         bfg.position.x = Math.sin(t * (12 + cp * 28)) * turbAmp + Math.sin(t * (7 + cp * 19) * 1.7) * turbAmp * 0.5
         bfg.position.y = 0.1 + Math.sin(t * 1.2) * 0.08 + Math.cos(t * (9 + cp * 22)) * turbAmp * 0.7
         bfg.position.z = Math.sin(t * (8 + cp * 24) * 1.3) * turbAmp * 0.4
+
+        // --- Audio frequency data ---
+        const cloudDp = darknessProgressRef.current
+        const { bass, mid } = getAudioFreqs()
+
+        // BFG point cloud — fades in with charge, disappears on fire
+        if (bfgCloudGeo && bfgCloudMat && bfgCloudBase && bfgCloudPhases) {
+          const cp2 = chargePctRef.current
+          const scatter = cp2 * (0.04 + bass * 0.12)
+          const cpos = bfgCloudGeo.attributes.position as THREE.BufferAttribute
+          for (let i = 0; i < cpos.count; i++) {
+            const bx = bfgCloudBase[i * 3], by = bfgCloudBase[i * 3 + 1], bz = bfgCloudBase[i * 3 + 2]
+            const len = Math.sqrt(bx * bx + by * by + bz * bz) || 1
+            const s = scatter * (0.5 + 0.5 * Math.sin(t * 6 + bfgCloudPhases[i]))
+            cpos.setXYZ(i, bx + bx / len * s, by + by / len * s, bz + bz / len * s)
+          }
+          cpos.needsUpdate = true
+          bfgCloudMat.opacity = cp2 * 0.65
+        }
+
+        if (envGeo && envMat) {
+          const ep = envGeo.attributes.position as THREE.BufferAttribute
+          const sway = mid * 0.25 + bass * 0.12
+          for (let i = 0; i < ENV_N; i++) {
+            const ph = envPhases[i]
+            ep.setXYZ(i,
+              envBase[i * 3]     + Math.sin(t * 1.4 + ph) * sway,
+              envBase[i * 3 + 1] + Math.sin(t * 1.1 + ph * 1.3) * sway,
+              envBase[i * 3 + 2] + Math.sin(t * 1.7 + ph * 0.7) * sway,
+            )
+          }
+          ep.needsUpdate = true
+          envMat.opacity = Math.min(0.55, cloudDp * (mid * 0.9 + bass * 0.4))
+        }
 
         // Charge accumulation
         const CHARGE_FRAMES = 180
@@ -706,6 +863,8 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
           }
         }
 
+
+
         const dp = darknessProgressRef.current
         const targetOpacity = dp < REVEAL_START
           ? 0
@@ -733,6 +892,11 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     return () => {
       cancelAnimationFrame(animId)
       if (bfg) scene.remove(bfg)
+      if (envPoints) scene.remove(envPoints)
+      envGeo?.dispose()
+      envMat?.dispose()
+      bfgCloudGeo?.dispose()
+      bfgCloudMat?.dispose()
       for (const s of activeShots) {
         scene.remove(s.points)
         s.geo.dispose()

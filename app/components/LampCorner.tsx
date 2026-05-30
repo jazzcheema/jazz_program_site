@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { getAudioFreqs } from '../lib/audioAnalyser'
 
 const SIZE = 92
 const CSS_SIZE = 'clamp(64px, 17vw, 92px)'
@@ -11,6 +12,7 @@ const CSS_SIZE = 'clamp(64px, 17vw, 92px)'
 export default function LampCorner() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [hiddenForCV, setHiddenForCV] = useState(false)
+  const bfgActiveRef = useRef(false)
   const pathname = usePathname()
   const router = useRouter()
 
@@ -18,6 +20,12 @@ export default function LampCorner() {
     const handler = (e: Event) => setHiddenForCV((e as CustomEvent<boolean>).detail)
     window.addEventListener('cv-page-active', handler)
     return () => window.removeEventListener('cv-page-active', handler)
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: Event) => { bfgActiveRef.current = (e as CustomEvent<boolean>).detail }
+    window.addEventListener('bfg-active', handler)
+    return () => window.removeEventListener('bfg-active', handler)
   }, [])
 
   useEffect(() => {
@@ -46,6 +54,11 @@ export default function LampCorner() {
     scene.add(rim)
 
     let lamp: THREE.Group | null = null
+    let lampCloudGeo: THREE.BufferGeometry | null = null
+    let lampCloudMat: THREE.PointsMaterial | null = null
+    let lampCloudBase: Float32Array | null = null
+    let lampCloudPhases: Float32Array | null = null
+    let lampCloud: THREE.Points | null = null
 
     new GLTFLoader().load('/models/lamp2.glb', (gltf) => {
       lamp = gltf.scene
@@ -55,6 +68,31 @@ export default function LampCorner() {
       lamp.scale.setScalar(2.45 / Math.max(size.x, size.y, size.z))
       lamp.rotation.y = Math.PI / 4
       scene.add(lamp)
+
+      // Sample vertices for point cloud overlay
+      lamp.updateMatrixWorld(true)
+      const inv = new THREE.Matrix4().copy(lamp.matrixWorld).invert()
+      const verts: number[] = []
+      lamp.traverse((child) => {
+        const mesh = child as THREE.Mesh
+        if (!mesh.isMesh) return
+        const posAttr = mesh.geometry.attributes.position
+        if (!posAttr) return
+        mesh.updateWorldMatrix(true, false)
+        const toLocal = new THREE.Matrix4().multiplyMatrices(inv, mesh.matrixWorld)
+        for (let i = 0; i < posAttr.count; i += 2) {
+          const v = new THREE.Vector3().fromBufferAttribute(posAttr, i).applyMatrix4(toLocal)
+          verts.push(v.x, v.y, v.z)
+        }
+      })
+      lampCloudBase = new Float32Array(verts)
+      lampCloudPhases = new Float32Array(lampCloudBase.length / 3).map(() => Math.random() * Math.PI * 2)
+      lampCloudGeo = new THREE.BufferGeometry()
+      lampCloudGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3))
+      lampCloudMat = new THREE.PointsMaterial({ color: 0x44ffaa, size: 0.05, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })
+      lampCloud = new THREE.Points(lampCloudGeo, lampCloudMat)
+      lampCloud.visible = false
+      lamp.add(lampCloud)
     })
 
     let tick = 0
@@ -79,6 +117,24 @@ export default function LampCorner() {
         lamp.position.y = Math.sin(t * 0.35) * 0.09 + randY
         lamp.rotation.y = Math.PI / 4 + Math.sin(t * 0.18) * 0.1
         lamp.rotation.z = Math.sin(t * 0.13) * 0.025
+
+        // BFG mode: swap mesh for point cloud, react to audio
+        const bfgOn = bfgActiveRef.current
+        lamp.traverse((child) => { if ((child as THREE.Mesh).isMesh) child.visible = !bfgOn })
+        if (lampCloud) lampCloud.visible = bfgOn
+        if (bfgOn && lampCloudGeo && lampCloudBase && lampCloudPhases && lampCloudMat) {
+          const { bass, mid } = getAudioFreqs()
+          const cpos = lampCloudGeo.attributes.position as THREE.BufferAttribute
+          const scatter = bass * 0.12
+          for (let i = 0; i < cpos.count; i++) {
+            const bx = lampCloudBase[i * 3], by = lampCloudBase[i * 3 + 1], bz = lampCloudBase[i * 3 + 2]
+            const len = Math.sqrt(bx * bx + by * by + bz * bz) || 1
+            const s = scatter * (0.5 + 0.5 * Math.sin(t * 80 + lampCloudPhases[i]))
+            cpos.setXYZ(i, bx + bx / len * s, by + by / len * s, bz + bz / len * s)
+          }
+          cpos.needsUpdate = true
+          lampCloudMat.opacity = Math.min(0.85, 0.3 + bass * 0.7 + mid * 0.4)
+        }
       }
 
       renderer.render(scene, camera)
