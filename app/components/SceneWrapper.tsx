@@ -7,7 +7,7 @@ import SandPage from "./SandPage";
 import CVPage from "./CVPage";
 import GridMouseTrail from "./GridMouseTrail"
 
-const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','a','b','Enter']
+const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a','Enter']
 
 export default function SceneWrapper() {
   const [reached, setReached] = useState(false);
