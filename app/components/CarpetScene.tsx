@@ -28,6 +28,12 @@ const BOOKS_FRAC  = { x: 0.40, y: 0.40 }
 const MOBILE_CLOUD_FRAC = { x: 0.31, y: 0.44 }
 const MOBILE_SAND_FRAC = { x: 0.36, y: 0.44 }
 const MOBILE_BOOKS_FRAC = { x: 0.32, y: 0.43 }
+const TWO_PI = Math.PI * 2
+
+const nearestEquivalentAngle = (from: number, target: number) => {
+  const delta = THREE.MathUtils.euclideanModulo(target - from + Math.PI, TWO_PI) - Math.PI
+  return from + delta
+}
 
 export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachBooks, showBfg, audioRef }: CarpetSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -524,17 +530,18 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
         clouds.traverse((child) => { if ((child as THREE.Mesh).isMesh) child.visible = !bfgOn })
         if (cCloud) cCloud.visible = bfgOn
         if (bfgOn && cGeo && cBase && cPhases && cMat) {
-          const { bass, mid } = getAudioFreqs()
+          const { bass, mid, snare } = getAudioFreqs()
           const cpos = cGeo.attributes.position as THREE.BufferAttribute
-          const scatter = bass * 0.14
+          const scatter = Math.min(0.16, bass * 0.1 + snare * 0.12)
           for (let i = 0; i < cpos.count; i++) {
             const bx = cBase[i * 3], by = cBase[i * 3 + 1], bz = cBase[i * 3 + 2]
             const len = Math.sqrt(bx * bx + by * by + bz * bz) || 1
-            const s = scatter * (0.5 + 0.5 * Math.sin(t * 80 + cPhases[i]))
+            const hitShape = snare > 0.01 ? 0.65 + 0.35 * Math.sin(cPhases[i] * 1.7) : 0.5 + 0.5 * Math.sin(t * 80 + cPhases[i])
+            const s = scatter * hitShape
             cpos.setXYZ(i, bx + bx / len * s, by + by / len * s, bz + bz / len * s)
           }
           cpos.needsUpdate = true
-          cMat.opacity = Math.min(0.8, 0.3 + bass * 0.7 + mid * 0.4)
+          cMat.opacity = Math.min(0.8, 0.3 + bass * 0.55 + mid * 0.3 + snare * 0.35)
         }
       }
 
@@ -565,10 +572,14 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     document.addEventListener('visibilitychange', onVisibility)
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && showBfgRef.current && !shotsFiredRef.current) enterHeldRef.current = true
+      if (e.key === 'Enter' && showBfgRef.current && !shotsFiredRef.current) {
+        e.preventDefault()
+        enterHeldRef.current = true
+      }
     }
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
+        if (showBfgRef.current) e.preventDefault()
         enterHeldRef.current = false
         if (!shotsFiredRef.current) { chargeFramesRef.current = 0; chargePctRef.current = 0 }
       }
@@ -600,13 +611,24 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     const loader = new GLTFLoader()
     loader.setDRACOLoader(dracoLoader)
 
-    type ShotBlob = { geo: THREE.BufferGeometry; basePos: Float32Array; drifts: Float32Array; points: THREE.Points; vel: THREE.Vector3; age: number }
+    type ShotBlob = {
+      geo: THREE.BufferGeometry
+      spikeGeo: THREE.BufferGeometry
+      basePos: Float32Array
+      drifts: Float32Array
+      phases: Float32Array
+      points: THREE.Points
+      spikeLines: THREE.LineSegments
+      vel: THREE.Vector3
+      age: number
+    }
     const activeShots: ShotBlob[] = []
 
     let bfg: THREE.Group | null = null
     let animId: number
     let t = 0
     let rotY = 0
+    let grabbedCloudLevel = 0
     let envPoints: THREE.Points | null = null
     let envGeo: THREE.BufferGeometry | null = null
     let envMat: THREE.PointsMaterial | null = null
@@ -721,8 +743,10 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
 
         if (enterHeldRef.current) {
           // Pick a frontal target once per charge session (±5° of dead-front)
-          if (chargeFramesRef.current === 1) {
-            frontalTargetRef.current = Math.PI / 2 + (Math.random() - 0.5) * (36 * Math.PI / 180)
+          if (chargeFramesRef.current === 0) {
+            const frontalTarget = Math.PI / 2 + (Math.random() - 0.5) * (36 * Math.PI / 180)
+            frontalTargetRef.current = nearestEquivalentAngle(rotY, frontalTarget)
+            bfgManualRotYRef.current = rotY
           }
           bfgManualRotYRef.current += (frontalTargetRef.current - bfgManualRotYRef.current) * 0.04
           rotY += (bfgManualRotYRef.current - rotY) * 0.1
@@ -745,36 +769,55 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
 
         // --- Audio frequency data ---
         const cloudDp = darknessProgressRef.current
-        const { bass, mid } = getAudioFreqs()
+        const { bass, mid, treble, highSpike, snare } = getAudioFreqs()
 
         // BFG point cloud — fades in with charge, disappears on fire
         if (bfgCloudGeo && bfgCloudMat && bfgCloudBase && bfgCloudPhases) {
           const cp2 = chargePctRef.current
-          const scatter = cp2 * (0.04 + bass * 0.12)
+          const grabbedCloudTarget = bfgGrabbedRef.current && !shotsFiredRef.current ? 1 : 0
+          const grabbedCloudEase = grabbedCloudTarget > grabbedCloudLevel ? 0.12 : 0.055
+          grabbedCloudLevel += (grabbedCloudTarget - grabbedCloudLevel) * grabbedCloudEase
+          if (grabbedCloudLevel < 0.001) grabbedCloudLevel = 0
+          const grabbedCloud = grabbedCloudLevel
+          const chargeBloom = cp2 * cp2
+          const grabbedTreble = grabbedCloud * Math.min(1, treble * 2.4)
+          const scatter = cp2 * 0.035 + chargeBloom * 0.085 + grabbedCloud * (0.018 + grabbedTreble * 0.065)
           const cpos = bfgCloudGeo.attributes.position as THREE.BufferAttribute
           for (let i = 0; i < cpos.count; i++) {
             const bx = bfgCloudBase[i * 3], by = bfgCloudBase[i * 3 + 1], bz = bfgCloudBase[i * 3 + 2]
             const len = Math.sqrt(bx * bx + by * by + bz * bz) || 1
-            const s = scatter * (0.5 + 0.5 * Math.sin(t * 6 + bfgCloudPhases[i]))
+            const chargeShape = 0.42 + 0.58 * Math.sin(t * 6 + bfgCloudPhases[i])
+            const highShape = 0.35 + 0.65 * Math.sin(t * 34 + bfgCloudPhases[i] * 2.1)
+            const shape = grabbedCloud > 0 && cp2 <= 0 ? highShape : chargeShape
+            const s = scatter * shape
             cpos.setXYZ(i, bx + bx / len * s, by + by / len * s, bz + bz / len * s)
           }
           cpos.needsUpdate = true
-          bfgCloudMat.opacity = cp2 * 0.65
+          bfgCloudMat.size = 0.007 + chargeBloom * 0.002 + grabbedTreble * 0.0025
+          bfgCloudMat.opacity = Math.min(0.82, cp2 * 0.8 + grabbedCloud * (0.2 + grabbedTreble * 0.42))
         }
 
         if (envGeo && envMat) {
           const ep = envGeo.attributes.position as THREE.BufferAttribute
-          const sway = mid * 0.25 + bass * 0.12
+          const motionCap = 0.37
+          const sway = Math.min(0.28, mid * 0.21 + bass * 0.08)
+          const spike = Math.min(motionCap - sway, snare * 0.28)
           for (let i = 0; i < ENV_N; i++) {
             const ph = envPhases[i]
+            const bx = envBase[i * 3]
+            const by = envBase[i * 3 + 1]
+            const bz = envBase[i * 3 + 2]
+            const len = Math.sqrt(bx * bx + by * by + bz * bz) || 1
+            const hit = spike * (0.45 + 0.55 * Math.abs(Math.sin(ph * 1.9)))
             ep.setXYZ(i,
-              envBase[i * 3]     + Math.sin(t * 1.4 + ph) * sway,
-              envBase[i * 3 + 1] + Math.sin(t * 1.1 + ph * 1.3) * sway,
-              envBase[i * 3 + 2] + Math.sin(t * 1.7 + ph * 0.7) * sway,
+              bx + bx / len * hit + Math.sin(t * 1.4 + ph) * sway,
+              by + by / len * hit + Math.sin(t * 1.1 + ph * 1.3) * sway,
+              bz + bz / len * hit + Math.sin(t * 1.7 + ph * 0.7) * sway,
             )
           }
           ep.needsUpdate = true
-          envMat.opacity = Math.min(0.55, cloudDp * (mid * 0.9 + bass * 0.4))
+          envMat.size = Math.min(0.017, 0.013 + snare * 0.006)
+          envMat.opacity = Math.min(0.55, cloudDp * (mid * 0.72 + bass * 0.25 + snare * 0.45))
         }
 
         // Charge accumulation
@@ -793,8 +836,10 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
             const worldTip = new THREE.Vector3(lx, ly, lz).applyMatrix4(bfg.matrixWorld)
             const N = 1800
             const positions = new Float32Array(N * 3)
+            const spikePositions = new Float32Array(N * 6)
             const colors = new Float32Array(N * 3)
             const drifts = new Float32Array(N * 3)
+            const phases = new Float32Array(N)
             for (let i = 0; i < N; i++) {
               const onShell = Math.random() > 0.18
               const theta = Math.random() * Math.PI * 2
@@ -808,6 +853,7 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
               drifts[i * 3]     = (Math.random() - 0.5) * 0.0009
               drifts[i * 3 + 1] = (Math.random() - 0.5) * 0.0009
               drifts[i * 3 + 2] = (Math.random() - 0.5) * 0.0009
+              phases[i] = Math.random() * Math.PI * 2
             }
             const geo = new THREE.BufferGeometry()
             geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
@@ -816,7 +862,13 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
             const points = new THREE.Points(geo, mat)
             points.position.copy(worldTip)
             scene.add(points)
-            activeShots.push({ geo, basePos: new Float32Array(positions), drifts, points, vel: barrelDir.clone(), age: 0 })
+            const spikeGeo = new THREE.BufferGeometry()
+            spikeGeo.setAttribute('position', new THREE.BufferAttribute(spikePositions, 3))
+            const spikeMat = new THREE.LineBasicMaterial({ color: 0xb7ff2a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })
+            const spikeLines = new THREE.LineSegments(spikeGeo, spikeMat)
+            spikeLines.position.copy(worldTip)
+            scene.add(spikeLines)
+            activeShots.push({ geo, spikeGeo, basePos: new Float32Array(positions), drifts, phases, points, spikeLines, vel: barrelDir.clone(), age: 0 })
           }
           // Fixed cooldown — resets spin and allows next charge after 2.8s
           setTimeout(() => {
@@ -834,18 +886,39 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
 
         // Update point-cloud shots — particles drift outward slowly
         const SHOT_LIFETIME = 900
+        const shotBass = Math.min(0.065, bass * 0.13)
+        const shotHighSpike = Math.min(0.13, highSpike * 0.17)
         for (let i = activeShots.length - 1; i >= 0; i--) {
           const s = activeShots[i]
           s.age++
           s.points.position.add(s.vel)
+          s.spikeLines.position.add(s.vel)
           const pos = s.geo.attributes.position as THREE.BufferAttribute
+          const spikePos = s.spikeGeo.attributes.position as THREE.BufferAttribute
+          const bassRamp = Math.min(1, s.age / 18)
+          const highRamp = Math.min(1, s.age / 6)
+          const shotAudio = shotBass * bassRamp + shotHighSpike * highRamp
           for (let j = 0; j < pos.count; j++) {
             s.basePos[j * 3]     += s.drifts[j * 3]
             s.basePos[j * 3 + 1] += s.drifts[j * 3 + 1]
             s.basePos[j * 3 + 2] += s.drifts[j * 3 + 2]
-            pos.setXYZ(j, s.basePos[j * 3], s.basePos[j * 3 + 1], s.basePos[j * 3 + 2])
+            const bx = s.basePos[j * 3]
+            const by = s.basePos[j * 3 + 1]
+            const bz = s.basePos[j * 3 + 2]
+            const len = Math.sqrt(bx * bx + by * by + bz * bz) || 1
+            const bassPulse = shotBass * (0.45 + 0.55 * Math.sin(t * 14 + s.phases[j]) ** 2)
+            const highPulse = shotHighSpike * (0.18 + 0.82 * Math.sin(t * 74 + s.phases[j] * 2.7) ** 2)
+            const pulse = bassPulse * bassRamp + highPulse * highRamp
+            pos.setXYZ(j, bx + bx / len * pulse, by + by / len * pulse, bz + bz / len * pulse)
+            const spikeBase = pulse + highPulse * highRamp * 0.16
+            const spikeTip = pulse + highPulse * highRamp * (0.72 + 0.38 * Math.sin(t * 31 + s.phases[j]) ** 2)
+            spikePos.setXYZ(j * 2, bx + bx / len * spikeBase, by + by / len * spikeBase, bz + bz / len * spikeBase)
+            spikePos.setXYZ(j * 2 + 1, bx + bx / len * spikeTip, by + by / len * spikeTip, bz + bz / len * spikeTip)
           }
           pos.needsUpdate = true
+          spikePos.needsUpdate = true
+          ;(s.points.material as THREE.PointsMaterial).size = Math.min(0.021, 0.014 + shotAudio * 0.055 + shotHighSpike * 0.11)
+          ;(s.spikeLines.material as THREE.LineBasicMaterial).opacity = Math.min(0.38, shotHighSpike * 3.2)
           // Fade only when leaving the viewport
           const shotCam = cameraRef.current
           if (shotCam) {
@@ -853,12 +926,17 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
             const edgeX = Math.max(0, Math.abs(ndc.x) - 1)
             const edgeY = Math.max(0, Math.abs(ndc.y) - 1)
             const outside = Math.max(edgeX, edgeY)
-            ;(s.points.material as THREE.PointsMaterial).opacity = Math.max(0, 0.92 * (1 - Math.min(1, outside * 5)))
+            const viewportFade = Math.max(0, 1 - Math.min(1, outside * 5))
+            ;(s.points.material as THREE.PointsMaterial).opacity = 0.92 * viewportFade
+            ;(s.spikeLines.material as THREE.LineBasicMaterial).opacity = Math.min(0.38, shotHighSpike * 3.2) * viewportFade
           }
           if (s.age > SHOT_LIFETIME) {
             scene.remove(s.points)
+            scene.remove(s.spikeLines)
             s.geo.dispose()
+            s.spikeGeo.dispose()
             ;(s.points.material as THREE.PointsMaterial).dispose()
+            ;(s.spikeLines.material as THREE.LineBasicMaterial).dispose()
             activeShots.splice(i, 1)
           }
         }
@@ -899,8 +977,11 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
       bfgCloudMat?.dispose()
       for (const s of activeShots) {
         scene.remove(s.points)
+        scene.remove(s.spikeLines)
         s.geo.dispose()
+        s.spikeGeo.dispose()
         ;(s.points.material as THREE.PointsMaterial).dispose()
+        ;(s.spikeLines.material as THREE.LineBasicMaterial).dispose()
       }
       dracoLoader.dispose()
     }

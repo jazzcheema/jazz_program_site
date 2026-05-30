@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import CarpetScene from "./CarpetScene";
 import CloudsPage from "./CloudsPage";
 import SandPage from "./SandPage";
@@ -124,6 +124,10 @@ export default function SceneWrapper() {
       audio.pause()
       setAudioPlaying(false)
     }
+  }
+
+  const preventAudioEnter = (e: ReactKeyboardEvent<HTMLElement>) => {
+    if (e.key === "Enter") e.preventDefault()
   }
 
   const seekAudio = (value: number) => {
@@ -330,6 +334,8 @@ export default function SceneWrapper() {
           data-ready="true"
           style={{ zIndex: 70, cursor: "pointer" }}
           onClick={() => setAudioControlOpen(o => !o)}
+          onKeyDown={preventAudioEnter}
+          onKeyUp={preventAudioEnter}
         >
           <audio
             ref={audioRef}
