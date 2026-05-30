@@ -979,7 +979,7 @@ export default function CloudsPage() {
     const isMobile = "ontouchstart" in window;
     const renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: !isMobile,
+      antialias: false,
       alpha: true,
     });
     renderer.setPixelRatio(

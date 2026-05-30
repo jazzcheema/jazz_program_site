@@ -33,7 +33,7 @@ export default function LampCorner() {
     if (!canvas) return
 
     const isMobile = 'ontouchstart' in window
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isMobile, alpha: true })
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2))
     renderer.setSize(SIZE, SIZE)
     renderer.outputColorSpace = THREE.SRGBColorSpace

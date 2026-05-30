@@ -109,8 +109,7 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     if (!canvas) return
 
     const isPortrait = () => window.innerWidth / window.innerHeight < 1.0
-    const isMobile = ('ontouchstart' in window)
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isMobile, alpha: true })
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true })
 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, isPortrait() ? 1.25 : 2))
     renderer.setSize(window.innerWidth, window.innerHeight)

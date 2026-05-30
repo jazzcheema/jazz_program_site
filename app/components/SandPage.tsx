@@ -162,7 +162,7 @@ export default function SandPage() {
     let W = window.innerWidth;
     let H = window.innerHeight;
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isMobile, alpha: true });
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
     renderer.setSize(W, H);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
