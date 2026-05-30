@@ -1007,3 +1007,43 @@ a.clouds-particle-btn {
 .sand-audio-control.bfg-audio-control .sand-audio-speaker::after {
   border-color: rgba(100, 190, 115, 0.6);
 }
+
+.bfg-exit-btn {
+  position: fixed;
+  right: clamp(16px, 2.6vw, 34px);
+  bottom: clamp(16px, 2.6vw, 34px);
+  z-index: 1200;
+  height: 38px;
+  min-width: 74px;
+  padding: 0 18px;
+  border: 1px solid rgba(211, 255, 89, 0.72);
+  background: rgba(16, 44, 8, 0.84);
+  color: rgba(232, 255, 137, 1);
+  font-family: var(--font-geist-mono);
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  backdrop-filter: blur(20px) saturate(1.7);
+  -webkit-backdrop-filter: blur(20px) saturate(1.7);
+  box-shadow:
+    inset 0 1px 0 rgba(211, 255, 89, 0.24),
+    0 0 0 1px rgba(183, 255, 42, 0.16),
+    0 0 24px rgba(183, 255, 42, 0.18),
+    0 14px 42px rgba(0, 0, 0, 0.52);
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.bfg-exit-btn:hover,
+.bfg-exit-btn:focus-visible {
+  border-color: rgba(211, 255, 89, 0.62);
+  background: rgba(20, 46, 10, 0.62);
+  color: rgba(230, 255, 136, 1);
+  outline: none;
+  transform: translateY(-1px);
+}

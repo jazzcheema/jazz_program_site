@@ -18,10 +18,12 @@ export default function SceneWrapper() {
   const [gateVisible, setGateVisible] = useState(false);
   const [bfgUnlocked, setBfgUnlocked] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
-  const [audioVolume, setAudioVolume] = useState(0.58);
+  const [audioVolume, setAudioVolume] = useState(0.75);
   const [audioTime, setAudioTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
   const [audioControlOpen, setAudioControlOpen] = useState(false);
+  const [bfgExiting, setBfgExiting] = useState(false);
+  const [bfgReturning, setBfgReturning] = useState(false);
   const homeRoomRef = useRef<HTMLDivElement>(null);
   const konamiProgress = useRef(0);
   const bfgFlashRef = useRef<HTMLDivElement>(null);
@@ -60,8 +62,8 @@ export default function SceneWrapper() {
   }, [])
 
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent('bfg-active', { detail: bfgUnlocked }))
-  }, [bfgUnlocked])
+    window.dispatchEvent(new CustomEvent('bfg-active', { detail: bfgUnlocked && !bfgExiting }))
+  }, [bfgUnlocked, bfgExiting])
 
   useEffect(() => {
     if (!bfgUnlocked) return
@@ -88,6 +90,7 @@ export default function SceneWrapper() {
     const audio = audioRef.current
     if (!audio) return
     audio.src = '/audio/muslimgauze.mp3'
+    audio.volume = audioVolume
     audio.load()
     audio.play().then(() => setAudioPlaying(true)).catch(() => setAudioPlaying(false))
     const t = setTimeout(() => setAudioControlOpen(true), 3200)
@@ -115,6 +118,28 @@ export default function SceneWrapper() {
     audio.volume = audioVolume
   }, [audioVolume])
 
+  useEffect(() => {
+    if (!bfgReturning) return
+    const audio = audioRef.current
+    if (!audio) return
+    const startVolume = audio.volume
+    const startedAt = performance.now()
+    const duration = 2600
+    const fade = window.setInterval(() => {
+      const p = Math.min(1, (performance.now() - startedAt) / duration)
+      audio.volume = startVolume * (1 - p)
+      if (p >= 1) {
+        window.clearInterval(fade)
+        audio.pause()
+        setAudioPlaying(false)
+      }
+    }, 40)
+    return () => {
+      window.clearInterval(fade)
+      if (audioRef.current && !bfgReturning) audioRef.current.volume = audioVolume
+    }
+  }, [bfgReturning, audioVolume])
+
   const toggleAudio = () => {
     const audio = audioRef.current
     if (!audio) return
@@ -128,6 +153,33 @@ export default function SceneWrapper() {
 
   const preventAudioEnter = (e: ReactKeyboardEvent<HTMLElement>) => {
     if (e.key === "Enter") e.preventDefault()
+  }
+
+  const beginBfgExit = () => {
+    if (bfgExiting) return
+    setBfgExiting(true)
+    setBfgReturning(false)
+    setAudioControlOpen(false)
+  }
+
+  const beginBfgReturn = () => {
+    setBfgReturning(true)
+  }
+
+  const finishBfgExit = () => {
+    const audio = audioRef.current
+    if (audio) {
+      audio.pause()
+      audio.removeAttribute("src")
+      audio.volume = audioVolume
+      audio.load()
+    }
+    setAudioPlaying(false)
+    setAudioTime(0)
+    setAudioDuration(0)
+    setBfgUnlocked(false)
+    setBfgExiting(false)
+    setBfgReturning(false)
   }
 
   const seekAudio = (value: number) => {
@@ -310,11 +362,11 @@ export default function SceneWrapper() {
       style={{
         width: "100dvw",
         height: "100dvh",
-        background: bfgUnlocked ? "#080906" : "#e2deda",
-        transition: "background 2.8s ease",
+        background: bfgUnlocked && !bfgReturning ? "#080906" : "#e2deda",
+        transition: "background 4.2s ease",
       }}
     >
-      <GridMouseTrail eerie={bfgUnlocked} />
+      <GridMouseTrail eerie={bfgUnlocked && !bfgExiting} />
 
       <div className="absolute inset-0">
         <CarpetScene
@@ -322,6 +374,9 @@ export default function SceneWrapper() {
           onReachSandcastle={handleReachSandcastle}
           onReachBooks={handleReachBooks}
           showBfg={bfgUnlocked}
+          bfgExiting={bfgExiting}
+          onBfgReturnStart={beginBfgReturn}
+          onBfgExitComplete={finishBfgExit}
           audioRef={audioRef}
         />
       </div>
@@ -332,7 +387,14 @@ export default function SceneWrapper() {
           className="sand-audio-control bfg-audio-control"
           data-expanded={audioControlOpen ? "true" : "false"}
           data-ready="true"
-          style={{ zIndex: 70, cursor: "pointer" }}
+          style={{
+            zIndex: 70,
+            cursor: "pointer",
+            opacity: bfgExiting ? 0 : 1,
+            transform: bfgExiting ? "translate(-50%, 1rem) scale(0.96)" : undefined,
+            transition: "opacity 2400ms ease, transform 2400ms ease",
+            pointerEvents: bfgExiting ? "none" : "auto",
+          }}
           onClick={() => setAudioControlOpen(o => !o)}
           onKeyDown={preventAudioEnter}
           onKeyUp={preventAudioEnter}
@@ -383,6 +445,18 @@ export default function SceneWrapper() {
             />
           </div>
         </div>
+      )}
+
+      {bfgUnlocked && !bfgExiting && (
+        <button
+          type="button"
+          className="bfg-exit-btn"
+          style={{ zIndex: 1200 }}
+          onClick={beginBfgExit}
+          aria-label="Drain BFG mode"
+        >
+          DRAIN
+        </button>
       )}
 
       {/* White flash on reach */}

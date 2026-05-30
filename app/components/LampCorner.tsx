@@ -100,6 +100,7 @@ export default function LampCorner() {
     let randY = 0
     let randYTarget = 0
     let randTimer = 0
+    let bfgLevel = 0
 
     const animate = () => {
       animId = requestAnimationFrame(animate)
@@ -119,10 +120,26 @@ export default function LampCorner() {
         lamp.rotation.z = Math.sin(t * 0.13) * 0.025
 
         // BFG mode: swap mesh for point cloud, react to audio
-        const bfgOn = bfgActiveRef.current
-        lamp.traverse((child) => { if ((child as THREE.Mesh).isMesh) child.visible = !bfgOn })
-        if (lampCloud) lampCloud.visible = bfgOn
-        if (bfgOn && lampCloudGeo && lampCloudBase && lampCloudPhases && lampCloudMat) {
+        const bfgTarget = bfgActiveRef.current ? 1 : 0
+        bfgLevel += (bfgTarget - bfgLevel) * (bfgTarget > bfgLevel ? 0.14 : 0.045)
+        if (bfgLevel < 0.001) bfgLevel = 0
+        lamp.traverse((child) => {
+          const mesh = child as THREE.Mesh
+          if (!mesh.isMesh) return
+          mesh.visible = bfgLevel < 0.98
+          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+          for (const m of mats) {
+            const mat = m as THREE.Material
+            if (!mat) continue
+            if (!mat.transparent) {
+              mat.transparent = true
+              mat.needsUpdate = true
+            }
+            mat.opacity = Math.max(0, Math.min(1, 1 - bfgLevel))
+          }
+        })
+        if (lampCloud) lampCloud.visible = bfgLevel > 0.01
+        if (bfgLevel > 0.01 && lampCloudGeo && lampCloudBase && lampCloudPhases && lampCloudMat) {
           const { bass, mid } = getAudioFreqs()
           const cpos = lampCloudGeo.attributes.position as THREE.BufferAttribute
           const scatter = bass * 0.12
@@ -133,7 +150,7 @@ export default function LampCorner() {
             cpos.setXYZ(i, bx + bx / len * s, by + by / len * s, bz + bz / len * s)
           }
           cpos.needsUpdate = true
-          lampCloudMat.opacity = Math.min(0.85, 0.3 + bass * 0.7 + mid * 0.4)
+          lampCloudMat.opacity = bfgLevel * Math.min(0.85, 0.3 + bass * 0.7 + mid * 0.4)
         }
       }
 

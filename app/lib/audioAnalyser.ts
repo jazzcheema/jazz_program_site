@@ -11,8 +11,11 @@ const HIGH_SPIKE_GAIN = 32
 
 // Singleton audio analyser — shared across components. Only one MediaElementSource per element.
 const store: {
+  ctx: AudioContext | null
+  src: MediaElementAudioSourceNode | null
   node: AnalyserNode | null
   data: Uint8Array | null
+  audioEl: HTMLAudioElement | null
   previousSnareBand: number
   previousTrebleBand: number
   snareEnv: number
@@ -20,8 +23,11 @@ const store: {
   lastAnalysisAt: number
   cached: AudioFreqs
 } = {
+  ctx: null,
+  src: null,
   node: null,
   data: null,
+  audioEl: null,
   previousSnareBand: 0,
   previousTrebleBand: 0,
   snareEnv: 0,
@@ -31,17 +37,33 @@ const store: {
 }
 
 export function initAudioAnalyser(audioEl: HTMLAudioElement): void {
-  if (store.node) return
+  if (store.node && store.audioEl === audioEl) {
+    if (store.ctx?.state === 'suspended') void store.ctx.resume()
+    return
+  }
   try {
+    store.src?.disconnect()
+    store.node?.disconnect()
+    if (store.ctx && store.ctx.state !== 'closed') void store.ctx.close()
+
     const Ctor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!Ctor) return
     const ctx = new Ctor()
     const src = ctx.createMediaElementSource(audioEl)
+    store.ctx = ctx
+    store.src = src
     store.node = ctx.createAnalyser()
     store.node.fftSize = 256
     src.connect(store.node)
     store.node.connect(ctx.destination)
     store.data = new Uint8Array(store.node.frequencyBinCount)
+    store.audioEl = audioEl
+    store.previousSnareBand = 0
+    store.previousTrebleBand = 0
+    store.snareEnv = 0
+    store.highSpikeEnv = 0
+    store.lastAnalysisAt = -Infinity
+    store.cached = { bass: 0, mid: 0, treble: 0, highSpike: 0, snare: 0 }
   } catch (_) {}
 }
 

@@ -12,6 +12,9 @@ interface CarpetSceneProps {
   onReachSandcastle: () => void
   onReachBooks: () => void
   showBfg?: boolean
+  bfgExiting?: boolean
+  onBfgReturnStart?: () => void
+  onBfgExitComplete?: () => void
   audioRef?: React.RefObject<HTMLAudioElement | null>
 }
 
@@ -29,13 +32,36 @@ const MOBILE_CLOUD_FRAC = { x: 0.31, y: 0.44 }
 const MOBILE_SAND_FRAC = { x: 0.36, y: 0.44 }
 const MOBILE_BOOKS_FRAC = { x: 0.32, y: 0.43 }
 const TWO_PI = Math.PI * 2
+const JAZZ_MODEL_SIZE = 3.2
+const JAZZ_MIRROR_X = true
+const JAZZ_POSITION = { x: 0, y: 0, z: 0 }
+const JAZZ_ROTATION_DEG = {
+  x: 105,
+  y: 0,
+  z: 150,
+}
 
 const nearestEquivalentAngle = (from: number, target: number) => {
   const delta = THREE.MathUtils.euclideanModulo(target - from + Math.PI, TWO_PI) - Math.PI
   return from + delta
 }
 
-export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachBooks, showBfg, audioRef }: CarpetSceneProps) {
+const phaseRand = (phase: number, salt: number) => {
+  const n = Math.sin(phase * 12.9898 + salt * 78.233) * 43758.5453
+  return n - Math.floor(n)
+}
+
+const applyJazzTransform = (jazz: THREE.Group, scale: number) => {
+  jazz.scale.set(JAZZ_MIRROR_X ? -scale : scale, scale, scale)
+  jazz.position.set(JAZZ_POSITION.x, JAZZ_POSITION.y, JAZZ_POSITION.z)
+  jazz.rotation.set(
+    THREE.MathUtils.degToRad(JAZZ_ROTATION_DEG.x),
+    THREE.MathUtils.degToRad(JAZZ_ROTATION_DEG.y),
+    THREE.MathUtils.degToRad(JAZZ_ROTATION_DEG.z),
+  )
+}
+
+export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachBooks, showBfg, bfgExiting, onBfgReturnStart, onBfgExitComplete, audioRef }: CarpetSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
@@ -44,7 +70,13 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
   const onReachSandcastleRef = useRef(onReachSandcastle)
   const onReachBooksRef = useRef(onReachBooks)
   const showBfgRef = useRef(showBfg)
+  const bfgExitingRef = useRef(bfgExiting)
+  const onBfgReturnStartRef = useRef(onBfgReturnStart)
+  const onBfgExitCompleteRef = useRef(onBfgExitComplete)
   const darknessProgressRef = useRef(0)
+  const bfgDrainProgressRef = useRef(0)
+  const bfgDropProgressRef = useRef(0)
+  const bfgReturnProgressRef = useRef(0)
   const bfgGrabbedRef = useRef(false)
   const bfgManualRotYRef = useRef(0)
   const bfgDragStartXRef = useRef(0)
@@ -68,6 +100,9 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
   }, [onReachClouds, onReachSandcastle, onReachBooks])
 
   useEffect(() => { showBfgRef.current = showBfg }, [showBfg])
+  useEffect(() => { bfgExitingRef.current = bfgExiting }, [bfgExiting])
+  useEffect(() => { onBfgReturnStartRef.current = onBfgReturnStart }, [onBfgReturnStart])
+  useEffect(() => { onBfgExitCompleteRef.current = onBfgExitComplete }, [onBfgExitComplete])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -191,6 +226,26 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     let sandcastleActivated = false
     let booksActivated = false
 
+    const fadeModelOpacity = (obj: THREE.Object3D | null, target: number, speed: number) => {
+      if (!obj) return
+      obj.traverse((child) => {
+        const mesh = child as THREE.Mesh
+        if (!mesh.isMesh) return
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+        for (const m of mats) {
+          const mat = m as THREE.Material
+          if (!mat) continue
+          if (!mat.transparent) {
+            mat.transparent = true
+            mat.needsUpdate = true
+          }
+          mat.opacity += (target - mat.opacity) * speed
+          if (target >= 1 && mat.opacity > 0.995) mat.opacity = 1
+          if (target <= 0 && mat.opacity < 0.005) mat.opacity = 0
+        }
+      })
+    }
+
     const dracoLoader = new DRACOLoader()
     dracoLoader.setDecoderPath('/draco/gltf/')
 
@@ -285,6 +340,7 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     let targetX = 0, targetY = 0
 
     const onPointerDown = (e: PointerEvent) => {
+      if (bfgExitingRef.current) return
       if (showBfgRef.current && darknessProgressRef.current > 0.88) {
         bfgGrabbedRef.current = true
         bfgDragStartXRef.current = e.clientX
@@ -358,6 +414,7 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     let tick = 0
     let animId: number
     let bfgDarkSettledAtTick = -1
+    let cloudPointLevel = 0
 
     const animate = () => {
       animId = requestAnimationFrame(animate)
@@ -377,7 +434,10 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
       }
 
       // BFG unlock — darken scene, fade objects, bring in eerie lights
-      if (showBfgRef.current) {
+      if (showBfgRef.current && !bfgExitingRef.current) {
+        bfgDrainProgressRef.current = 0
+        bfgDropProgressRef.current = 0
+        bfgReturnProgressRef.current = 0
         darknessProgressRef.current = Math.min(1, darknessProgressRef.current + 0.007)
 
         // Start 3-second countdown once fully dark
@@ -415,23 +475,31 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
           eerieDeep.intensity  += (0 - eerieDeep.intensity) * 0.02
         }
 
-        for (const obj of [carpet, sandcastle, books]) {
-          if (!obj) continue
-          obj.traverse((child) => {
-            const mesh = child as THREE.Mesh
-            if (!mesh.isMesh) return
-            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-            for (const m of mats) {
-              const mat = m as THREE.Material
-              if (!mat || mat.opacity <= 0) continue
-              if (!mat.transparent) {
-                mat.transparent = true
-                mat.needsUpdate = true
-              }
-              mat.opacity = Math.max(0, mat.opacity - 0.008)
-            }
-          })
+        for (const obj of [carpet, sandcastle, books]) fadeModelOpacity(obj, 0, 0.05)
+      } else if (bfgExitingRef.current) {
+        const returnProgress = bfgReturnProgressRef.current
+        darknessProgressRef.current = Math.max(0, darknessProgressRef.current - 0.0045 * returnProgress)
+        bfgDarkSettledAtTick = -1
+
+        if (returnProgress > 0) {
+          const returnEase = 0.006 + returnProgress * 0.022
+          ambient.intensity         += (LIGHT_TARGETS.ambient - ambient.intensity) * returnEase
+          key.intensity             += (LIGHT_TARGETS.key - key.intensity) * returnEase
+          rim.intensity             += (LIGHT_TARGETS.rim - rim.intensity) * returnEase
+          cloudLight.intensity      += (LIGHT_TARGETS.cloud - cloudLight.intensity) * returnEase
+          sandcastleLight.intensity += (LIGHT_TARGETS.sandcastle - sandcastleLight.intensity) * returnEase
+          booksLight.intensity      += (LIGHT_TARGETS.books - booksLight.intensity) * returnEase
+          for (const obj of [carpet, sandcastle, books]) fadeModelOpacity(obj, 1, 0.012 + returnProgress * 0.024)
+        } else {
+          ambient.intensity         += (0.003 - ambient.intensity) * 0.015
+          key.intensity             += (0 - key.intensity) * 0.015
+          rim.intensity             += (0 - rim.intensity) * 0.015
+          cloudLight.intensity      += (0.2 - cloudLight.intensity) * 0.012
+          sandcastleLight.intensity += (0 - sandcastleLight.intensity) * 0.015
+          booksLight.intensity      += (0 - booksLight.intensity) * 0.015
         }
+        eerieGreen.intensity      += (0 - eerieGreen.intensity) * (returnProgress > 0 ? 0.035 : 0.012)
+        eerieDeep.intensity       += (0 - eerieDeep.intensity) * (returnProgress > 0 ? 0.035 : 0.012)
       }
 
       if (carpet && !reached) {
@@ -521,15 +589,32 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
         clouds.rotation.y = Math.sin(t * 0.3) * 0.04
 
         // BFG mode: swap mesh for point cloud, react to audio
-        const bfgOn = !!showBfgRef.current
+        const returnProgress = bfgReturnProgressRef.current
+        const bfgOnTarget = !!showBfgRef.current && (!bfgExitingRef.current || returnProgress < 0.96)
+        const cloudTarget = bfgOnTarget ? Math.max(0, 1 - returnProgress) : 0
+        cloudPointLevel += (cloudTarget - cloudPointLevel) * (cloudTarget > cloudPointLevel ? 0.16 : 0.028)
         const cCloud = cloudsCloudRef.current
         const cGeo = cloudsCloudGeoRef.current
         const cBase = cloudsCloudBaseRef.current
         const cPhases = cloudsCloudPhasesRef.current
         const cMat = cloudsCloudMatRef.current
-        clouds.traverse((child) => { if ((child as THREE.Mesh).isMesh) child.visible = !bfgOn })
-        if (cCloud) cCloud.visible = bfgOn
-        if (bfgOn && cGeo && cBase && cPhases && cMat) {
+        clouds.traverse((child) => {
+          const mesh = child as THREE.Mesh
+          if (!mesh.isMesh) return
+          mesh.visible = cloudPointLevel < 0.98
+          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+          for (const m of mats) {
+            const mat = m as THREE.Material
+            if (!mat) continue
+            if (!mat.transparent) {
+              mat.transparent = true
+              mat.needsUpdate = true
+            }
+            mat.opacity = Math.max(0, Math.min(1, 1 - cloudPointLevel))
+          }
+        })
+        if (cCloud) cCloud.visible = cloudPointLevel > 0.01
+        if (cloudPointLevel > 0.01 && cGeo && cBase && cPhases && cMat) {
           const { bass, mid, snare } = getAudioFreqs()
           const cpos = cGeo.attributes.position as THREE.BufferAttribute
           const scatter = Math.min(0.16, bass * 0.1 + snare * 0.12)
@@ -541,7 +626,7 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
             cpos.setXYZ(i, bx + bx / len * s, by + by / len * s, bz + bz / len * s)
           }
           cpos.needsUpdate = true
-          cMat.opacity = Math.min(0.8, 0.3 + bass * 0.55 + mid * 0.3 + snare * 0.35)
+          cMat.opacity = cloudPointLevel * Math.min(0.8, 0.3 + bass * 0.55 + mid * 0.3 + snare * 0.35)
         }
       }
 
@@ -572,7 +657,7 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     document.addEventListener('visibilitychange', onVisibility)
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && showBfgRef.current && !shotsFiredRef.current) {
+      if (e.key === 'Enter' && showBfgRef.current && !bfgExitingRef.current && !shotsFiredRef.current) {
         e.preventDefault()
         enterHeldRef.current = true
       }
@@ -636,6 +721,17 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     let bfgCloudMat: THREE.PointsMaterial | null = null
     let bfgCloudBase: Float32Array | null = null
     let bfgCloudPhases: Float32Array | null = null
+    let jazz: THREE.Group | null = null
+    let jazzCloud: THREE.Points | null = null
+    let jazzCloudGeo: THREE.BufferGeometry | null = null
+    let jazzCloudMat: THREE.PointsMaterial | null = null
+    let jazzCloudBase: Float32Array | null = null
+    let jazzCloudPhases: Float32Array | null = null
+    let jazzLoaded = false
+    let exitStarted = false
+    let exitFrames = 0
+    let returnStarted = false
+    let exitComplete = false
 
     loader.load('/models/bfg.glb', (gltf) => {
       bfg = gltf.scene
@@ -733,15 +829,86 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
       envPoints = new THREE.Points(envGeo, envMat)
       scene.add(envPoints)
 
+      loader.load('/models/jazz.glb', (jazzGltf) => {
+        jazz = jazzGltf.scene
+        const box = new THREE.Box3().setFromObject(jazz)
+        jazz.position.sub(box.getCenter(new THREE.Vector3()))
+        const size = box.getSize(new THREE.Vector3())
+        const maxDim = Math.max(size.x, size.y, size.z)
+        applyJazzTransform(jazz, JAZZ_MODEL_SIZE / maxDim)
+        jazz.visible = false
+
+        jazz.updateMatrixWorld(true)
+        const inv = new THREE.Matrix4().copy(jazz.matrixWorld).invert()
+        const verts: number[] = []
+        jazz.traverse((child) => {
+          const mesh = child as THREE.Mesh
+          if (!mesh.isMesh) return
+          mesh.visible = false
+          const posAttr = mesh.geometry.attributes.position
+          if (!posAttr) return
+          mesh.updateWorldMatrix(true, false)
+          const toLocal = new THREE.Matrix4().multiplyMatrices(inv, mesh.matrixWorld)
+          for (let i = 0; i < posAttr.count; i += 2) {
+            const v = new THREE.Vector3().fromBufferAttribute(posAttr, i).applyMatrix4(toLocal)
+            verts.push(v.x, v.y, v.z)
+          }
+        })
+
+        jazzCloudBase = new Float32Array(verts)
+        jazzCloudPhases = new Float32Array(jazzCloudBase.length / 3).map(() => Math.random() * Math.PI * 2)
+        jazzCloudGeo = new THREE.BufferGeometry()
+        jazzCloudGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3))
+        jazzCloudMat = new THREE.PointsMaterial({ color: 0xb7ff2a, size: 0.0065, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })
+        jazzCloud = new THREE.Points(jazzCloudGeo, jazzCloudMat)
+        jazzCloud.visible = false
+        jazz.add(jazzCloud)
+        scene.add(jazz)
+        jazzLoaded = true
+      })
+
       const REVEAL_START = 0.88  // darkness threshold before BFG begins to show
       const REVEAL_RANGE = 1 - REVEAL_START
+      const EXIT_CLOUD_FRAMES = 170
+      const EXIT_DROP_FRAMES = 95
+      const EXIT_JAZZ_IN_FRAMES = 85
+      const EXIT_JAZZ_HOLD_FRAMES = 180
+      const EXIT_RETURN_FRAMES = 190
+      const EXIT_DROP_START = EXIT_CLOUD_FRAMES
+      const EXIT_JAZZ_START = EXIT_DROP_START + EXIT_DROP_FRAMES
+      const EXIT_RETURN_START = EXIT_JAZZ_START + EXIT_JAZZ_IN_FRAMES + EXIT_JAZZ_HOLD_FRAMES
+      const EXIT_TOTAL_FRAMES = EXIT_RETURN_START + EXIT_RETURN_FRAMES
 
       const spin = () => {
         animId = requestAnimationFrame(spin)
         t += 0.006
         if (!bfg) return
+        const exiting = !!bfgExitingRef.current
 
-        if (enterHeldRef.current) {
+        if (exiting && !exitStarted) {
+          exitStarted = true
+          exitFrames = 0
+          bfgGrabbedRef.current = false
+          bfgTiltTargetRef.current = 0
+          enterHeldRef.current = false
+          chargeFramesRef.current = 0
+          chargePctRef.current = 0
+        }
+        if (exiting) {
+          exitFrames++
+          const drainProgress = THREE.MathUtils.smoothstep(THREE.MathUtils.clamp(exitFrames / EXIT_CLOUD_FRAMES, 0, 1), 0, 1)
+          const dropProgress = THREE.MathUtils.smoothstep(THREE.MathUtils.clamp((exitFrames - EXIT_DROP_START) / EXIT_DROP_FRAMES, 0, 1), 0, 1)
+          const returnProgress = THREE.MathUtils.smoothstep(THREE.MathUtils.clamp((exitFrames - EXIT_RETURN_START) / EXIT_RETURN_FRAMES, 0, 1), 0, 1)
+          bfgDrainProgressRef.current = drainProgress
+          bfgDropProgressRef.current = dropProgress
+          bfgReturnProgressRef.current = returnProgress
+          if (returnProgress > 0 && !returnStarted) {
+            returnStarted = true
+            onBfgReturnStartRef.current?.()
+          }
+        }
+
+        if (!exiting && enterHeldRef.current) {
           // Pick a frontal target once per charge session (±5° of dead-front)
           if (chargeFramesRef.current === 0) {
             const frontalTarget = Math.PI / 2 + (Math.random() - 0.5) * (36 * Math.PI / 180)
@@ -750,11 +917,13 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
           }
           bfgManualRotYRef.current += (frontalTargetRef.current - bfgManualRotYRef.current) * 0.04
           rotY += (bfgManualRotYRef.current - rotY) * 0.1
-        } else if (bfgGrabbedRef.current || shotsFiredRef.current) {
+        } else if (!exiting && (bfgGrabbedRef.current || shotsFiredRef.current)) {
           rotY += (bfgManualRotYRef.current - rotY) * 0.1
-        } else {
+        } else if (!exiting) {
           rotY += 0.008
           bfgManualRotYRef.current = rotY
+        } else {
+          rotY += (bfgManualRotYRef.current - rotY) * 0.045
         }
 
         // Smooth tilt toward drag target, ease back to 0 when released
@@ -774,27 +943,43 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
         // BFG point cloud — fades in with charge, disappears on fire
         if (bfgCloudGeo && bfgCloudMat && bfgCloudBase && bfgCloudPhases) {
           const cp2 = chargePctRef.current
-          const grabbedCloudTarget = bfgGrabbedRef.current && !shotsFiredRef.current ? 1 : 0
+          const drainProgress = bfgDrainProgressRef.current
+          const dropProgress = bfgDropProgressRef.current
+          const returnProgress = bfgReturnProgressRef.current
+          const grabbedCloudTarget = bfgGrabbedRef.current && !shotsFiredRef.current && !exiting ? 1 : 0
           const grabbedCloudEase = grabbedCloudTarget > grabbedCloudLevel ? 0.12 : 0.055
           grabbedCloudLevel += (grabbedCloudTarget - grabbedCloudLevel) * grabbedCloudEase
           if (grabbedCloudLevel < 0.001) grabbedCloudLevel = 0
           const grabbedCloud = grabbedCloudLevel
           const chargeBloom = cp2 * cp2
           const grabbedTreble = grabbedCloud * Math.min(1, treble * 2.4)
-          const scatter = cp2 * 0.035 + chargeBloom * 0.085 + grabbedCloud * (0.018 + grabbedTreble * 0.065)
+          const drainCloud = exiting ? drainProgress * Math.max(0, 1 - returnProgress) : 0
+          const scatter = cp2 * 0.035
+            + chargeBloom * 0.085
+            + grabbedCloud * (0.018 + grabbedTreble * 0.065)
+            + drainCloud * (0.035 + Math.sin(t * 9) * 0.008)
           const cpos = bfgCloudGeo.attributes.position as THREE.BufferAttribute
+          const dropY = dropProgress * dropProgress * 8.8
           for (let i = 0; i < cpos.count; i++) {
             const bx = bfgCloudBase[i * 3], by = bfgCloudBase[i * 3 + 1], bz = bfgCloudBase[i * 3 + 2]
+            const phase = bfgCloudPhases[i]
             const len = Math.sqrt(bx * bx + by * by + bz * bz) || 1
-            const chargeShape = 0.42 + 0.58 * Math.sin(t * 6 + bfgCloudPhases[i])
-            const highShape = 0.35 + 0.65 * Math.sin(t * 34 + bfgCloudPhases[i] * 2.1)
-            const shape = grabbedCloud > 0 && cp2 <= 0 ? highShape : chargeShape
+            const chargeShape = 0.42 + 0.58 * Math.sin(t * 6 + phase)
+            const highShape = 0.35 + 0.65 * Math.sin(t * 34 + phase * 2.1)
+            const drainShape = 0.35 + 0.65 * Math.sin(t * 11 + phase * 1.4)
+            const shape = drainCloud > 0.01 ? drainShape : grabbedCloud > 0 && cp2 <= 0 ? highShape : chargeShape
             const s = scatter * shape
-            cpos.setXYZ(i, bx + bx / len * s, by + by / len * s, bz + bz / len * s)
+            const fall = dropY * (0.35 + phaseRand(phase, 1) * 1.85)
+            const drift = dropProgress * dropProgress
+            const sideX = (phaseRand(phase, 2) - 0.5) * drift * 0.7
+            const sideZ = (phaseRand(phase, 3) - 0.5) * drift * 0.55
+            cpos.setXYZ(i, bx + bx / len * s + sideX, by + by / len * s - fall, bz + bz / len * s + sideZ)
           }
           cpos.needsUpdate = true
-          bfgCloudMat.size = 0.007 + chargeBloom * 0.002 + grabbedTreble * 0.0025
-          bfgCloudMat.opacity = Math.min(0.82, cp2 * 0.8 + grabbedCloud * (0.2 + grabbedTreble * 0.42))
+          bfgCloudMat.size = 0.007 + chargeBloom * 0.002 + grabbedTreble * 0.0025 + drainCloud * 0.002
+          const activeOpacity = Math.min(0.82, cp2 * 0.8 + grabbedCloud * (0.2 + grabbedTreble * 0.42))
+          const drainOpacity = drainCloud * 0.84
+          bfgCloudMat.opacity = Math.max(activeOpacity, drainOpacity) * Math.max(0, 1 - returnProgress)
         }
 
         if (envGeo && envMat) {
@@ -802,6 +987,9 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
           const motionCap = 0.37
           const sway = Math.min(0.28, mid * 0.21 + bass * 0.08)
           const spike = Math.min(motionCap - sway, snare * 0.28)
+          const dropProgress = bfgDropProgressRef.current
+          const returnProgress = bfgReturnProgressRef.current
+          const dropY = dropProgress * dropProgress * 9.5
           for (let i = 0; i < ENV_N; i++) {
             const ph = envPhases[i]
             const bx = envBase[i * 3]
@@ -809,26 +997,32 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
             const bz = envBase[i * 3 + 2]
             const len = Math.sqrt(bx * bx + by * by + bz * bz) || 1
             const hit = spike * (0.45 + 0.55 * Math.abs(Math.sin(ph * 1.9)))
+            const fall = dropY * (0.25 + phaseRand(ph, 4) * 2.15)
+            const dropDrift = dropProgress * dropProgress
+            const driftX = (phaseRand(ph, 5) - 0.5) * dropDrift * 1.15
+            const driftZ = (phaseRand(ph, 6) - 0.5) * dropDrift * 0.9
             ep.setXYZ(i,
-              bx + bx / len * hit + Math.sin(t * 1.4 + ph) * sway,
-              by + by / len * hit + Math.sin(t * 1.1 + ph * 1.3) * sway,
-              bz + bz / len * hit + Math.sin(t * 1.7 + ph * 0.7) * sway,
+              bx + bx / len * hit + Math.sin(t * 1.4 + ph) * sway + driftX,
+              by + by / len * hit + Math.sin(t * 1.1 + ph * 1.3) * sway - fall,
+              bz + bz / len * hit + Math.sin(t * 1.7 + ph * 0.7) * sway + driftZ,
             )
           }
           ep.needsUpdate = true
           envMat.size = Math.min(0.017, 0.013 + snare * 0.006)
-          envMat.opacity = Math.min(0.55, cloudDp * (mid * 0.72 + bass * 0.25 + snare * 0.45))
+          envMat.opacity = exiting
+            ? Math.min(0.55, Math.max(0.24, cloudDp * 0.42) * Math.max(0, 1 - returnProgress))
+            : Math.min(0.55, cloudDp * (mid * 0.72 + bass * 0.25 + snare * 0.45))
         }
 
         // Charge accumulation
         const CHARGE_FRAMES = 180
-        if (enterHeldRef.current && !shotsFiredRef.current) {
+        if (!exiting && enterHeldRef.current && !shotsFiredRef.current) {
           chargeFramesRef.current = Math.min(CHARGE_FRAMES, chargeFramesRef.current + 1)
         }
         chargePctRef.current = chargeFramesRef.current / CHARGE_FRAMES
 
         // Fire point-cloud blobs at full charge
-        if (chargePctRef.current >= 1 && !shotsFiredRef.current) {
+        if (!exiting && chargePctRef.current >= 1 && !shotsFiredRef.current) {
           shotsFiredRef.current = true
           bfg.updateMatrixWorld()
           const barrelDir = new THREE.Vector3(-1, 0, 0).transformDirection(bfg.matrixWorld).multiplyScalar(0.016)
@@ -898,6 +1092,7 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
           const bassRamp = Math.min(1, s.age / 18)
           const highRamp = Math.min(1, s.age / 6)
           const shotAudio = shotBass * bassRamp + shotHighSpike * highRamp
+          const shotDropY = bfgDropProgressRef.current * 8.2
           for (let j = 0; j < pos.count; j++) {
             s.basePos[j * 3]     += s.drifts[j * 3]
             s.basePos[j * 3 + 1] += s.drifts[j * 3 + 1]
@@ -909,11 +1104,11 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
             const bassPulse = shotBass * (0.45 + 0.55 * Math.sin(t * 14 + s.phases[j]) ** 2)
             const highPulse = shotHighSpike * (0.18 + 0.82 * Math.sin(t * 74 + s.phases[j] * 2.7) ** 2)
             const pulse = bassPulse * bassRamp + highPulse * highRamp
-            pos.setXYZ(j, bx + bx / len * pulse, by + by / len * pulse, bz + bz / len * pulse)
+            pos.setXYZ(j, bx + bx / len * pulse, by + by / len * pulse - shotDropY, bz + bz / len * pulse)
             const spikeBase = pulse + highPulse * highRamp * 0.16
             const spikeTip = pulse + highPulse * highRamp * (0.72 + 0.38 * Math.sin(t * 31 + s.phases[j]) ** 2)
-            spikePos.setXYZ(j * 2, bx + bx / len * spikeBase, by + by / len * spikeBase, bz + bz / len * spikeBase)
-            spikePos.setXYZ(j * 2 + 1, bx + bx / len * spikeTip, by + by / len * spikeTip, bz + bz / len * spikeTip)
+            spikePos.setXYZ(j * 2, bx + bx / len * spikeBase, by + by / len * spikeBase - shotDropY, bz + bz / len * spikeBase)
+            spikePos.setXYZ(j * 2 + 1, bx + bx / len * spikeTip, by + by / len * spikeTip - shotDropY, bz + bz / len * spikeTip)
           }
           pos.needsUpdate = true
           spikePos.needsUpdate = true
@@ -930,6 +1125,11 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
             ;(s.points.material as THREE.PointsMaterial).opacity = 0.92 * viewportFade
             ;(s.spikeLines.material as THREE.LineBasicMaterial).opacity = Math.min(0.38, shotHighSpike * 3.2) * viewportFade
           }
+          if (exiting) {
+            const shotDrain = Math.max(0, 1 - bfgReturnProgressRef.current)
+            ;(s.points.material as THREE.PointsMaterial).opacity *= shotDrain
+            ;(s.spikeLines.material as THREE.LineBasicMaterial).opacity *= shotDrain
+          }
           if (s.age > SHOT_LIFETIME) {
             scene.remove(s.points)
             scene.remove(s.spikeLines)
@@ -941,25 +1141,70 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
           }
         }
 
+        if (exiting) {
+          if (jazz && jazzCloud && jazzCloudGeo && jazzCloudBase && jazzCloudPhases && jazzCloudMat) {
+            const intro = THREE.MathUtils.smoothstep(THREE.MathUtils.clamp((exitFrames - EXIT_JAZZ_START) / EXIT_JAZZ_IN_FRAMES, 0, 1), 0, 1)
+            const returnProgress = bfgReturnProgressRef.current
+            const visibleAmount = intro * Math.max(0, 1 - returnProgress)
+            jazz.visible = visibleAmount > 0.01
+            jazzCloud.visible = visibleAmount > 0.01
+            jazz.position.y = Math.sin(t * 1.25) * 0.035 - returnProgress * 0.25
+
+            const cpos = jazzCloudGeo.attributes.position as THREE.BufferAttribute
+            const jazzBody = Math.min(0.18, bass * 0.06 + mid * 0.11 + treble * 0.035)
+            const jazzHit = Math.min(0.22, snare * 0.12 + highSpike * 0.16)
+            const scatter = intro * (0.008 + jazzBody + jazzHit + returnProgress * 0.34)
+            for (let i = 0; i < cpos.count; i++) {
+              const bx = jazzCloudBase[i * 3]
+              const by = jazzCloudBase[i * 3 + 1]
+              const bz = jazzCloudBase[i * 3 + 2]
+              const len = Math.sqrt(bx * bx + by * by + bz * bz) || 1
+              const phase = jazzCloudPhases[i]
+              const bodyShape = 0.55 + 0.45 * Math.sin(phase * 1.3)
+              const transientShape = 0.35 + 0.65 * Math.abs(Math.sin(phase * 2.7 + t * 36))
+              const jitter = jazzHit * 0.16
+              const s = scatter * (bodyShape + transientShape * jazzHit * 2.4)
+              cpos.setXYZ(
+                i,
+                bx + bx / len * s + Math.sin(t * 30 + phase) * jitter,
+                by + by / len * s + Math.cos(t * 28 + phase * 1.4) * jitter,
+                bz + bz / len * s + Math.sin(t * 34 + phase * 0.8) * jitter,
+              )
+            }
+            cpos.needsUpdate = true
+            jazzCloudMat.size = Math.min(0.014, 0.0065 + treble * 0.004 + snare * 0.003 + highSpike * 0.006 + returnProgress * 0.004)
+            jazzCloudMat.opacity = Math.min(0.95, visibleAmount * (0.68 + bass * 0.2 + mid * 0.22 + snare * 0.18 + highSpike * 0.16))
+          }
+
+          if (!exitComplete && exitFrames > (jazzLoaded ? EXIT_TOTAL_FRAMES : EXIT_TOTAL_FRAMES + 180)) {
+            exitComplete = true
+            onBfgExitCompleteRef.current?.()
+          }
+        }
+
 
 
         const dp = darknessProgressRef.current
-        const targetOpacity = dp < REVEAL_START
+        const targetOpacity = exiting
+          ? Math.max(0, 1 - bfgDrainProgressRef.current * 2.4)
+          : dp < REVEAL_START
           ? 0
           : Math.min(1, (dp - REVEAL_START) / REVEAL_RANGE)
 
         bfg.traverse((child) => {
           const mesh = child as THREE.Mesh
           if (!mesh.isMesh) return
+          mesh.visible = !exiting || bfgDrainProgressRef.current < 0.48
           const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
           for (const m of mats) {
             const mat = m as THREE.Material
-            mat.opacity += (targetOpacity - mat.opacity) * 0.028
+            mat.opacity += (targetOpacity - mat.opacity) * (exiting ? 0.08 : 0.028)
+            if (exiting) mat.opacity = Math.min(mat.opacity, targetOpacity)
           }
         })
 
         // Pulse emissive glow — compound sine for organic plasma feel
-        const pulse = Math.max(0.15, 2.0 + Math.sin(t * 5) * 1.4 + Math.sin(t * 13) * 0.6)
+        const pulse = exiting ? 0 : Math.max(0.15, 2.0 + Math.sin(t * 5) * 1.4 + Math.sin(t * 13) * 0.6)
         for (const mat of emissiveMats) {
           mat.emissiveIntensity = pulse
         }
@@ -971,10 +1216,13 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
       cancelAnimationFrame(animId)
       if (bfg) scene.remove(bfg)
       if (envPoints) scene.remove(envPoints)
+      if (jazz) scene.remove(jazz)
       envGeo?.dispose()
       envMat?.dispose()
       bfgCloudGeo?.dispose()
       bfgCloudMat?.dispose()
+      jazzCloudGeo?.dispose()
+      jazzCloudMat?.dispose()
       for (const s of activeShots) {
         scene.remove(s.points)
         scene.remove(s.spikeLines)
