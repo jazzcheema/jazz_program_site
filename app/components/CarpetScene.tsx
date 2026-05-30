@@ -754,31 +754,19 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
         }
       })
 
-      // Collect emissive materials (for pulsing) and their meshes (for world-position tracking)
+      // Collect emissive materials for pulsing.
       const emissiveMats: THREE.MeshStandardMaterial[] = []
-      const emissiveMeshes: THREE.Mesh[] = []
-      const wp = new THREE.Vector3()
-      console.group('[BFG] mesh nodes')
       bfg.traverse((child) => {
         const mesh = child as THREE.Mesh
         if (!mesh.isMesh) return
-        mesh.getWorldPosition(wp)
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-        const hasEmissive = mats.some(m => (m as THREE.MeshStandardMaterial).emissiveMap)
-        console.log(
-          `name="${mesh.name || '(unnamed)'}"`
-          + ` pos=(${wp.x.toFixed(3)}, ${wp.y.toFixed(3)}, ${wp.z.toFixed(3)})`
-          + (hasEmissive ? ' *** EMISSIVE ***' : '')
-        )
         for (const m of mats) {
           const mat = m as THREE.MeshStandardMaterial
           if (mat.emissiveMap) {
             emissiveMats.push(mat)
-            if (!emissiveMeshes.includes(mesh)) emissiveMeshes.push(mesh)
           }
         }
       })
-      console.groupEnd()
 
       scene.add(bfg)
 
