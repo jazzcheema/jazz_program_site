@@ -29,6 +29,8 @@ const MOBILE_BOOKS_FRAC = { x: 0.32, y: 0.43 }
 
 export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachBooks, showBfg }: CarpetSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
   const onReachRef = useRef(onReachClouds)
   const onReachSandcastleRef = useRef(onReachSandcastle)
@@ -38,6 +40,12 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
   const bfgGrabbedRef = useRef(false)
   const bfgManualRotYRef = useRef(0)
   const bfgDragStartXRef = useRef(0)
+  const bfgDragStartYRef = useRef(0)
+  const bfgTiltTargetRef = useRef(0)
+  const enterHeldRef = useRef(false)
+  const chargeFramesRef = useRef(0)
+  const shotsFiredRef = useRef(false)
+  const chargePctRef = useRef(0)
 
   useEffect(() => {
     onReachRef.current = onReachClouds
@@ -70,6 +78,7 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100)
     camera.position.set(0, 0, CAMERA_Z)
     camera.updateProjectionMatrix()
+    cameraRef.current = camera
 
     const designVisibleHeight = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5) * CAMERA_Z
     const designVisibleWidth = designVisibleHeight * REFERENCE_ASPECT
@@ -234,6 +243,7 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
       if (showBfgRef.current && darknessProgressRef.current > 0.88) {
         bfgGrabbedRef.current = true
         bfgDragStartXRef.current = e.clientX
+        bfgDragStartYRef.current = e.clientY
         canvas.setPointerCapture(e.pointerId)
         return
       }
@@ -252,6 +262,9 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
         const dx = e.clientX - bfgDragStartXRef.current
         bfgManualRotYRef.current += dx * 0.012
         bfgDragStartXRef.current = e.clientX
+        // Vertical drag tilts the gun to show the top (clamped to ±0.5 rad)
+        const dy = e.clientY - bfgDragStartYRef.current
+        bfgTiltTargetRef.current = Math.max(-0.5, Math.min(0.5, dy * 0.008))
         return
       }
       if (!isDragging) return
@@ -263,6 +276,7 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     const onPointerUp = (e: PointerEvent) => {
       if (bfgGrabbedRef.current) {
         bfgGrabbedRef.current = false
+        bfgTiltTargetRef.current = 0
         return
       }
       isDragging = false
@@ -298,6 +312,7 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
 
     let tick = 0
     let animId: number
+    let bfgDarkSettledAtTick = -1
 
     const animate = () => {
       animId = requestAnimationFrame(animate)
@@ -320,17 +335,36 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
       if (showBfgRef.current) {
         darknessProgressRef.current = Math.min(1, darknessProgressRef.current + 0.007)
 
-        ambient.intensity      += (0.003 - ambient.intensity) * 0.022
-        key.intensity          += (0 - key.intensity) * 0.02
-        rim.intensity          += (0 - rim.intensity) * 0.02
-        cloudLight.intensity   += (0.22 - cloudLight.intensity) * 0.018
-        sandcastleLight.intensity += (0 - sandcastleLight.intensity) * 0.02
-        booksLight.intensity   += (0 - booksLight.intensity) * 0.02
+        // Start 3-second countdown once fully dark
+        if (darknessProgressRef.current >= 1 && bfgDarkSettledAtTick === -1) {
+          bfgDarkSettledAtTick = tick
+        }
+        const baselineActive = bfgDarkSettledAtTick !== -1 && (tick - bfgDarkSettledAtTick) > 180
+        const grabbed = bfgGrabbedRef.current
 
-        if (bfgGrabbedRef.current) {
+        // Regular scene lights stay dark throughout
+        ambient.intensity         += (0.003 - ambient.intensity) * 0.022
+        key.intensity             += (0 - key.intensity) * 0.02
+        rim.intensity             += (0 - rim.intensity) * 0.02
+        cloudLight.intensity      += (0.22 - cloudLight.intensity) * 0.018
+        sandcastleLight.intensity += (0 - sandcastleLight.intensity) * 0.02
+        booksLight.intensity      += (0 - booksLight.intensity) * 0.02
+
+        // Eerie lights are the baseline — settle in after 3s, boost when grabbed or charging
+        const chargePct = chargePctRef.current
+        if (chargePct > 0) {
+          const sinePulse = Math.sin(tick * 0.038)
+          const gTarget = THREE.MathUtils.lerp(3.6 + sinePulse * 0.7, 8.0 + sinePulse * 1.5, chargePct)
+          eerieGreen.intensity += (gTarget - eerieGreen.intensity) * 0.06
+          eerieDeep.intensity  += (THREE.MathUtils.lerp(2.2, 5.0, chargePct) - eerieDeep.intensity) * 0.05
+        } else if (grabbed) {
           const gTarget = 3.6 + Math.sin(tick * 0.038) * 0.7
           eerieGreen.intensity += (gTarget - eerieGreen.intensity) * 0.04
           eerieDeep.intensity  += (2.2 - eerieDeep.intensity) * 0.03
+        } else if (baselineActive) {
+          const gTarget = 1.4 + Math.sin(tick * 0.038) * 0.3
+          eerieGreen.intensity += (gTarget - eerieGreen.intensity) * 0.018
+          eerieDeep.intensity  += (0.8 - eerieDeep.intensity) * 0.014
         } else {
           eerieGreen.intensity += (0 - eerieGreen.intensity) * 0.025
           eerieDeep.intensity  += (0 - eerieDeep.intensity) * 0.02
@@ -468,6 +502,18 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     }
     document.addEventListener('visibilitychange', onVisibility)
 
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && showBfgRef.current && !shotsFiredRef.current) enterHeldRef.current = true
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        enterHeldRef.current = false
+        if (!shotsFiredRef.current) { chargeFramesRef.current = 0; chargePctRef.current = 0 }
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+
     return () => {
       cancelAnimationFrame(animId)
       document.removeEventListener('visibilitychange', onVisibility)
@@ -475,6 +521,8 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerup', onPointerUp)
       window.removeEventListener('resize', onResize)
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
       dracoLoader.dispose()
       renderer.dispose()
     }
@@ -489,6 +537,9 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     dracoLoader.setDecoderPath('/draco/gltf/')
     const loader = new GLTFLoader()
     loader.setDRACOLoader(dracoLoader)
+
+    type ShotBlob = { geo: THREE.BufferGeometry; basePos: Float32Array; drifts: Float32Array; points: THREE.Points; vel: THREE.Vector3; age: number }
+    const activeShots: ShotBlob[] = []
 
     let bfg: THREE.Group | null = null
     let animId: number
@@ -552,16 +603,108 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
         t += 0.006
         if (!bfg) return
 
-        if (bfgGrabbedRef.current) {
+        if (bfgGrabbedRef.current || enterHeldRef.current || shotsFiredRef.current) {
           rotY += (bfgManualRotYRef.current - rotY) * 0.1
         } else {
           rotY += 0.008
           bfgManualRotYRef.current = rotY
         }
 
+        // Smooth tilt toward drag target, ease back to 0 when released
+        bfg.rotation.x += (bfgTiltTargetRef.current - bfg.rotation.x) * 0.1
         bfg.rotation.y = rotY
-        bfg.position.y = 0.1 + Math.sin(t * 1.2) * 0.08
+        // Turbulence grows quadratically as charge builds, settles gracefully as chargePct decays
+        const cp = chargePctRef.current
+        const turbAmp = cp * cp * 0.055
+        bfg.position.x = Math.sin(t * (12 + cp * 28)) * turbAmp + Math.sin(t * (7 + cp * 19) * 1.7) * turbAmp * 0.5
+        bfg.position.y = 0.1 + Math.sin(t * 1.2) * 0.08 + Math.cos(t * (9 + cp * 22)) * turbAmp * 0.7
+        bfg.position.z = Math.sin(t * (8 + cp * 24) * 1.3) * turbAmp * 0.4
 
+        // Charge accumulation
+        const CHARGE_FRAMES = 180
+        if (enterHeldRef.current && !shotsFiredRef.current) {
+          chargeFramesRef.current = Math.min(CHARGE_FRAMES, chargeFramesRef.current + 1)
+        }
+        chargePctRef.current = chargeFramesRef.current / CHARGE_FRAMES
+
+        // Fire point-cloud blobs at full charge
+        if (chargePctRef.current >= 1 && !shotsFiredRef.current) {
+          shotsFiredRef.current = true
+          bfg.updateMatrixWorld()
+          const barrelDir = new THREE.Vector3(-1, 0, 0).transformDirection(bfg.matrixWorld).multiplyScalar(0.016)
+          for (const [lx, ly, lz] of [[-0.95, 0.25, -0.37], [-0.95, 0.25, 0.37]] as [number, number, number][]) {
+            const worldTip = new THREE.Vector3(lx, ly, lz).applyMatrix4(bfg.matrixWorld)
+            const N = 1800
+            const positions = new Float32Array(N * 3)
+            const colors = new Float32Array(N * 3)
+            const drifts = new Float32Array(N * 3)
+            for (let i = 0; i < N; i++) {
+              const onShell = Math.random() > 0.18
+              const theta = Math.random() * Math.PI * 2
+              const phi = Math.acos(2 * Math.random() - 1)
+              const r = onShell ? 0.13 + Math.random() * 0.05 : Math.random() * 0.13
+              positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta)
+              positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta)
+              positions[i * 3 + 2] = r * Math.cos(phi)
+              const bright = onShell ? 0.6 + Math.random() * 0.4 : 0.15 + Math.random() * 0.25
+              colors[i * 3] = bright * 0.62; colors[i * 3 + 1] = bright; colors[i * 3 + 2] = bright * 0.04
+              drifts[i * 3]     = (Math.random() - 0.5) * 0.0009
+              drifts[i * 3 + 1] = (Math.random() - 0.5) * 0.0009
+              drifts[i * 3 + 2] = (Math.random() - 0.5) * 0.0009
+            }
+            const geo = new THREE.BufferGeometry()
+            geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+            geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+            const mat = new THREE.PointsMaterial({ vertexColors: true, size: 0.014, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false })
+            const points = new THREE.Points(geo, mat)
+            points.position.copy(worldTip)
+            scene.add(points)
+            activeShots.push({ geo, basePos: new Float32Array(positions), drifts, points, vel: barrelDir.clone(), age: 0 })
+          }
+          // Fixed cooldown — resets spin and allows next charge after 2.8s
+          setTimeout(() => {
+            shotsFiredRef.current = false
+            chargeFramesRef.current = 0
+            chargePctRef.current = 0
+          }, 2800)
+        }
+
+        // Decay chargePct after firing so turbulence settles gracefully (visual only)
+        if (shotsFiredRef.current && chargePctRef.current > 0) {
+          chargePctRef.current = Math.max(0, chargePctRef.current - 0.011)
+          chargeFramesRef.current = Math.max(0, chargeFramesRef.current - 2)
+        }
+
+        // Update point-cloud shots — particles drift outward slowly
+        const SHOT_LIFETIME = 900
+        for (let i = activeShots.length - 1; i >= 0; i--) {
+          const s = activeShots[i]
+          s.age++
+          s.points.position.add(s.vel)
+          const pos = s.geo.attributes.position as THREE.BufferAttribute
+          for (let j = 0; j < pos.count; j++) {
+            s.basePos[j * 3]     += s.drifts[j * 3]
+            s.basePos[j * 3 + 1] += s.drifts[j * 3 + 1]
+            s.basePos[j * 3 + 2] += s.drifts[j * 3 + 2]
+            pos.setXYZ(j, s.basePos[j * 3], s.basePos[j * 3 + 1], s.basePos[j * 3 + 2])
+          }
+          pos.needsUpdate = true
+          // Fade only when leaving the viewport
+          const shotCam = cameraRef.current
+          if (shotCam) {
+            const ndc = s.points.position.clone().project(shotCam)
+            const edgeX = Math.max(0, Math.abs(ndc.x) - 1)
+            const edgeY = Math.max(0, Math.abs(ndc.y) - 1)
+            const outside = Math.max(edgeX, edgeY)
+            ;(s.points.material as THREE.PointsMaterial).opacity = Math.max(0, 0.92 * (1 - Math.min(1, outside * 5)))
+          }
+          if (s.age > SHOT_LIFETIME) {
+            scene.remove(s.points)
+            s.geo.dispose()
+            ;(s.points.material as THREE.PointsMaterial).dispose()
+            activeShots.splice(i, 1)
+          }
+        }
 
         const dp = darknessProgressRef.current
         const targetOpacity = dp < REVEAL_START
@@ -590,15 +733,22 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     return () => {
       cancelAnimationFrame(animId)
       if (bfg) scene.remove(bfg)
+      for (const s of activeShots) {
+        scene.remove(s.points)
+        s.geo.dispose()
+        ;(s.points.material as THREE.PointsMaterial).dispose()
+      }
       dracoLoader.dispose()
     }
   }, [showBfg])
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="block w-full h-full cursor-grab active:cursor-grabbing"
-      style={{ touchAction: 'none' }}
-    />
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <canvas
+        ref={canvasRef}
+        className="block w-full h-full cursor-grab active:cursor-grabbing"
+        style={{ touchAction: 'none' }}
+      />
+    </div>
   )
 }
