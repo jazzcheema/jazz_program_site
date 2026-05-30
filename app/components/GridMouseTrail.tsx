@@ -9,8 +9,11 @@ const FADE_MS = 750;
 
 type TrailCell = { cx: number; cy: number; time: number };
 
-export default function GridMouseTrail({ cellSize = 192 }: { cellSize?: number }) {
+export default function GridMouseTrail({ cellSize = 192, eerie = false }: { cellSize?: number; eerie?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const eerieRef = useRef(eerie);
+
+  useEffect(() => { eerieRef.current = eerie }, [eerie]);
 
   useEffect(() => {
     if (typeof window === "undefined" || window.innerWidth < 768) return;
@@ -70,6 +73,26 @@ export default function GridMouseTrail({ cellSize = 192 }: { cellSize?: number }
 
       ctx.clearRect(0, 0, W, H);
 
+      if (eerieRef.current) {
+        // Persistent dim grid — all visible cells faintly lit
+        const colStart = Math.floor(-currentOffX / cellSize) - 1;
+        const colEnd = Math.ceil((W - currentOffX) / cellSize) + 1;
+        const rowStart = Math.floor(-currentOffY / cellSize) - 1;
+        const rowEnd = Math.ceil((H - currentOffY) / cellSize) + 1;
+
+        for (let col = colStart; col <= colEnd; col++) {
+          for (let row = rowStart; row <= rowEnd; row++) {
+            const sx = col * cellSize + currentOffX;
+            const sy = row * cellSize + currentOffY;
+            ctx.fillStyle = "rgba(0,180,70,0.028)";
+            ctx.fillRect(sx + 1, sy + 1, cellSize - 2, cellSize - 2);
+            ctx.strokeStyle = "rgba(0,180,70,0.07)";
+            ctx.lineWidth = 0.5;
+            ctx.strokeRect(sx + 1, sy + 1, cellSize - 2, cellSize - 2);
+          }
+        }
+      }
+
       for (let i = trail.length - 1; i >= 0; i--) {
         const cell = trail[i];
         const age = now - cell.time;
@@ -78,10 +101,12 @@ export default function GridMouseTrail({ cellSize = 192 }: { cellSize?: number }
           continue;
         }
         const t = age / FADE_MS;
-        const alpha = (1 - t) * (1 - t) * 0.13;
+        const alpha = (1 - t) * (1 - t) * (eerieRef.current ? 0.18 : 0.13);
         const sx = cell.cx * cellSize + currentOffX;
         const sy = cell.cy * cellSize + currentOffY;
-        ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(4)})`;
+        ctx.fillStyle = eerieRef.current
+          ? `rgba(0,220,80,${alpha.toFixed(4)})`
+          : `rgba(255,255,255,${alpha.toFixed(4)})`;
         ctx.fillRect(sx + 1, sy + 1, cellSize - 2, cellSize - 2);
       }
     };

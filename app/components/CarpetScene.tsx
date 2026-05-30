@@ -10,6 +10,7 @@ interface CarpetSceneProps {
   onReachClouds: () => void
   onReachSandcastle: () => void
   onReachBooks: () => void
+  showBfg?: boolean
 }
 
 // Desktop target; the live position is clamped to the camera's visible area.
@@ -26,17 +27,25 @@ const MOBILE_CLOUD_FRAC = { x: 0.31, y: 0.44 }
 const MOBILE_SAND_FRAC = { x: 0.36, y: 0.44 }
 const MOBILE_BOOKS_FRAC = { x: 0.32, y: 0.43 }
 
-export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachBooks }: CarpetSceneProps) {
+export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachBooks, showBfg }: CarpetSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const sceneRef = useRef<THREE.Scene | null>(null)
   const onReachRef = useRef(onReachClouds)
   const onReachSandcastleRef = useRef(onReachSandcastle)
   const onReachBooksRef = useRef(onReachBooks)
+  const showBfgRef = useRef(showBfg)
+  const darknessProgressRef = useRef(0)
+  const bfgGrabbedRef = useRef(false)
+  const bfgManualRotYRef = useRef(0)
+  const bfgDragStartXRef = useRef(0)
 
   useEffect(() => {
     onReachRef.current = onReachClouds
     onReachSandcastleRef.current = onReachSandcastle
     onReachBooksRef.current = onReachBooks
   }, [onReachClouds, onReachSandcastle, onReachBooks])
+
+  useEffect(() => { showBfgRef.current = showBfg }, [showBfg])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -55,6 +64,7 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     renderer.setClearColor(0xe9e5e0, 0)
 
     const scene = new THREE.Scene()
+    sceneRef.current = scene
     scene.fog = new THREE.Fog('#e9e5e0', 16, 34)
 
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100)
@@ -120,6 +130,14 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     const booksLight = new THREE.PointLight('#6688cc', 0, 7)
     booksLight.position.copy(booksPos).add(new THREE.Vector3(0, 0.8, 2))
     scene.add(booksLight)
+
+    // Eerie lights — dormant until BFG unlock
+    const eerieGreen = new THREE.PointLight('#1aff66', 0, 12)
+    eerieGreen.position.set(0, 0.6, 2)
+    scene.add(eerieGreen)
+    const eerieDeep = new THREE.PointLight('#0a1a5c', 0, 18)
+    eerieDeep.position.set(0.8, -0.8, -1)
+    scene.add(eerieDeep)
 
     const LIGHT_TARGETS = { ambient: 0.52, key: 1.9, rim: 2.8, cloud: 2.0, sandcastle: 1.15, books: 1.2 }
     const LIGHT_DURATION = 210 // ~3.5s at 60fps
@@ -213,6 +231,12 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     let targetX = 0, targetY = 0
 
     const onPointerDown = (e: PointerEvent) => {
+      if (showBfgRef.current && darknessProgressRef.current > 0.88) {
+        bfgGrabbedRef.current = true
+        bfgDragStartXRef.current = e.clientX
+        canvas.setPointerCapture(e.pointerId)
+        return
+      }
       isDragging = true
       downX = e.clientX
       downY = e.clientY
@@ -224,6 +248,12 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     }
 
     const onPointerMove = (e: PointerEvent) => {
+      if (bfgGrabbedRef.current) {
+        const dx = e.clientX - bfgDragStartXRef.current
+        bfgManualRotYRef.current += dx * 0.012
+        bfgDragStartXRef.current = e.clientX
+        return
+      }
       if (!isDragging) return
       const w = toWorld(e.clientX, e.clientY)
       targetX = w.x
@@ -231,6 +261,10 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
     }
 
     const onPointerUp = (e: PointerEvent) => {
+      if (bfgGrabbedRef.current) {
+        bfgGrabbedRef.current = false
+        return
+      }
       isDragging = false
       const moved = Math.hypot(e.clientX - downX, e.clientY - downY)
       if (moved < 6) return
@@ -271,7 +305,7 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
       const t = tick * 0.01
 
       // Cinematic light fade-in — smoothstep easing
-      if (lightT < 1) {
+      if (lightT < 1 && !showBfgRef.current) {
         lightT = Math.min(1, lightT + 1 / LIGHT_DURATION)
         const e = lightT * lightT * (3 - 2 * lightT)
         ambient.intensity   = LIGHT_TARGETS.ambient * e
@@ -280,6 +314,45 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
         cloudLight.intensity = LIGHT_TARGETS.cloud  * e
         sandcastleLight.intensity = LIGHT_TARGETS.sandcastle * e
         booksLight.intensity = LIGHT_TARGETS.books * e
+      }
+
+      // BFG unlock — darken scene, fade objects, bring in eerie lights
+      if (showBfgRef.current) {
+        darknessProgressRef.current = Math.min(1, darknessProgressRef.current + 0.007)
+
+        ambient.intensity      += (0.003 - ambient.intensity) * 0.022
+        key.intensity          += (0 - key.intensity) * 0.02
+        rim.intensity          += (0 - rim.intensity) * 0.02
+        cloudLight.intensity   += (0.22 - cloudLight.intensity) * 0.018
+        sandcastleLight.intensity += (0 - sandcastleLight.intensity) * 0.02
+        booksLight.intensity   += (0 - booksLight.intensity) * 0.02
+
+        if (bfgGrabbedRef.current) {
+          const gTarget = 3.6 + Math.sin(tick * 0.038) * 0.7
+          eerieGreen.intensity += (gTarget - eerieGreen.intensity) * 0.04
+          eerieDeep.intensity  += (2.2 - eerieDeep.intensity) * 0.03
+        } else {
+          eerieGreen.intensity += (0 - eerieGreen.intensity) * 0.025
+          eerieDeep.intensity  += (0 - eerieDeep.intensity) * 0.02
+        }
+
+        for (const obj of [carpet, sandcastle, books]) {
+          if (!obj) continue
+          obj.traverse((child) => {
+            const mesh = child as THREE.Mesh
+            if (!mesh.isMesh) return
+            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+            for (const m of mats) {
+              const mat = m as THREE.Material
+              if (!mat || mat.opacity <= 0) continue
+              if (!mat.transparent) {
+                mat.transparent = true
+                mat.needsUpdate = true
+              }
+              mat.opacity = Math.max(0, mat.opacity - 0.008)
+            }
+          })
+        }
       }
 
       if (carpet && !reached) {
@@ -406,6 +479,120 @@ export default function CarpetScene({ onReachClouds, onReachSandcastle, onReachB
       renderer.dispose()
     }
   }, [])
+
+  useEffect(() => {
+    if (!showBfg) return
+    const scene = sceneRef.current
+    if (!scene) return
+
+    const dracoLoader = new DRACOLoader()
+    dracoLoader.setDecoderPath('/draco/gltf/')
+    const loader = new GLTFLoader()
+    loader.setDRACOLoader(dracoLoader)
+
+    let bfg: THREE.Group | null = null
+    let animId: number
+    let t = 0
+    let rotY = 0
+
+    loader.load('/models/bfg.glb', (gltf) => {
+      bfg = gltf.scene
+      const box = new THREE.Box3().setFromObject(bfg)
+      bfg.position.sub(box.getCenter(new THREE.Vector3()))
+      const size = box.getSize(new THREE.Vector3())
+      const maxDim = Math.max(size.x, size.y, size.z)
+      bfg.scale.setScalar(2.4 / maxDim)
+      bfg.position.set(0, 0.1, 0)
+
+      // Start fully invisible — revealed by darkness progress
+      bfg.traverse((child) => {
+        const mesh = child as THREE.Mesh
+        if (!mesh.isMesh) return
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+        for (const m of mats) {
+          const mat = m as THREE.Material
+          mat.transparent = true
+          mat.opacity = 0
+        }
+      })
+
+      // Collect emissive materials (for pulsing) and their meshes (for world-position tracking)
+      const emissiveMats: THREE.MeshStandardMaterial[] = []
+      const emissiveMeshes: THREE.Mesh[] = []
+      const wp = new THREE.Vector3()
+      console.group('[BFG] mesh nodes')
+      bfg.traverse((child) => {
+        const mesh = child as THREE.Mesh
+        if (!mesh.isMesh) return
+        mesh.getWorldPosition(wp)
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+        const hasEmissive = mats.some(m => (m as THREE.MeshStandardMaterial).emissiveMap)
+        console.log(
+          `name="${mesh.name || '(unnamed)'}"`
+          + ` pos=(${wp.x.toFixed(3)}, ${wp.y.toFixed(3)}, ${wp.z.toFixed(3)})`
+          + (hasEmissive ? ' *** EMISSIVE ***' : '')
+        )
+        for (const m of mats) {
+          const mat = m as THREE.MeshStandardMaterial
+          if (mat.emissiveMap) {
+            emissiveMats.push(mat)
+            if (!emissiveMeshes.includes(mesh)) emissiveMeshes.push(mesh)
+          }
+        }
+      })
+      console.groupEnd()
+
+      scene.add(bfg)
+
+      const REVEAL_START = 0.88  // darkness threshold before BFG begins to show
+      const REVEAL_RANGE = 1 - REVEAL_START
+
+      const spin = () => {
+        animId = requestAnimationFrame(spin)
+        t += 0.006
+        if (!bfg) return
+
+        if (bfgGrabbedRef.current) {
+          rotY += (bfgManualRotYRef.current - rotY) * 0.1
+        } else {
+          rotY += 0.008
+          bfgManualRotYRef.current = rotY
+        }
+
+        bfg.rotation.y = rotY
+        bfg.position.y = 0.1 + Math.sin(t * 1.2) * 0.08
+
+
+        const dp = darknessProgressRef.current
+        const targetOpacity = dp < REVEAL_START
+          ? 0
+          : Math.min(1, (dp - REVEAL_START) / REVEAL_RANGE)
+
+        bfg.traverse((child) => {
+          const mesh = child as THREE.Mesh
+          if (!mesh.isMesh) return
+          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+          for (const m of mats) {
+            const mat = m as THREE.Material
+            mat.opacity += (targetOpacity - mat.opacity) * 0.028
+          }
+        })
+
+        // Pulse emissive glow — compound sine for organic plasma feel
+        const pulse = Math.max(0.15, 2.0 + Math.sin(t * 5) * 1.4 + Math.sin(t * 13) * 0.6)
+        for (const mat of emissiveMats) {
+          mat.emissiveIntensity = pulse
+        }
+      }
+      spin()
+    })
+
+    return () => {
+      cancelAnimationFrame(animId)
+      if (bfg) scene.remove(bfg)
+      dracoLoader.dispose()
+    }
+  }, [showBfg])
 
   return (
     <canvas

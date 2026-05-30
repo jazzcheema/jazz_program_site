@@ -5,7 +5,9 @@ import CarpetScene from "./CarpetScene";
 import CloudsPage from "./CloudsPage";
 import SandPage from "./SandPage";
 import CVPage from "./CVPage";
-import GridMouseTrail from "./GridMouseTrail";
+import GridMouseTrail from "./GridMouseTrail"
+
+const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','a','b','Enter']
 
 export default function SceneWrapper() {
   const [reached, setReached] = useState(false);
@@ -14,7 +16,16 @@ export default function SceneWrapper() {
   const [flashing, setFlashing] = useState(false);
   const [showMobileGate, setShowMobileGate] = useState(false);
   const [gateVisible, setGateVisible] = useState(false);
+  const [bfgUnlocked, setBfgUnlocked] = useState(false);
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const [audioVolume, setAudioVolume] = useState(0.58);
+  const [audioTime, setAudioTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [audioControlOpen, setAudioControlOpen] = useState(false);
   const homeRoomRef = useRef<HTMLDivElement>(null);
+  const konamiProgress = useRef(0);
+  const bfgFlashRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     const isMobile = window.innerWidth < 768 && "ontouchstart" in window;
@@ -31,6 +42,99 @@ export default function SceneWrapper() {
       };
     }
   }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === KONAMI[konamiProgress.current]) {
+        konamiProgress.current++
+        if (konamiProgress.current === KONAMI.length) {
+          setBfgUnlocked(true)
+          konamiProgress.current = 0
+        }
+      } else {
+        konamiProgress.current = e.key === KONAMI[0] ? 1 : 0
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  useEffect(() => {
+    if (!bfgUnlocked) return
+    const el = bfgFlashRef.current
+    if (!el) return
+    // Power-surge flicker: three bursts of decreasing intensity
+    const seq: [number, number][] = [
+      [280,  1.0],
+      [370,  0],
+      [460,  0.62],
+      [520,  0],
+      [580,  0.28],
+      [650,  0],
+    ]
+    const timers = seq.map(([delay, opacity]) =>
+      setTimeout(() => { el.style.opacity = String(opacity) }, delay)
+    )
+    return () => timers.forEach(clearTimeout)
+  }, [bfgUnlocked])
+
+  // Lazy-load audio + auto-play + auto-expand pill after BFG reveal
+  useEffect(() => {
+    if (!bfgUnlocked) return
+    const audio = audioRef.current
+    if (!audio) return
+    audio.src = '/audio/muslimgauze.mp3'
+    audio.load()
+    audio.play().then(() => setAudioPlaying(true)).catch(() => setAudioPlaying(false))
+    const t = setTimeout(() => setAudioControlOpen(true), 3200)
+
+    let wasPlaying = false
+    const onVisibility = () => {
+      if (document.hidden) {
+        wasPlaying = !audio.paused
+        if (wasPlaying) audio.pause()
+      } else {
+        if (wasPlaying) audio.play().then(() => setAudioPlaying(true)).catch(() => {})
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      clearTimeout(t)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [bfgUnlocked])
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    audio.volume = audioVolume
+  }, [audioVolume])
+
+  const toggleAudio = () => {
+    const audio = audioRef.current
+    if (!audio) return
+    if (audio.paused) {
+      audio.play().then(() => setAudioPlaying(true)).catch(() => setAudioPlaying(false))
+    } else {
+      audio.pause()
+      setAudioPlaying(false)
+    }
+  }
+
+  const seekAudio = (value: number) => {
+    const audio = audioRef.current
+    if (!audio || !audioDuration) return
+    audio.currentTime = value
+    setAudioTime(value)
+  }
+
+  const formatAudioTime = (seconds: number) => {
+    if (!Number.isFinite(seconds)) return "0:00"
+    const m = Math.floor(seconds / 60)
+    const s = Math.floor(seconds % 60).toString().padStart(2, "0")
+    return `${m}:${s}`
+  }
 
   useEffect(() => {
     if (reached || reachedSand || reachedBooks) return;
@@ -195,22 +299,92 @@ export default function SceneWrapper() {
     <div
       ref={homeRoomRef}
       className="home-room w-dvw h-dvh overflow-hidden relative"
-      style={{ width: "100dvw", height: "100dvh", background: "#e2deda" }}
+      style={{
+        width: "100dvw",
+        height: "100dvh",
+        background: bfgUnlocked ? "#080906" : "#e2deda",
+        transition: "background 2.8s ease",
+      }}
     >
-      <GridMouseTrail />
+      <GridMouseTrail eerie={bfgUnlocked} />
 
       <div className="absolute inset-0">
         <CarpetScene
           onReachClouds={handleReachClouds}
           onReachSandcastle={handleReachSandcastle}
           onReachBooks={handleReachBooks}
+          showBfg={bfgUnlocked}
         />
       </div>
+
+      {/* BFG audio pill */}
+      {bfgUnlocked && (
+        <div
+          className="sand-audio-control bfg-audio-control"
+          data-expanded={audioControlOpen ? "true" : "false"}
+          data-ready="true"
+          style={{ zIndex: 70, cursor: "pointer" }}
+          onClick={() => setAudioControlOpen(o => !o)}
+        >
+          <audio
+            ref={audioRef}
+            loop
+            onPlay={() => setAudioPlaying(true)}
+            onPause={() => setAudioPlaying(false)}
+            onTimeUpdate={(e) => setAudioTime(e.currentTarget.currentTime)}
+            onLoadedMetadata={(e) => setAudioDuration(e.currentTarget.duration)}
+          />
+          <span className="sand-audio-seal" aria-hidden="true">×</span>
+          <div className="sand-audio-strip">
+            <button
+              className="sand-audio-toggle"
+              type="button"
+              aria-label={audioPlaying ? "Pause audio" : "Play audio"}
+              onClick={(e) => { e.stopPropagation(); toggleAudio() }}
+            >
+              <span className={audioPlaying ? "sand-audio-pause-icon" : "sand-audio-play-icon"} aria-hidden="true" />
+            </button>
+            <span className="sand-audio-time">
+              {formatAudioTime(audioTime)} / {formatAudioTime(audioDuration)}
+            </span>
+            <input
+              className="sand-audio-progress"
+              type="range"
+              min="0"
+              max={audioDuration || 0}
+              step="0.1"
+              value={audioDuration ? Math.min(audioTime, audioDuration) : 0}
+              aria-label="Audio position"
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => seekAudio(Number(e.target.value))}
+            />
+            <span className="sand-audio-speaker" aria-hidden="true" />
+            <input
+              className="sand-audio-volume"
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={audioVolume}
+              aria-label="Audio volume"
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => { e.stopPropagation(); setAudioVolume(Number(e.target.value)) }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* White flash on reach */}
       <div
         className="fixed inset-0 pointer-events-none transition-opacity duration-300"
         style={{ background: "#ffffff", opacity: flashing ? 1 : 0, zIndex: 50 }}
+      />
+
+      {/* BFG power-surge flicker */}
+      <div
+        ref={bfgFlashRef}
+        className="fixed inset-0 pointer-events-none"
+        style={{ background: "#ffffff", opacity: 0, zIndex: 60 }}
       />
     </div>
   );
